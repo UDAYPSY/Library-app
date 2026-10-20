@@ -149,6 +149,7 @@ class StudentInfo {
   final DateTime? feeDueDate;
   final DateTime? joinedAt;
   final int monthlyFee;
+  final String paymentMode;
 
   const StudentInfo({
     required this.id,
@@ -160,6 +161,7 @@ class StudentInfo {
     this.feeDueDate,
     this.joinedAt,
     this.monthlyFee = 500,
+    this.paymentMode = 'UPI',
   });
 
   factory StudentInfo.fromFirestore(String id, Map<String, dynamic> data) {
@@ -179,6 +181,57 @@ class StudentInfo {
       feeDueDate: parseDate(data['fee_due_date']),
       joinedAt: parseDate(data['joined_at']),
       monthlyFee: (data['monthly_fee'] as num?)?.toInt() ?? 500,
+      paymentMode: (data['payment_mode'] as String?) ?? 'UPI',
+    );
+  }
+}
+
+class ExpenseItem {
+  final String id;
+  final String title;
+  final String category;
+  final int amount;
+  final DateTime date;
+  final String paymentMode;
+  final String note;
+
+  const ExpenseItem({
+    required this.id,
+    required this.title,
+    required this.category,
+    required this.amount,
+    required this.date,
+    this.paymentMode = 'Cash',
+    this.note = '',
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'category': category,
+      'amount': amount,
+      'date': Timestamp.fromDate(date),
+      'payment_mode': paymentMode,
+      'note': note,
+    };
+  }
+
+  factory ExpenseItem.fromFirestore(String id, Map<String, dynamic> data) {
+    DateTime parseDate(dynamic val) {
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      return DateTime.now();
+    }
+
+    return ExpenseItem(
+      id: id,
+      title: (data['title'] as String?) ?? 'Expense',
+      category: (data['category'] as String?) ?? 'General',
+      amount: (data['amount'] as num?)?.toInt() ?? 0,
+      date: parseDate(data['date']),
+      paymentMode: (data['payment_mode'] as String?) ?? 'Cash',
+      note: (data['note'] as String?) ?? '',
     );
   }
 }

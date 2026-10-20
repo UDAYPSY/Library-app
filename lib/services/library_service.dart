@@ -35,11 +35,14 @@ class LibraryService {
   // In-memory mock fallback state
   static late List<SeatInfo> _mockSeats;
   static final List<StudentInfo> _mockStudents = [];
+  static final List<ExpenseItem> _mockExpenses = [];
 
   static final StreamController<List<SeatInfo>> _mockSeatsController =
       StreamController<List<SeatInfo>>.broadcast();
   static final StreamController<List<StudentInfo>> _mockStudentsController =
       StreamController<List<StudentInfo>>.broadcast();
+  static final StreamController<List<ExpenseItem>> _mockExpensesController =
+      StreamController<List<ExpenseItem>>.broadcast();
 
   bool _initialized = false;
 
@@ -115,6 +118,67 @@ class LibraryService {
     }
   }
 
+  // Real-time expenses stream
+  Stream<List<ExpenseItem>> streamExpenses() {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      return _db
+          .collection('expenses')
+          .orderBy('date', descending: true)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((d) => ExpenseItem.fromFirestore(d.id, d.data()))
+            .toList();
+      });
+    } else {
+      Timer.run(() {
+        if (!_mockExpensesController.isClosed) {
+          _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+        }
+      });
+      return _mockExpensesController.stream;
+    }
+  }
+
+  // Add Expense
+  Future<void> addExpense({
+    required String title,
+    required String category,
+    required int amount,
+    required DateTime date,
+    String paymentMode = 'Cash',
+    String note = '',
+  }) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      final docRef = _db.collection('expenses').doc();
+      await docRef.set({
+        'id': docRef.id,
+        'title': title,
+        'category': category,
+        'amount': amount,
+        'date': Timestamp.fromDate(date),
+        'payment_mode': paymentMode,
+        'note': note,
+      });
+    } else {
+      _mockExpenses.insert(
+        0,
+        ExpenseItem(
+          id: 'exp_${DateTime.now().millisecondsSinceEpoch}',
+          title: title,
+          category: category,
+          amount: amount,
+          date: date,
+          paymentMode: paymentMode,
+          note: note,
+        ),
+      );
+      _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+    }
+  }
+
   // Atomic Seat Assignment Transaction
   Future<void> assignSeatAndRegisterStudent({
     required int seatNumber,
@@ -123,6 +187,7 @@ class LibraryService {
     required String shift,
     required String deviceUserId,
     int feeAmount = 500,
+    String paymentMode = 'UPI',
   }) async {
     ensureInitialized();
     final now = DateTime.now();
@@ -154,6 +219,7 @@ class LibraryService {
           'status': 'ACTIVE',
           'joined_at': Timestamp.fromDate(now),
           'monthly_fee': feeAmount,
+          'payment_mode': paymentMode,
         });
 
         // 2. Lock Seat
@@ -179,6 +245,7 @@ class LibraryService {
           'date': Timestamp.fromDate(now),
           'valid_until': Timestamp.fromDate(validUntil),
           'collected_by': deviceUserId,
+          'payment_mode': paymentMode,
         });
       });
     } else {
@@ -208,6 +275,7 @@ class LibraryService {
             feeDueDate: validUntil,
             joinedAt: now,
             monthlyFee: feeAmount,
+            paymentMode: paymentMode,
           ),
         );
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
@@ -258,6 +326,7 @@ class LibraryService {
               feeDueDate: s.feeDueDate,
               joinedAt: s.joinedAt,
               monthlyFee: s.monthlyFee,
+              paymentMode: s.paymentMode,
             );
           }
         }

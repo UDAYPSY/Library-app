@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../models/library_models.dart';
 import '../services/library_service.dart';
+import 'analytics/financial_analytics_screen.dart';
 import 'login_screen.dart';
 
 class MainHubScreen extends StatefulWidget {
@@ -18,6 +19,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
   int _currentTabIndex = 0;
   bool _isModernMode = false;
 
+  void _openFinancialAnalytics() {
+    setState(() => _currentTabIndex = 4); // Jump to Analytics tab
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,7 +35,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
             _buildStudentsTab(),
             _buildSeatsTab(),
             _buildPaymentsTab(),
-            _buildAnalyticsTab(),
+            const FinancialAnalyticsScreen(isStandalone: false),
             _buildSettingsTab(),
           ],
         ),
@@ -40,14 +45,13 @@ class _MainHubScreenState extends State<MainHubScreen> {
   }
 
   // -------------------------------------------------------------
-  // TAB 1: HOME (Image 11)
+  // TAB 1: HOME (Image 1)
   // -------------------------------------------------------------
   Widget _buildHomeTab() {
     final profile = _service.profile;
     final adminName = profile.adminName.isNotEmpty ? profile.adminName : 'Nivi';
     final avatarLetter = adminName.isNotEmpty ? adminName[0].toUpperCase() : 'N';
 
-    // Time-based greeting
     final hour = DateTime.now().hour;
     final greeting = (hour < 12)
         ? 'Good Morning'
@@ -73,7 +77,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top Greeting & Avatar Row (Image 11)
+                  // Top Greeting & Avatar Row (Image 1)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -99,7 +103,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           ),
                         ],
                       ),
-                      // Avatar Card with Star (Image 11)
+                      // Avatar Card with Star (Image 1)
                       Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -144,7 +148,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   const SizedBox(height: 18),
 
-                  // Pill Switcher: Classic vs Modern (Image 11)
+                  // Pill Switcher: Classic vs Modern (Image 1)
                   Container(
                     width: 200,
                     height: 42,
@@ -222,76 +226,75 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Hero Card: Library Today (Image 11)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.heroGradient,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x330D9488),
-                          blurRadius: 14,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // LIVE STATUS badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.18),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.show_chart_rounded, size: 14, color: Colors.white),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      'LIVE STATUS',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Library Today',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$occupiedSeats active • ₹$totalEarnings earned today',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.85),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                  // Hero Card: Library Today -> Navigates to Financial Analytics (Image 1)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: _openFinancialAnalytics,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.heroGradient,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x330D9488),
+                            blurRadius: 14,
+                            offset: Offset(0, 6),
                           ),
-                        ),
-                        // Right Arrow Button (Image 11)
-                        InkWell(
-                          onTap: () => setState(() => _currentTabIndex = 2), // Jump to Seats
-                          child: Container(
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.show_chart_rounded, size: 14, color: Colors.white),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'LIVE STATUS',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Library Today',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$occupiedSeats active • ₹$totalEarnings earned today',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.85),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
                             width: 44,
                             height: 44,
                             decoration: const BoxDecoration(
@@ -304,13 +307,13 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               size: 20,
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 26),
 
-                  // Section Header: Library Overview (Image 11)
+                  // Section Header: Library Overview (Image 1)
                   const Text(
                     'Library Overview',
                     style: TextStyle(
@@ -321,7 +324,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // 2x2 Metric Grid (Image 11)
+                  // 2x2 Metric Grid (Image 1)
                   Row(
                     children: [
                       Expanded(
@@ -371,7 +374,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   const SizedBox(height: 26),
 
-                  // Section Header: Quick Actions (Image 11)
+                  // Section Header: Quick Actions (Image 1)
                   const Text(
                     'Quick Actions',
                     style: TextStyle(
@@ -382,7 +385,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Horizontal Action Cards (Image 11)
+                  // Horizontal Action Cards (Image 1)
                   SizedBox(
                     height: 96,
                     child: ListView(
@@ -795,6 +798,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
     final phoneCtrl = TextEditingController();
     String shift = _service.shifts.isNotEmpty ? _service.shifts.first.name : 'Full Day';
     int fee = _service.shifts.isNotEmpty ? _service.shifts.first.monthlyFee : 500;
+    String paymentMode = 'UPI';
 
     showModalBottomSheet(
       context: context,
@@ -825,19 +829,36 @@ class _MainHubScreenState extends State<MainHubScreen> {
                 decoration: const InputDecoration(labelText: 'WhatsApp Phone Number', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: shift,
-                items: _service.shifts.map((s) => DropdownMenuItem(value: s.name, child: Text('${s.name} (₹${s.monthlyFee})'))).toList(),
-                onChanged: (v) {
-                  if (v != null) {
-                    final found = _service.shifts.firstWhere((s) => s.name == v);
-                    setModalState(() {
-                      shift = v;
-                      fee = found.monthlyFee;
-                    });
-                  }
-                },
-                decoration: const InputDecoration(labelText: 'Select Shift', border: OutlineInputBorder()),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: shift,
+                      items: _service.shifts.map((s) => DropdownMenuItem(value: s.name, child: Text('${s.name} (₹${s.monthlyFee})'))).toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          final found = _service.shifts.firstWhere((s) => s.name == v);
+                          setModalState(() {
+                            shift = v;
+                            fee = found.monthlyFee;
+                          });
+                        }
+                      },
+                      decoration: const InputDecoration(labelText: 'Select Shift', border: OutlineInputBorder()),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: paymentMode,
+                      items: ['UPI', 'Cash']
+                          .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                          .toList(),
+                      onChanged: (v) => setModalState(() => paymentMode = v ?? paymentMode),
+                      decoration: const InputDecoration(labelText: 'Payment Mode', border: OutlineInputBorder()),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               SizedBox(
@@ -855,14 +876,15 @@ class _MainHubScreenState extends State<MainHubScreen> {
                       shift: shift,
                       deviceUserId: _service.profile.adminName,
                       feeAmount: fee,
+                      paymentMode: paymentMode,
                     );
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Student assigned to S-$seatNum & ₹$fee fee collected!')),
+                        SnackBar(content: Text('Student assigned to S-$seatNum & ₹$fee fee collected via $paymentMode!')),
                       );
                     }
                   },
-                  child: Text('Confirm & Collect ₹$fee', style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  child: Text('Confirm & Collect ₹$fee ($paymentMode)', style: const TextStyle(color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],
@@ -951,7 +973,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text('Seat S-${st.seatNumber ?? "None"} • ${st.shift}', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                              Text('Seat S-${st.seatNumber ?? "None"} • ${st.shift} (${st.paymentMode})', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
                             ],
                           ),
                           Text('₹${st.monthlyFee}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.successGreen)),
@@ -961,65 +983,6 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   },
                 ),
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // -------------------------------------------------------------
-  // TAB 5: ANALYTICS
-  // -------------------------------------------------------------
-  Widget _buildAnalyticsTab() {
-    return StreamBuilder<List<SeatInfo>>(
-      stream: _service.streamSeats(),
-      builder: (context, snapshot) {
-        final seats = snapshot.data ?? [];
-        final occupied = seats.where((s) => s.isOccupied).length;
-        final total = seats.isNotEmpty ? seats.length : 35;
-        final occupancyRate = ((occupied / total) * 100).toStringAsFixed(1);
-
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Performance Analytics', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-                ),
-                child: Column(
-                  children: [
-                    Text('$occupancyRate%', style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w900, color: AppColors.primaryTeal)),
-                    const SizedBox(height: 4),
-                    const Text('Occupancy Rate', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textNavy)),
-                    const SizedBox(height: 4),
-                    Text('$occupied of $total seats filled', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text('Sections Breakdown', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-              const SizedBox(height: 10),
-              ..._service.sections.map((sec) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(sec.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text('${sec.totalSeats} seats capacity', style: const TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  )),
             ],
           ),
         );
@@ -1078,7 +1041,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
   }
 
   // -------------------------------------------------------------
-  // 6-ITEM BOTTOM NAVIGATION BAR (Image 11)
+  // 6-ITEM BOTTOM NAVIGATION BAR (Image 1 & 2)
   // -------------------------------------------------------------
   Widget _buildBottomNavigationBar() {
     return Container(
