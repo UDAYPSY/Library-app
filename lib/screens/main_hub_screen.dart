@@ -5,6 +5,7 @@ import '../constants/app_colors.dart';
 import '../models/library_models.dart';
 import '../services/library_service.dart';
 import 'analytics/financial_analytics_screen.dart';
+import 'students/student_directory_screen.dart';
 import 'login_screen.dart';
 
 class MainHubScreen extends StatefulWidget {
@@ -18,9 +19,17 @@ class _MainHubScreenState extends State<MainHubScreen> {
   final LibraryService _service = LibraryService();
   int _currentTabIndex = 0;
   bool _isModernMode = false;
+  String _studentFilter = 'RECENT';
 
   void _openFinancialAnalytics() {
     setState(() => _currentTabIndex = 4); // Jump to Analytics tab
+  }
+
+  void _openStudentsWithFilter(String filter) {
+    setState(() {
+      _studentFilter = filter;
+      _currentTabIndex = 1; // Jump to Students Directory tab
+    });
   }
 
   @override
@@ -32,7 +41,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
           index: _currentTabIndex,
           children: [
             _buildHomeTab(),
-            _buildStudentsTab(),
+            StudentDirectoryScreen(
+              key: ValueKey(_studentFilter),
+              initialStatusFilter: _studentFilter,
+            ),
             _buildSeatsTab(),
             _buildPaymentsTab(),
             const FinancialAnalyticsScreen(isStandalone: false),
@@ -334,6 +346,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           iconColor: AppColors.activeGreenIcon,
                           value: '$activeStudents',
                           label: 'ACTIVE',
+                          onTap: () => _openStudentsWithFilter('ACTIVE'),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -344,6 +357,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           iconColor: AppColors.todayPurpleIcon,
                           value: '₹$totalEarnings',
                           label: 'TODAY',
+                          onTap: _openFinancialAnalytics,
                         ),
                       ),
                     ],
@@ -358,6 +372,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           iconColor: AppColors.monthlyAmberIcon,
                           value: '₹$totalEarnings',
                           label: 'MONTHLY',
+                          onTap: _openFinancialAnalytics,
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -368,6 +383,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           iconColor: AppColors.totalBlueIcon,
                           value: '${_service.totalSeatsCount}',
                           label: 'TOTAL',
+                          onTap: () => setState(() => _currentTabIndex = 2),
                         ),
                       ),
                     ],
@@ -435,49 +451,54 @@ class _MainHubScreenState extends State<MainHubScreen> {
     required Color iconColor,
     required String value,
     required String label,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(10),
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
             ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textNavy,
+            const SizedBox(height: 14),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textNavy,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
-              color: AppColors.textMuted,
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+                color: AppColors.textMuted,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
