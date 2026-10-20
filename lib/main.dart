@@ -1,73 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'constants/app_colors.dart';
 import 'firebase_options.dart';
-import 'screens/dashboard_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/library_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  bool isFirebaseReady = false;
-  String? firebaseError;
+  // Initialize service in-memory baseline
+  LibraryService().ensureInitialized();
 
+  // Safe Firebase Initialization
   try {
     if (DefaultFirebaseOptions.isConfigured) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      isFirebaseReady = true;
     } else {
-      // Try initializing with native configuration (google-services.json) if present
       try {
         await Firebase.initializeApp();
-        isFirebaseReady = true;
       } catch (_) {
-        // Safe fallback: project credentials not yet supplied in firebase_options.dart
-        firebaseError =
-            'Firebase credentials not yet configured. Running in preview mode. Update lib/firebase_options.dart with your Firebase project keys to enable cloud sync.';
+        debugPrint('Running in high-fidelity preview mode.');
       }
     }
   } catch (e) {
-    firebaseError = e.toString();
+    debugPrint('Firebase init note: $e');
   }
 
-  runApp(LibraryApp(
-    isFirebaseReady: isFirebaseReady,
-    firebaseError: firebaseError,
-  ));
+  runApp(const TrackMyLibraryApp());
 }
 
-class LibraryApp extends StatelessWidget {
-  final bool isFirebaseReady;
-  final String? firebaseError;
-
-  const LibraryApp({
-    super.key,
-    this.isFirebaseReady = false,
-    this.firebaseError,
-  });
+class TrackMyLibraryApp extends StatelessWidget {
+  const TrackMyLibraryApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Library Seat Manager',
+      title: 'Track My Library',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        scaffoldBackgroundColor: AppColors.scaffoldBg,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4F46E5),
-          brightness: Brightness.light,
+          seedColor: AppColors.primaryTeal,
+          primary: AppColors.primaryTeal,
+          secondary: AppColors.mintAccent,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        fontFamily: 'Roboto',
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF1E293B),
           elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.textNavy,
         ),
       ),
-      home: DashboardScreen(
-        isFirebaseReady: isFirebaseReady,
-        firebaseError: firebaseError,
-      ),
+      home: const LoginScreen(),
     );
   }
 }

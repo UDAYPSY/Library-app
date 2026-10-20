@@ -1,85 +1,39 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
-
-class SeatInfo {
-  final int seatNumber;
-  final bool isOccupied;
-  final String studentName;
-  final String studentId;
-  final String shift;
-
-  const SeatInfo({
-    required this.seatNumber,
-    this.isOccupied = false,
-    this.studentName = '',
-    this.studentId = '',
-    this.shift = '',
-  });
-
-  factory SeatInfo.fromMap(int seatNumber, Map<String, dynamic>? data) {
-    if (data == null) {
-      return SeatInfo(seatNumber: seatNumber);
-    }
-    return SeatInfo(
-      seatNumber: (data['seat_number'] as num?)?.toInt() ?? seatNumber,
-      isOccupied: data['is_occupied'] == true,
-      studentName: (data['student_name'] as String?) ?? '',
-      studentId: (data['student_id'] as String?) ?? '',
-      shift: (data['shift'] as String?) ?? 'Full Day',
-    );
-  }
-}
-
-class StudentInfo {
-  final String id;
-  final String name;
-  final String phone;
-  final int? seatNumber;
-  final String shift;
-  final String status;
-  final DateTime? feeDueDate;
-  final DateTime? joinedAt;
-
-  const StudentInfo({
-    required this.id,
-    required this.name,
-    required this.phone,
-    this.seatNumber,
-    this.shift = 'Full Day',
-    this.status = 'ACTIVE',
-    this.feeDueDate,
-    this.joinedAt,
-  });
-
-  factory StudentInfo.fromFirestore(String id, Map<String, dynamic> data) {
-    DateTime? parseDate(dynamic val) {
-      if (val is Timestamp) return val.toDate();
-      if (val is String) return DateTime.tryParse(val);
-      return null;
-    }
-
-    return StudentInfo(
-      id: id,
-      name: (data['name'] as String?) ?? '',
-      phone: (data['phone'] as String?) ?? '',
-      seatNumber: (data['seat_number'] as num?)?.toInt(),
-      shift: (data['shift'] as String?) ?? 'Full Day',
-      status: (data['status'] as String?) ?? 'ACTIVE',
-      feeDueDate: parseDate(data['fee_due_date']),
-      joinedAt: parseDate(data['joined_at']),
-    );
-  }
-}
+import '../models/library_models.dart';
 
 class LibraryService {
-  static const int totalSeatsCount = 50;
+  // Singleton pattern for centralized app state
+  static final LibraryService _instance = LibraryService._internal();
+  factory LibraryService() => _instance;
+  LibraryService._internal();
 
-  // In-memory mock fallback state for offline preview mode
-  static final List<SeatInfo> _mockSeats = List.generate(
-    totalSeatsCount,
-    (index) => SeatInfo(seatNumber: index + 1),
-  );
+  // Active configuration models
+  LibraryProfile profile = LibraryProfile();
+  List<SectionConfig> sections = [
+    SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
+  ];
+  List<ShiftConfig> shifts = [
+    ShiftConfig(
+      id: 'shift_1',
+      name: 'Full Day',
+      startsAt: '06:00 AM',
+      endsAt: '10:00 PM',
+      monthlyFee: 500,
+    ),
+  ];
+
+  int get totalSeatsCount {
+    int total = 0;
+    for (var s in sections) {
+      total += s.totalSeats;
+    }
+    return total > 0 ? total : 35;
+  }
+
+  // In-memory mock fallback state
+  static late List<SeatInfo> _mockSeats;
   static final List<StudentInfo> _mockStudents = [];
 
   static final StreamController<List<SeatInfo>> _mockSeatsController =
@@ -87,14 +41,32 @@ class LibraryService {
   static final StreamController<List<StudentInfo>> _mockStudentsController =
       StreamController<List<StudentInfo>>.broadcast();
 
-  bool get isFirebaseConnected => Firebase.apps.isNotEmpty;
+  bool _initialized = false;
 
-  FirebaseFirestore get _db {
-    return FirebaseFirestore.instance;
+  void ensureInitialized() {
+    if (_initialized) return;
+    _mockSeats = List.generate(
+      totalSeatsCount,
+      (index) => SeatInfo(seatNumber: index + 1),
+    );
+    _initialized = true;
   }
+
+  void updateSectionsAndRebuildSeats(List<SectionConfig> newSections) {
+    sections = newSections;
+    _mockSeats = List.generate(
+      totalSeatsCount,
+      (index) => SeatInfo(seatNumber: index + 1),
+    );
+    _mockSeatsController.add(List.unmodifiable(_mockSeats));
+  }
+
+  bool get isFirebaseConnected => Firebase.apps.isNotEmpty;
+  FirebaseFirestore get _db => FirebaseFirestore.instance;
 
   // Real-time seat stream (Cloud Firestore or In-Memory Demo)
   Stream<List<SeatInfo>> streamSeats() {
+    ensureInitialized();
     if (isFirebaseConnected) {
       return _db.collection('seats').snapshots().map((snapshot) {
         final seatMap = <int, SeatInfo>{};
@@ -111,7 +83,6 @@ class LibraryService {
         });
       });
     } else {
-      // Return stream with initial sync
       Timer.run(() {
         if (!_mockSeatsController.isClosed) {
           _mockSeatsController.add(List.unmodifiable(_mockSeats));
@@ -123,6 +94,7 @@ class LibraryService {
 
   // Real-time student list stream
   Stream<List<StudentInfo>> streamStudents() {
+    ensureInitialized();
     if (isFirebaseConnected) {
       return _db
           .collection('students')
@@ -150,7 +122,9 @@ class LibraryService {
     required String phone,
     required String shift,
     required String deviceUserId,
+    int feeAmount = 500,
   }) async {
+    ensureInitialized();
     final now = DateTime.now();
     final validUntil = now.add(const Duration(days: 30));
 
@@ -179,6 +153,7 @@ class LibraryService {
           'fee_due_date': Timestamp.fromDate(validUntil),
           'status': 'ACTIVE',
           'joined_at': Timestamp.fromDate(now),
+          'monthly_fee': feeAmount,
         });
 
         // 2. Lock Seat
@@ -195,12 +170,12 @@ class LibraryService {
           SetOptions(merge: true),
         );
 
-        // 3. Log initial ₹500 fee
+        // 3. Log payment
         transaction.set(paymentDocRef, {
           'payment_id': paymentDocRef.id,
           'student_id': studentDocRef.id,
           'student_name': studentName,
-          'amount': 500,
+          'amount': feeAmount,
           'date': Timestamp.fromDate(now),
           'valid_until': Timestamp.fromDate(validUntil),
           'collected_by': deviceUserId,
@@ -232,6 +207,7 @@ class LibraryService {
             status: 'ACTIVE',
             feeDueDate: validUntil,
             joinedAt: now,
+            monthlyFee: feeAmount,
           ),
         );
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
@@ -242,6 +218,7 @@ class LibraryService {
 
   // Vacate Seat
   Future<void> vacateSeat(int seatNumber, String? studentId) async {
+    ensureInitialized();
     if (isFirebaseConnected) {
       final batch = _db.batch();
       final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
@@ -280,6 +257,7 @@ class LibraryService {
               status: 'INACTIVE',
               feeDueDate: s.feeDueDate,
               joinedAt: s.joinedAt,
+              monthlyFee: s.monthlyFee,
             );
           }
         }
