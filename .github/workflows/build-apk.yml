@@ -1,9 +1,14 @@
-name: Build Android APK
+name: Build Android APK and Web App
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -24,10 +29,14 @@ jobs:
           flutter-version: '3.24.x'
           channel: 'stable'
 
-      - name: Recreate Android Project Scaffolding
+      - name: Recreate Android and Web Platform Scaffolding
         run: |
-          # If android folder is missing native gradle wrappers, regenerate them
-          flutter create --org com.example.library_manager .
+          # Backup pubspec.yaml before scaffolding
+          cp pubspec.yaml pubspec.yaml.bak
+          # Recreate android and web platforms with explicit valid project-name
+          flutter create --org com.example.library_manager --project-name library_manager --platforms android,web .
+          # Restore project pubspec.yaml
+          cp pubspec.yaml.bak pubspec.yaml
 
       - name: Fetch Dependencies
         run: flutter pub get
@@ -35,8 +44,27 @@ jobs:
       - name: Compile Release APK
         run: flutter build apk --release
 
-      - name: Upload APK
+      - name: Compile Flutter Web
+        run: flutter build web --release --base-href "/Library-app/"
+
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: library-manager-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload Web Build Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+        continue-on-error: true
+
+  deploy-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true

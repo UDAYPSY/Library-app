@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/library_service.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final bool isFirebaseReady;
+  final String? firebaseError;
+
+  const DashboardScreen({
+    super.key,
+    this.isFirebaseReady = false,
+    this.firebaseError,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -13,65 +20,157 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final LibraryService _service = LibraryService();
   int _selectedTab = 0;
+  bool _dismissedBanner = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Digital Library Hub', style: TextStyle(fontWeight: FontWeight.bold)),
-        elevation: 0,
+        title: const Row(
+          children: [
+            Icon(Icons.local_library_rounded, color: Color(0xFF4F46E5)),
+            SizedBox(width: 8),
+            Text(
+              'Digital Library Hub',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 19,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+          ],
+        ),
+        elevation: 0.5,
         backgroundColor: Colors.white,
-        foregroundColor: Colors.indigo,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh data',
+            icon: const Icon(Icons.refresh, color: Color(0xFF4F46E5)),
             onPressed: () => setState(() {}),
-          )
+          ),
         ],
       ),
-      body: _selectedTab == 0 ? _buildSeatGridTab() : _buildStudentsListTab(),
+      body: Column(
+        children: [
+          if (!widget.isFirebaseReady && !_dismissedBanner) _buildDemoModeBanner(),
+          Expanded(
+            child: _selectedTab == 0
+                ? _buildSeatGridTab()
+                : _buildStudentsListTab(),
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
         onDestinationSelected: (idx) => setState(() => _selectedTab = idx),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Seats Map'),
-          NavigationDestination(icon: Icon(Icons.people_alt_rounded), label: 'Students'),
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_rounded),
+            label: 'Seats Map',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_alt_rounded),
+            label: 'Students',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDemoModeBanner() {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFFEF3C7),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Color(0xFFB45309), size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Preview Mode: To sync seats live across multiple devices, add your Firebase keys in lib/firebase_options.dart.',
+              style: TextStyle(
+                color: Color(0xFF92400E),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16, color: Color(0xFFB45309)),
+            onPressed: () => setState(() => _dismissedBanner = true),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildSeatGridTab() {
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<List<SeatInfo>>(
       stream: _service.streamSeats(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.cloud_off, size: 56, color: Colors.amber),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Unable to load seat data',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => setState(() {}),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final seatDocs = snapshot.data!.docs;
-        // Generate a 50-seat layout view
-        final totalSeats = 50;
-        final seatMap = {for (var doc in seatDocs) doc.get('seat_number'): doc};
-
-        int occupiedCount = seatDocs.where((d) => (d.data() as Map<String, dynamic>)['is_occupied'] == true).length;
+        final seats = snapshot.data!;
+        final totalSeats = seats.length;
+        final occupiedCount = seats.where((s) => s.isOccupied).length;
+        final vacantCount = totalSeats - occupiedCount;
 
         return Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              margin: const EdgeInsets.fromLTRB(14, 12, 14, 8),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 4,
+                    offset: Offset(0, 1),
+                  ),
+                ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _statItem('Total Seats', '$totalSeats', Colors.blueGrey),
-                  _statItem('Occupied', '$occupiedCount', Colors.redAccent),
-                  _statItem('Vacant', '${totalSeats - occupiedCount}', Colors.green),
+                  _statItem('Total Seats', '$totalSeats', const Color(0xFF64748B)),
+                  _statItem('Occupied', '$occupiedCount', const Color(0xFFEF4444)),
+                  _statItem('Vacant', '$vacantCount', const Color(0xFF10B981)),
                 ],
               ),
             ),
@@ -80,22 +179,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 padding: const EdgeInsets.all(12),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 5,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 0.95,
                 ),
                 itemCount: totalSeats,
                 itemBuilder: (context, index) {
-                  final seatNum = index + 1;
-                  final doc = seatMap[seatNum];
-                  final isOccupied = doc != null && (doc.data() as Map<String, dynamic>)['is_occupied'] == true;
-                  final studentName = isOccupied ? doc.get('student_name') ?? '' : '';
+                  final seat = seats[index];
+                  final isOccupied = seat.isOccupied;
 
-                  return GestureDetector(
-                    onTap: () => _handleSeatClick(seatNum, doc),
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _handleSeatClick(seat),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isOccupied ? Colors.red.shade100 : Colors.green.shade100,
-                        border: Border.all(color: isOccupied ? Colors.red : Colors.green, width: 1.5),
+                        color: isOccupied
+                            ? const Color(0xFFFEE2E2)
+                            : const Color(0xFFDCFCE7),
+                        border: Border.all(
+                          color: isOccupied
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF22C55E),
+                          width: 1.5,
+                        ),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -103,16 +209,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           Icon(
                             Icons.chair_alt,
-                            color: isOccupied ? Colors.red.shade700 : Colors.green.shade700,
-                            size: 24,
+                            color: isOccupied
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF16A34A),
+                            size: 22,
                           ),
-                          Text('S-$seatNum', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          if (isOccupied)
-                            Text(
-                              studentName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 9),
+                          const SizedBox(height: 2),
+                          Text(
+                            'S-${seat.seatNumber}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (isOccupied && seat.studentName.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                              child: Text(
+                                seat.studentName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                         ],
                       ),
@@ -130,39 +252,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _statItem(String title, String val, Color color) {
     return Column(
       children: [
-        Text(val, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-        Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(
+          val,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
       ],
     );
   }
 
-  void _handleSeatClick(int seatNum, DocumentSnapshot? doc) {
-    final isOccupied = doc != null && (doc.data() as Map<String, dynamic>)['is_occupied'] == true;
-
-    if (isOccupied) {
+  void _handleSeatClick(SeatInfo seat) {
+    if (seat.isOccupied) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('Seat $seatNum Details'),
-          content: Text('Student: ${doc.get('student_name')}\nShift: ${doc.get('shift')}'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Seat S-${seat.seatNumber} Details'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Student: ${seat.studentName}',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Text('Shift: ${seat.shift}'),
+              const SizedBox(height: 6),
+              const Text('Monthly Fee: ₹500 (Collected)',
+                  style: TextStyle(color: Colors.green)),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Close'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
               onPressed: () async {
                 Navigator.pop(ctx);
-                await _service.vacateSeat(seatNum, doc.get('student_id'));
+                try {
+                  await _service.vacateSeat(seat.seatNumber, seat.studentId);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Seat S-${seat.seatNumber} is now vacant.')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error vacating seat: $e')),
+                    );
+                  }
+                }
               },
-              child: const Text('Vacate Seat', style: TextStyle(color: Colors.white)),
+              child: const Text('Vacate Seat'),
             ),
           ],
         ),
       );
     } else {
-      _showRegistrationSheet(seatNum);
+      _showRegistrationSheet(seat.seatNumber);
     }
   }
 
@@ -170,99 +330,243 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     String shift = 'Full Day';
+    String? nameError;
+    String? phoneError;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Assign Seat S-$seatNum (Fee: ₹500/mo)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Student Full Name', border: OutlineInputBorder())),
-            const SizedBox(height: 10),
-            TextField(controller: phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'WhatsApp Phone Number', border: OutlineInputBorder())),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              value: shift,
-              items: ['Full Day', 'Morning (6AM - 2PM)', 'Evening (2PM - 10PM)']
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                  .toList(),
-              onChanged: (v) => shift = v ?? shift,
-              decoration: const InputDecoration(labelText: 'Select Shift', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-                onPressed: () async {
-                  if (nameCtrl.text.isEmpty || phoneCtrl.text.isEmpty) return;
-                  Navigator.pop(ctx);
-                  try {
-                    await _service.assignSeatAndRegisterStudent(
-                      seatNumber: seatNum,
-                      studentName: nameCtrl.text.trim(),
-                      phone: phoneCtrl.text.trim(),
-                      shift: shift,
-                      deviceUserId: 'Desk_Manager',
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student registered & ₹500 fee logged!')));
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (sheetContext, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Assign Seat S-$seatNum (Fee: ₹500/mo)',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Student Full Name',
+                  errorText: nameError,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.person),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'WhatsApp Phone Number',
+                  errorText: phoneError,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.phone),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: shift,
+                items: ['Full Day', 'Morning (6AM - 2PM)', 'Evening (2PM - 10PM)']
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    setModalState(() => shift = v);
                   }
                 },
-                child: const Text('Confirm & Collect ₹500', style: TextStyle(color: Colors.white, fontSize: 16)),
+                decoration: const InputDecoration(
+                  labelText: 'Select Shift',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.access_time),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    final phone = phoneCtrl.text.trim();
+
+                    bool hasErr = false;
+                    if (name.isEmpty) {
+                      setModalState(() => nameError = 'Please enter student name');
+                      hasErr = true;
+                    } else {
+                      setModalState(() => nameError = null);
+                    }
+
+                    if (phone.isEmpty || phone.length < 10) {
+                      setModalState(() => phoneError = 'Enter a valid 10-digit phone number');
+                      hasErr = true;
+                    } else {
+                      setModalState(() => phoneError = null);
+                    }
+
+                    if (hasErr) return;
+
+                    Navigator.pop(ctx);
+                    try {
+                      await _service.assignSeatAndRegisterStudent(
+                        seatNumber: seatNum,
+                        studentName: name,
+                        phone: phone,
+                        shift: shift,
+                        deviceUserId: 'Desk_Manager',
+                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Student registered & ₹500 fee logged!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(e.toString()),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text(
+                    'Confirm & Collect ₹500',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildStudentsListTab() {
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<List<StudentInfo>>(
       stream: _service.streamStudents(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final docs = snapshot.data!.docs;
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.cloud_off, size: 56, color: Colors.amber),
+                  const SizedBox(height: 12),
+                  const Text('Error loading student records'),
+                  const SizedBox(height: 6),
+                  Text('${snapshot.error}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+              ),
+            ),
+          );
+        }
 
-        if (docs.isEmpty) return const Center(child: Text('No registered students yet.'));
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final students = snapshot.data!;
+        if (students.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.person_outline, size: 64, color: Colors.grey),
+                SizedBox(height: 12),
+                Text(
+                  'No registered students yet.',
+                  style: TextStyle(color: Colors.grey, fontSize: 15),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Tap any vacant seat in the Seats Map to register.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final dateFormat = DateFormat('dd MMM yyyy');
 
         return ListView.builder(
-          itemCount: docs.length,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: students.length,
           itemBuilder: (context, idx) {
-            final s = docs[idx].data() as Map<String, dynamic>;
-            final seat = s['seat_number'] ?? 'None';
-            final phone = s['phone'] ?? '';
-            final name = s['name'] ?? '';
+            final s = students[idx];
+            final seatLabel = s.seatNumber != null ? 'S-${s.seatNumber}' : 'None';
+            final dueDateStr = s.feeDueDate != null ? dateFormat.format(s.feeDueDate!) : 'N/A';
 
             return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              elevation: 0.5,
+              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: Colors.indigo.shade50,
-                  child: Text('S-$seat', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.indigo)),
+                  backgroundColor: const Color(0xFFEEF2FF),
+                  child: Text(
+                    seatLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      color: Color(0xFF4F46E5),
+                    ),
+                  ),
                 ),
-                title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('Shift: ${s['shift']} | Status: ${s['status']}'),
+                title: Text(
+                  s.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 2),
+                    Text('Shift: ${s.shift} • Phone: ${s.phone}'),
+                    Text(
+                      'Renewal Due: $dueDateStr',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF059669),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
                 trailing: IconButton(
-                  icon: const Icon(Icons.message, color: Colors.green),
-                  onPressed: () async {
-                    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-                    final url = Uri.parse('https://wa.me/91$cleanPhone?text=Hello%20$name,%20your%20library%20monthly%20seat%20renewal%20fee%20of%20Rs.500%20is%20scheduled.');
-                    if (await canLaunchUrl(url)) launchUrl(url);
-                  },
+                  icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF22C55E)),
+                  tooltip: 'Send WhatsApp fee reminder',
+                  onPressed: () => _sendWhatsAppReminder(s.name, s.phone),
                 ),
               ),
             );
@@ -270,5 +574,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
     );
+  }
+
+  Future<void> _sendWhatsAppReminder(String name, String phone) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (cleanPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid student phone number')),
+      );
+      return;
+    }
+
+    final message =
+        'Hello $name, this is a reminder from Digital Library Hub that your monthly seat renewal fee of Rs.500 is scheduled. Please confirm renewal at the desk.';
+    final url = Uri.parse(
+      'https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(message)}',
+    );
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(url);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open WhatsApp: $e')),
+        );
+      }
+    }
   }
 }
