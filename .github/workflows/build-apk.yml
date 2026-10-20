@@ -11,7 +11,8 @@ permissions:
   id-token: write
 
 jobs:
-  build:
+  build-apk:
+    name: Build Android APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -29,29 +30,48 @@ jobs:
           flutter-version: '3.24.x'
           channel: 'stable'
 
-      - name: Recreate Android and Web Platform Scaffolding
+      - name: Scaffolding and Dependencies
         run: |
-          # Backup pubspec.yaml before scaffolding
           cp pubspec.yaml pubspec.yaml.bak
-          # Recreate android and web platforms with explicit valid project-name
-          flutter create --org com.example.library_manager --project-name library_manager --platforms android,web .
-          # Restore project pubspec.yaml
+          flutter create --org com.example.library_manager --project-name library_manager --platforms android .
           cp pubspec.yaml.bak pubspec.yaml
-
-      - name: Fetch Dependencies
-        run: flutter pub get
+          # Cloud Firestore requires Android minSdkVersion 21 or higher
+          echo "flutter.minSdkVersion=21" >> android/local.properties
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
+          flutter pub get
 
       - name: Compile Release APK
         run: flutter build apk --release
-
-      - name: Compile Flutter Web
-        run: flutter build web --release --base-href "/Library-app/"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: library-manager-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-web:
+    name: Build & Deploy Web App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.x'
+          channel: 'stable'
+
+      - name: Scaffolding and Dependencies
+        run: |
+          cp pubspec.yaml pubspec.yaml.bak
+          flutter create --org com.example.library_manager --project-name library_manager --platforms web .
+          cp pubspec.yaml.bak pubspec.yaml
+          flutter pub get
+
+      - name: Compile Flutter Web
+        run: flutter build web --release --base-href "/Library-app/"
 
       - name: Upload Web Build Artifact
         uses: actions/upload-pages-artifact@v3
@@ -60,7 +80,8 @@ jobs:
         continue-on-error: true
 
   deploy-pages:
-    needs: build
+    name: Deploy to GitHub Pages
+    needs: build-web
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
