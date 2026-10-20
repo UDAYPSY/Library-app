@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow staff and owner to read seat layouts and student lists
+    match /seats/{seatId} {
+      allow read: if true;
+      allow write: if true; // In production, replace with: if request.auth != null;
+    }
+
+    match /students/{studentId} {
+      allow read, create, update: if true;
+      // Prevent normal desk devices from deleting student archives
+      allow delete: if request.auth.token.role == 'owner';
+    }
+
+    match /payments/{paymentId} {
+      allow read, create: if true;
+      // Fee records are append-only; cannot be altered once collected
+      allow update, delete: if false;
+    }
+  }
+}
