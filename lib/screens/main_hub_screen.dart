@@ -5,6 +5,7 @@ import '../constants/app_colors.dart';
 import '../models/library_models.dart';
 import '../services/library_service.dart';
 import 'analytics/financial_analytics_screen.dart';
+import 'payments/revenue_screen.dart';
 import 'students/student_directory_screen.dart';
 import 'login_screen.dart';
 
@@ -20,6 +21,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
   int _currentTabIndex = 0;
   bool _isModernMode = false;
   String _studentFilter = 'RECENT';
+  String _paymentTimeFilter = 'MONTHLY';
 
   void _openFinancialAnalytics() {
     setState(() => _currentTabIndex = 4); // Jump to Analytics tab
@@ -29,6 +31,13 @@ class _MainHubScreenState extends State<MainHubScreen> {
     setState(() {
       _studentFilter = filter;
       _currentTabIndex = 1; // Jump to Students Directory tab
+    });
+  }
+
+  void _openRevenueScreen(String filter) {
+    setState(() {
+      _paymentTimeFilter = filter;
+      _currentTabIndex = 3; // Jump to Payments / Revenue tab (Image 2)
     });
   }
 
@@ -46,7 +55,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
               initialStatusFilter: _studentFilter,
             ),
             _buildSeatsTab(),
-            _buildPaymentsTab(),
+            RevenueScreen(
+              key: ValueKey(_paymentTimeFilter),
+              initialTimeFilter: _paymentTimeFilter,
+            ),
             const FinancialAnalyticsScreen(isStandalone: false),
             _buildSettingsTab(),
           ],
@@ -357,7 +369,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           iconColor: AppColors.todayPurpleIcon,
                           value: '₹$totalEarnings',
                           label: 'TODAY',
-                          onTap: _openFinancialAnalytics,
+                          onTap: () => _openRevenueScreen('TODAY'),
                         ),
                       ),
                     ],
@@ -372,7 +384,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           iconColor: AppColors.monthlyAmberIcon,
                           value: '₹$totalEarnings',
                           label: 'MONTHLY',
-                          onTap: _openFinancialAnalytics,
+                          onTap: () => _openRevenueScreen('MONTHLY'),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -383,7 +395,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           iconColor: AppColors.totalBlueIcon,
                           value: '${_service.totalSeatsCount}',
                           label: 'TOTAL',
-                          onTap: () => setState(() => _currentTabIndex = 2),
+                          onTap: () => _openStudentsWithFilter('RECENT'), // Opens Student Directory, same page as Active tab
                         ),
                       ),
                     ],
@@ -431,7 +443,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           ),
                           icon: Icons.receipt_long_rounded,
                           title: 'Fee Ledger',
-                          onTap: () => setState(() => _currentTabIndex = 3),
+                          onTap: () => _openRevenueScreen('MONTHLY'),
                         ),
                       ],
                     ),
@@ -936,80 +948,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
     }
   }
 
-  // -------------------------------------------------------------
-  // TAB 4: PAYMENTS
-  // -------------------------------------------------------------
-  Widget _buildPaymentsTab() {
-    return StreamBuilder<List<StudentInfo>>(
-      stream: _service.streamStudents(),
-      builder: (context, snapshot) {
-        final students = snapshot.data ?? [];
-        final totalCollected = students.fold<int>(0, (sum, s) => sum + s.monthlyFee);
 
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Fee Ledger & Receipts', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF0F766E), Color(0xFF14B8A6)]),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('TOTAL COLLECTED', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 6),
-                    Text('₹$totalCollected', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 4),
-                    Text('${students.length} recorded payments', style: const TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text('Recent Collections', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: students.length,
-                  itemBuilder: (ctx, i) {
-                    final st = students[i];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFF1F5F9)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text('Seat S-${st.seatNumber ?? "None"} • ${st.shift} (${st.paymentMode})', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                            ],
-                          ),
-                          Text('₹${st.monthlyFee}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.successGreen)),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   // -------------------------------------------------------------
   // TAB 6: SETTINGS

@@ -235,3 +235,66 @@ class ExpenseItem {
     );
   }
 }
+
+class PaymentTransaction {
+  final String id;
+  final String studentId;
+  final String studentName;
+  final String studentPhone;
+  final int? seatNumber;
+  final String shift;
+  final int amount;
+  final DateTime date;
+  final String paymentMode;
+  final String notes;
+
+  const PaymentTransaction({
+    required this.id,
+    this.studentId = '',
+    required this.studentName,
+    this.studentPhone = '',
+    this.seatNumber,
+    this.shift = 'Full Day',
+    required this.amount,
+    required this.date,
+    this.paymentMode = 'UPI',
+    this.notes = '',
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'payment_id': id,
+      'student_id': studentId,
+      'student_name': studentName,
+      'student_phone': studentPhone,
+      'seat_number': seatNumber,
+      'shift': shift,
+      'amount': amount,
+      'date': Timestamp.fromDate(date),
+      'payment_mode': paymentMode,
+      'notes': notes,
+    };
+  }
+
+  factory PaymentTransaction.fromFirestore(String id, Map<String, dynamic> data) {
+    DateTime parseDate(dynamic val) {
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      return DateTime.now();
+    }
+
+    return PaymentTransaction(
+      id: id,
+      studentId: (data['student_id'] as String?) ?? '',
+      studentName: (data['student_name'] as String?) ?? '',
+      studentPhone: (data['student_phone'] as String?) ?? '',
+      seatNumber: (data['seat_number'] as num?)?.toInt(),
+      shift: (data['shift'] as String?) ?? 'Full Day',
+      amount: (data['amount'] as num?)?.toInt() ?? 0,
+      date: parseDate(data['date']),
+      paymentMode: (data['payment_mode'] as String?) ?? 'UPI',
+      notes: (data['notes'] as String?) ?? (data['note'] as String?) ?? '',
+    );
+  }
+}
+
