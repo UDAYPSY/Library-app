@@ -21,8 +21,64 @@ class LibraryService {
       startsAt: '06:00 AM',
       endsAt: '10:00 PM',
       monthlyFee: 500,
+      isActive: true,
+      isSystemSlot: true,
+    ),
+    ShiftConfig(
+      id: 'shift_2',
+      name: '24 Hours',
+      startsAt: '12:00 AM',
+      endsAt: '11:59 PM',
+      monthlyFee: 1500,
+      isActive: false,
+      isSystemSlot: false,
+    ),
+    ShiftConfig(
+      id: 'shift_3',
+      name: 'Evening Shift',
+      startsAt: '02:00 PM',
+      endsAt: '10:00 PM',
+      monthlyFee: 600,
+      isActive: false,
+      isSystemSlot: false,
+    ),
+    ShiftConfig(
+      id: 'shift_4',
+      name: 'Morning Shift',
+      startsAt: '06:00 AM',
+      endsAt: '02:00 PM',
+      monthlyFee: 600,
+      isActive: false,
+      isSystemSlot: false,
+    ),
+    ShiftConfig(
+      id: 'shift_5',
+      name: 'Night Shift',
+      startsAt: '10:00 PM',
+      endsAt: '06:00 AM',
+      monthlyFee: 500,
+      isActive: false,
+      isSystemSlot: false,
     ),
   ];
+
+  void toggleShiftActive(String shiftId) {
+    final idx = shifts.indexWhere((s) => s.id == shiftId);
+    if (idx != -1) {
+      shifts[idx].isActive = !shifts[idx].isActive;
+    }
+  }
+
+  void updateShift(ShiftConfig updated) {
+    final idx = shifts.indexWhere((s) => s.id == updated.id);
+    if (idx != -1) {
+      shifts[idx] = updated;
+    }
+  }
+
+  void addShift(ShiftConfig newShift) {
+    shifts.add(newShift);
+  }
 
   int get totalSeatsCount {
     int total = 0;

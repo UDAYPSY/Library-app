@@ -5,7 +5,9 @@ import '../constants/app_colors.dart';
 import '../models/library_models.dart';
 import '../services/library_service.dart';
 import 'analytics/financial_analytics_screen.dart';
+import 'analytics/add_expense_sheet.dart';
 import 'payments/revenue_screen.dart';
+import 'shifts/shift_system_screen.dart';
 import 'students/add_student_wizard_screen.dart';
 import 'students/student_directory_screen.dart';
 import 'login_screen.dart';
@@ -455,7 +457,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           icon: Icons.receipt_long_rounded,
                           title: 'Log Expense',
                           subtitle: 'Track costs',
-                          onTap: () => _openRevenueScreen('MONTHLY'),
+                          onTap: () => showAddExpenseModal(context),
                         ),
                         const SizedBox(width: 12),
                         _quickActionCard(
@@ -622,42 +624,45 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         iconBg: const Color(0xFFEFF6FF),
                         iconColor: const Color(0xFF3B82F6),
                         label: 'Students',
-                        onTap: () => setState(() => _currentTabIndex = 1),
+                        onTap: () => setState(() => _currentTabIndex = 2), // Routes to Image 2 (Seats tab)
                       ),
                       _gridMenuItem(
                         icon: Icons.grid_view_rounded,
                         iconBg: const Color(0xFFECFEFF),
                         iconColor: const Color(0xFF06B6D4),
                         label: 'Seats',
-                        onTap: () => setState(() => _currentTabIndex = 2),
+                        onTap: () => setState(() => _currentTabIndex = 2), // Routes to Image 2 (Seats tab)
                       ),
                       _gridMenuItem(
                         icon: Icons.credit_card_rounded,
                         iconBg: const Color(0xFFF3E8FF),
                         iconColor: const Color(0xFFA855F7),
                         label: 'Payments',
-                        onTap: () => _openRevenueScreen('MONTHLY'),
+                        onTap: () => setState(() => _currentTabIndex = 3), // Routes to Image 3 (Revenue tab)
                       ),
                       _gridMenuItem(
                         icon: Icons.access_time_filled_rounded,
                         iconBg: const Color(0xFFFFF7ED),
                         iconColor: const Color(0xFFF97316),
                         label: 'Shifts',
-                        onTap: _showShiftsModal,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ShiftSystemScreen()),
+                        ), // Routes to Image 4 & 5 (Shift System)
                       ),
                       _gridMenuItem(
                         icon: Icons.bar_chart_rounded,
                         iconBg: const Color(0xFFFDF2F8),
                         iconColor: const Color(0xFFEC4899),
                         label: 'Analytics',
-                        onTap: _openFinancialAnalytics,
+                        onTap: _openFinancialAnalytics, // Routes to Image 6 (Financial Analytics tab)
                       ),
                       _gridMenuItem(
                         icon: Icons.assignment_ind_rounded,
                         iconBg: const Color(0xFFCCFBF1),
                         iconColor: const Color(0xFF0D9488),
                         label: 'Student ID',
-                        onTap: _showStudentIDModal,
+                        onTap: () => setState(() => _currentTabIndex = 1), // Routes to Image 7 (Students tab with Member ID)
                       ),
                     ],
                   ),

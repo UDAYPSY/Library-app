@@ -599,62 +599,120 @@ class _RevenueScreenState extends State<RevenueScreen> {
                             final dateStr = DateFormat('dd MMM yyyy').format(p.date);
                             final seatStr = p.seatNumber != null ? 'S-${p.seatNumber}' : 'Unallocated';
 
+                            final formattedPaidDate = DateFormat('dd-MMM-yyyy').format(p.date);
+                            final validUntilDate = DateFormat('dd-MMM-yyyy').format(p.date.add(const Duration(days: 30)));
+
                             return Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(14),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(18),
                                 border: Border.all(color: const Color(0xFFF1F5F9)),
                                 boxShadow: const [
-                                  BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(0, 1)),
+                                  BoxShadow(
+                                    color: Color(0x06000000),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
                                 ],
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.lightMint,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Center(
-                                      child: Icon(Icons.receipt_rounded, color: AppColors.primaryTeal, size: 22),
-                                    ),
+                                  // Top Row: Student Name & Amount (Image 3)
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        p.studentName.isNotEmpty ? p.studentName : 'Student',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppColors.textNavy,
+                                        ),
+                                      ),
+                                      Text(
+                                        '₹${p.amount}',
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppColors.primaryTeal,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          p.studentName,
+                                  const SizedBox(height: 6),
+
+                                  // Second Row: Paid on Date & Payment Mode Pill (Image 3)
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.access_time_rounded,
+                                            size: 14,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Paid on $formattedPaidDate',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF64748B),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF0F9FF),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFFBAE6FD)),
+                                        ),
+                                        child: Text(
+                                          p.paymentMode.toUpperCase(),
                                           style: const TextStyle(
-                                            fontSize: 15,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0284C7),
+                                            letterSpacing: 0.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  // Third Row: Validity Period Box (Image 3)
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.calendar_month_outlined,
+                                          size: 15,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '$formattedPaidDate — $validUntilDate',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
                                             color: AppColors.textNavy,
                                           ),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Seat $seatStr • ${p.shift} (${p.paymentMode})',
-                                          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          dateStr,
-                                          style: const TextStyle(fontSize: 11, color: AppColors.textSubtle),
-                                        ),
                                       ],
-                                    ),
-                                  ),
-                                  Text(
-                                    '+₹${p.amount}',
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.successGreen,
                                     ),
                                   ),
                                 ],

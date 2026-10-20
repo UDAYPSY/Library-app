@@ -77,6 +77,8 @@ class ShiftConfig {
   String startsAt;
   String endsAt;
   int monthlyFee;
+  bool isActive;
+  bool isSystemSlot;
 
   ShiftConfig({
     required this.id,
@@ -84,6 +86,8 @@ class ShiftConfig {
     required this.startsAt,
     required this.endsAt,
     this.monthlyFee = 500,
+    this.isActive = true,
+    this.isSystemSlot = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -93,6 +97,8 @@ class ShiftConfig {
       'starts_at': startsAt,
       'ends_at': endsAt,
       'monthly_fee': monthlyFee,
+      'is_active': isActive,
+      'is_system_slot': isSystemSlot,
     };
   }
 
@@ -103,6 +109,8 @@ class ShiftConfig {
       startsAt: map['starts_at'] ?? '06:00 AM',
       endsAt: map['ends_at'] ?? '10:00 PM',
       monthlyFee: (map['monthly_fee'] as num?)?.toInt() ?? 500,
+      isActive: map['is_active'] ?? true,
+      isSystemSlot: map['is_system_slot'] ?? false,
     );
   }
 }
