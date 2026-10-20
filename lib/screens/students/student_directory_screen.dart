@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import 'add_student_wizard_screen.dart';
 
 class StudentDirectoryScreen extends StatefulWidget {
   final String? initialStatusFilter;
@@ -637,7 +638,12 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                   right: 20,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
-                    onTap: _openAddMemberSheet,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AddStudentWizardScreen()),
+                      );
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       decoration: BoxDecoration(

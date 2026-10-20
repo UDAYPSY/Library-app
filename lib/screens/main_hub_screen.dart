@@ -6,6 +6,7 @@ import '../models/library_models.dart';
 import '../services/library_service.dart';
 import 'analytics/financial_analytics_screen.dart';
 import 'payments/revenue_screen.dart';
+import 'students/add_student_wizard_screen.dart';
 import 'students/student_directory_screen.dart';
 import 'login_screen.dart';
 
@@ -413,9 +414,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Horizontal Action Cards (Image 1)
+                  // Horizontal Action Cards (Batch 5 Image 1)
                   SizedBox(
-                    height: 96,
+                    height: 128,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
@@ -423,18 +424,25 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           gradient: const LinearGradient(
                             colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
                           ),
-                          icon: Icons.person_add_rounded,
+                          icon: Icons.person_add_alt_1_rounded,
                           title: 'Add Student',
-                          onTap: () => _openAddStudentSheet(),
+                          subtitle: 'New admission',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AddStudentWizardScreen()),
+                            );
+                          },
                         ),
                         const SizedBox(width: 12),
                         _quickActionCard(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
+                            colors: [Color(0xFF10B981), Color(0xFF059669)],
                           ),
-                          icon: Icons.chat_rounded,
-                          title: 'WhatsApp Reminder',
-                          onTap: () => setState(() => _currentTabIndex = 1),
+                          icon: Icons.chat_bubble_outline_rounded,
+                          title: 'Send Reminders',
+                          subtitle: '$activeStudents students due',
+                          onTap: () => _openStudentsWithFilter('DUES'),
                         ),
                         const SizedBox(width: 12),
                         _quickActionCard(
@@ -442,10 +450,82 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
                           ),
                           icon: Icons.receipt_long_rounded,
-                          title: 'Fee Ledger',
+                          title: 'Log Expense',
+                          subtitle: 'Track overheads',
                           onTap: () => _openRevenueScreen('MONTHLY'),
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+
+                  // Section Header: Recommended for You (Batch 5 Image 1)
+                  const Text(
+                    'Recommended for You',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textNavy,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Refer & Earn Banner Card (Batch 5 Image 1)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: _showReferralDialog,
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x336366F1), blurRadius: 10, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 26),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Refer & Earn ₹149',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Get bonus on every successful referral',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 24),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -519,17 +599,18 @@ class _MainHubScreenState extends State<MainHubScreen> {
     required LinearGradient gradient,
     required IconData icon,
     required String title,
+    required String subtitle,
     required VoidCallback onTap,
   }) {
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Container(
-        width: 140,
-        padding: const EdgeInsets.all(14),
+        width: 148,
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: gradient,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: const [
             BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
           ],
@@ -539,25 +620,85 @@ class _MainHubScreenState extends State<MainHubScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withOpacity(0.25),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: Colors.white, size: 20),
+              child: Icon(icon, color: Colors.white, size: 22),
             ),
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showReferralDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.card_giftcard_rounded, color: Color(0xFF8B5CF6)),
+            SizedBox(width: 8),
+            Text('Refer & Earn ₹149', style: TextStyle(fontWeight: FontWeight.w900)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Share your library referral link with other admins or libraries. When they subscribe, you both receive ₹149 credited to your ledger!'),
+            SizedBox(height: 14),
+            SelectableText(
+              'Code: LIB-NIVI-149',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primaryTeal),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B5CF6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Referral link copied to clipboard!')),
+              );
+            },
+            child: const Text('Copy Link', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
