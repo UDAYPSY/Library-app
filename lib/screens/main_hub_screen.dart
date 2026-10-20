@@ -1274,6 +1274,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
         );
       },
     );
+      },
+    );
   }
 
   Widget _overviewCard({
@@ -2692,8 +2694,6 @@ class _MainHubScreenState extends State<MainHubScreen> {
               ),
           ],
         );
-      },
-    );
       },
     );
   }
