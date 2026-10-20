@@ -11,6 +11,12 @@ import 'seats/seats_screen.dart';
 import 'shifts/shift_system_screen.dart';
 import 'students/add_student_wizard_screen.dart';
 import 'students/student_directory_screen.dart';
+import 'tools/whatsapp_automation_screen.dart';
+import 'tools/reports_exports_screen.dart';
+import 'tools/share_qr_screen.dart';
+import 'tools/library_branding_screen.dart';
+import 'tools/refer_earn_screen.dart';
+import 'tools/library_community_screen.dart';
 import 'login_screen.dart';
 
 class MainHubScreen extends StatefulWidget {
@@ -500,7 +506,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           icon: Icons.card_giftcard_rounded,
                           title: 'Refer & Earn ₹149',
                           subtitle: 'Get bonus on every referral',
-                          onTap: _showReferralDialog,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ReferEarnScreen(),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 14),
                         _recommendedCard(
@@ -511,7 +522,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           icon: Icons.chat_bubble_rounded,
                           title: 'Join Community',
                           subtitle: 'Connect with 500+ library owners',
-                          onTap: _showCommunityModal,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LibraryCommunityScreen(),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -670,64 +686,78 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   const SizedBox(height: 20),
 
                   // PRO TIP • TODAY Card (Batch 6 Image 3)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFF1F5F9)),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x08000000),
-                          blurRadius: 10,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ShareQrScreen(),
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE6F4EA),
-                            borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFF1F5F9)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x08000000),
+                            blurRadius: 10,
+                            offset: Offset(0, 3),
                           ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.lightbulb_outline_rounded,
-                              color: Color(0xFF0D9488),
-                              size: 24,
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6F4EA),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.lightbulb_outline_rounded,
+                                color: Color(0xFF0D9488),
+                                size: 24,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'PRO TIP • TODAY',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
-                                  color: Color(0xFF0D9488),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'PRO TIP • TODAY',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: Color(0xFF0D9488),
+                                  ),
                                 ),
-                              ),
-                              SizedBox(height: 3),
-                              Text(
-                                'Use QR codes to let students check-in automatically.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textNavy,
+                                SizedBox(height: 3),
+                                Text(
+                                  'Use QR codes to let students check-in automatically.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textNavy,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            color: Color(0xFF94A3B8),
+                            size: 20,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 26),
@@ -751,42 +781,72 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         iconBg: const Color(0xFFECFDF5),
                         iconColor: const Color(0xFF10B981),
                         label: 'WhatsApp',
-                        onTap: _showWhatsAppToolsModal,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WhatsAppAutomationScreen(),
+                          ),
+                        ),
                       ),
                       _gridMenuItem(
                         icon: Icons.insert_chart_rounded,
                         iconBg: const Color(0xFFCCFBF1),
                         iconColor: const Color(0xFF0D9488),
                         label: 'Reports',
-                        onTap: _openFinancialAnalytics,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ReportsExportsScreen(),
+                          ),
+                        ),
                       ),
                       _gridMenuItem(
                         icon: Icons.qr_code_2_rounded,
                         iconBg: const Color(0xFFF3E8FF),
                         iconColor: const Color(0xFF8B5CF6),
                         label: 'QR Code',
-                        onTap: _showQRCodeModal,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ShareQrScreen(),
+                          ),
+                        ),
                       ),
                       _gridMenuItem(
                         icon: Icons.auto_fix_high_rounded,
                         iconBg: const Color(0xFFFFE4E6),
                         iconColor: const Color(0xFFF43F5E),
                         label: 'Branding',
-                        onTap: _showBrandingModal,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LibraryBrandingScreen(),
+                          ),
+                        ),
                       ),
                       _gridMenuItem(
                         icon: Icons.card_giftcard_rounded,
                         iconBg: const Color(0xFFEEF2FF),
                         iconColor: const Color(0xFF6366F1),
                         label: 'Refer & Earn',
-                        onTap: _showReferralDialog,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ReferEarnScreen(),
+                          ),
+                        ),
                       ),
                       _gridMenuItem(
                         icon: Icons.forum_rounded,
                         iconBg: const Color(0xFFE0F2FE),
                         iconColor: const Color(0xFF0284C7),
                         label: 'Community',
-                        onTap: _showCommunityModal,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LibraryCommunityScreen(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
