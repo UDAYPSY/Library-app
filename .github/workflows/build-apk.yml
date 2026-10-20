@@ -36,19 +36,15 @@ jobs:
           flutter create --org com.example.library_manager --project-name library_manager --platforms android .
           cp pubspec.yaml.bak pubspec.yaml
           # Ensure Android minimum SDK satisfies Cloud Firestore (minSdk 23) in both Groovy and Kotlin DSL
+          echo "flutter.minSdkVersion=23" >> android/local.properties || true
           find android/app -name "build.gradle*" -exec sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/g' {} + || true
           find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' {} + || true
-          find android/app -name "build.gradle*" -exec sed -i 's/minSdk = .*/minSdk = 23/g' {} + || true
-          find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion .*/minSdkVersion 23/g' {} + || true
+          find android/app -name "build.gradle*" -exec sed -i 's/minSdk = [0-9]*/minSdk = 23/g' {} + || true
+          find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion [0-9]*/minSdkVersion 23/g' {} + || true
           flutter pub get
 
       - name: Compile Release APK
-        run: |
-          flutter build apk --release > build.log 2>&1 || {
-            echo "==================== BUILD ERROR LOG ===================="
-            tail -n 120 build.log
-            exit 1
-          }
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
