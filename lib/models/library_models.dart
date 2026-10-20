@@ -179,6 +179,18 @@ class StudentInfo {
     this.sectionName = 'Main Hall',
   });
 
+  bool get hasDues {
+    if (status == 'DUES' || duesAmount > 0) return true;
+    if (feeDueDate != null && feeDueDate!.isBefore(DateTime.now())) return true;
+    return false;
+  }
+
+  int get effectiveDues {
+    if (duesAmount > 0) return duesAmount;
+    if (hasDues) return monthlyFee;
+    return 0;
+  }
+
   StudentInfo copyWith({
     String? id,
     String? name,

@@ -99,15 +99,33 @@ class _MainHubScreenState extends State<MainHubScreen> {
         final students = studentSnapshot.data ?? [];
         final activeStudents = students.where((s) => s.status == 'ACTIVE').length;
         final totalEarnings = students.fold<int>(0, (sum, s) => sum + s.monthlyFee);
-        final dueStudents = students.where((s) => s.status == 'DUES').toList();
-        final dueStudentsCount = dueStudents.isNotEmpty ? dueStudents.length : 1;
-        final pendingDuesTotal = dueStudents.fold<int>(0, (sum, s) => sum + s.monthlyFee);
+        final dueStudents = students.where((s) => s.hasDues).toList();
+        final dueStudentsCount = dueStudents.length;
+        final pendingDuesTotal = dueStudents.fold<int>(0, (sum, s) => sum + s.effectiveDues);
 
-        return StreamBuilder<List<SeatInfo>>(
-          stream: _service.streamSeats(),
-          builder: (context, seatSnapshot) {
-            final seats = seatSnapshot.data ?? [];
-            final occupiedSeats = seats.where((s) => s.isOccupied).length;
+        return StreamBuilder<List<PaymentTransaction>>(
+          stream: _service.streamPayments(),
+          builder: (context, paymentSnapshot) {
+            final payments = paymentSnapshot.data ?? [];
+            final today = DateTime.now();
+            final todayPayments = payments.where((p) =>
+                p.date.year == today.year &&
+                p.date.month == today.month &&
+                p.date.day == today.day).toList();
+            final todayEarnings = todayPayments.fold<int>(0, (sum, p) => sum + p.amount);
+
+            final monthPayments = payments.where((p) =>
+                p.date.year == today.year &&
+                p.date.month == today.month).toList();
+            final monthEarnings = monthPayments.isNotEmpty
+                ? monthPayments.fold<int>(0, (sum, p) => sum + p.amount)
+                : totalEarnings;
+
+            return StreamBuilder<List<SeatInfo>>(
+              stream: _service.streamSeats(),
+              builder: (context, seatSnapshot) {
+                final seats = seatSnapshot.data ?? [];
+                final occupiedSeats = seats.where((s) => s.isOccupied).length;
 
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -380,7 +398,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           icon: Icons.calendar_today_rounded,
                           iconBg: AppColors.todayPurpleBg,
                           iconColor: AppColors.todayPurpleIcon,
-                          value: '₹$totalEarnings',
+                          value: '₹$todayEarnings',
                           label: 'TODAY',
                           onTap: () => _openRevenueScreen('TODAY'),
                         ),
@@ -395,7 +413,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           icon: Icons.account_balance_wallet_rounded,
                           iconBg: AppColors.monthlyAmberBg,
                           iconColor: AppColors.monthlyAmberIcon,
-                          value: '₹$totalEarnings',
+                          value: '₹$monthEarnings',
                           label: 'MONTHLY',
                           onTap: () => _openRevenueScreen('MONTHLY'),
                         ),
@@ -453,7 +471,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           ),
                           icon: Icons.chat_bubble_outline_rounded,
                           title: 'Send Reminders',
-                          subtitle: '$activeStudents students due',
+                          subtitle: '$dueStudentsCount students due',
                           onTap: () => _openStudentsWithFilter('DUES'),
                         ),
                         const SizedBox(width: 12),
@@ -581,7 +599,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                '₹$pendingDuesTotal from $dueStudentsCount student${dueStudentsCount == 1 ? '' : 's'}',
+                                dueStudentsCount > 0
+                                    ? '₹ from  student'
+                                    : 'All dues cleared • ₹0 pending',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -593,7 +613,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         ),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFEF4444),
+                            backgroundColor: dueStudentsCount > 0
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF0D9488),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -601,19 +623,19 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                           ),
-                          onPressed: () => _openStudentsWithFilter('DUES'),
-                          child: const Row(
+                          onPressed: () => _openStudentsWithFilter(dueStudentsCount > 0 ? 'DUES' : 'ACTIVE'),
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Collect',
-                                style: TextStyle(
+                                dueStudentsCount > 0 ? 'Collect' : 'View All',
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 13,
                                 ),
                               ),
-                              SizedBox(width: 4),
-                              Icon(Icons.chevron_right_rounded, size: 16),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.chevron_right_rounded, size: 16),
                             ],
                           ),
                         ),
@@ -641,7 +663,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         iconBg: const Color(0xFFEFF6FF),
                         iconColor: const Color(0xFF3B82F6),
                         label: 'Students',
-                        onTap: () => setState(() => _currentTabIndex = 2), // Routes to Image 2 (Seats tab)
+                        onTap: () => _openStudentsWithFilter('ALL'),
                       ),
                       _gridMenuItem(
                         icon: Icons.grid_view_rounded,
@@ -2670,6 +2692,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
               ),
           ],
         );
+      },
+    );
       },
     );
   }

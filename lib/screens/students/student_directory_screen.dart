@@ -802,12 +802,12 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
           }
 
           // Status filter
-          if (_selectedStatusFilter == 'RECENT') {
+          if (_selectedStatusFilter == 'RECENT' || _selectedStatusFilter == 'ALL') {
             return true;
           } else if (_selectedStatusFilter == 'PAID') {
-            return s.monthlyFee > 0;
+            return !s.hasDues && s.status != 'INACTIVE';
           } else if (_selectedStatusFilter == 'DUES') {
-            return s.status == 'INACTIVE';
+            return s.hasDues;
           } else if (_selectedStatusFilter == 'ACTIVE') {
             return s.status == 'ACTIVE';
           } else if (_selectedStatusFilter == 'INACTIVE') {

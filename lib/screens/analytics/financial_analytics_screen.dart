@@ -31,6 +31,7 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
       setState(() {});
     });
   }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<StudentInfo>>(
@@ -43,671 +44,942 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
           builder: (context, expenseSnapshot) {
             final expenses = expenseSnapshot.data ?? [];
 
-            // Metrics Calculations
-            final today = DateTime.now();
-            final todayStudents = students.where((s) =>
-                s.joinedAt != null &&
-                s.joinedAt!.year == today.year &&
-                s.joinedAt!.month == today.month &&
-                s.joinedAt!.day == today.day).toList();
+            return StreamBuilder<List<PaymentTransaction>>(
+              stream: _service.streamPayments(),
+              builder: (context, paymentSnapshot) {
+                final payments = paymentSnapshot.data ?? [];
 
-            final todayRevenue = todayStudents.fold<int>(0, (sum, s) => sum + s.monthlyFee);
-            final todayCash = todayStudents.where((s) => s.paymentMode == 'Cash').fold<int>(0, (sum, s) => sum + s.monthlyFee);
-            final todayUPI = todayStudents.where((s) => s.paymentMode == 'UPI').fold<int>(0, (sum, s) => sum + s.monthlyFee);
+                // Metrics Calculations
+                final today = DateTime.now();
 
-            final monthlyRevenue = students.fold<int>(0, (sum, s) => sum + s.monthlyFee);
-            final monthlyPaidCount = students.length;
+                // Today payments
+                final todayPayments = payments.where((p) =>
+                    p.date.year == today.year &&
+                    p.date.month == today.month &&
+                    p.date.day == today.day).toList();
+                final todayRevenue = todayPayments.fold<int>(0, (sum, p) => sum + p.amount);
+                final todayCash = todayPayments
+                    .where((p) => p.paymentMode.toLowerCase() == 'cash')
+                    .fold<int>(0, (sum, p) => sum + p.amount);
+                final todayUPI = todayPayments
+                    .where((p) => p.paymentMode.toLowerCase() == 'upi')
+                    .fold<int>(0, (sum, p) => sum + p.amount);
 
-            final monthlyExpenses = expenses.fold<int>(0, (sum, e) => sum + e.amount);
-            final netProfit = monthlyRevenue - monthlyExpenses;
+                // Selected month metrics
+                final selectedMonthNumber = _selectedMonthIndex + 1;
+                final selectedMonthPayments = payments.where((p) =>
+                    p.date.year == _selectedYear &&
+                    p.date.month == selectedMonthNumber).toList();
+                final monthlyRevenue = selectedMonthPayments.fold<int>(
+                    0, (sum, p) => sum + p.amount);
+                final monthlyPaidCount = selectedMonthPayments.length;
 
-            // Inactive / Pending dues
-            final totalDues = 0; // Or calculated pending students
-            final annualRevenue = monthlyRevenue;
-            final annualExpenses = monthlyExpenses;
-            final annualNetProfit = netProfit;
+                final selectedMonthExpenses = expenses.where((e) =>
+                    e.date.year == _selectedYear &&
+                    e.date.month == selectedMonthNumber).toList();
+                final monthlyExpenses = selectedMonthExpenses.fold<int>(
+                    0, (sum, e) => sum + e.amount);
+                final netProfit = monthlyRevenue - monthlyExpenses;
 
-            return Scaffold(
-              backgroundColor: AppColors.scaffoldBg,
-              appBar: widget.isStandalone
-                  ? AppBar(
-                      backgroundColor: Colors.white,
-                      elevation: 0.5,
-                      leading: IconButton(
-                        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textNavy),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      title: const Text(
-                        'Financial Analytics',
-                        style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textNavy, fontSize: 18),
-                      ),
-                    )
-                  : null,
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header Row: FINANCIAL Analytics + [+ Expense] (Image 2)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // Pending Dues
+                final dueStudents = students.where((s) => s.hasDues).toList();
+                final totalDues = dueStudents.fold<int>(
+                    0, (sum, s) => sum + s.effectiveDues);
+                final totalDuesCount = dueStudents.length;
+
+                // Annual Metrics
+                final annualPayments = payments.where((p) =>
+                    p.date.year == _selectedYear).toList();
+                final annualRevenue = annualPayments.fold<int>(
+                    0, (sum, p) => sum + p.amount);
+                final annualExpensesList = expenses.where((e) =>
+                    e.date.year == _selectedYear).toList();
+                final annualExpenses = annualExpensesList.fold<int>(
+                    0, (sum, e) => sum + e.amount);
+                final annualNetProfit = annualRevenue - annualExpenses;
+
+                // Trend bar calculation for 6 months (May to Oct or Jun to Nov)
+                // We show 6 months ending at current selected month or active window
+                final List<int> trendMonthIndices = [4, 5, 6, 7, 8, 9]; // May, Jun, Jul, Aug, Sep, Oct
+                int maxTrendVal = 1;
+                final List<Map<String, dynamic>> trendData = [];
+
+                for (final mIdx in trendMonthIndices) {
+                  final mNum = mIdx + 1;
+                  final mRev = payments.where((p) =>
+                      p.date.year == _selectedYear &&
+                      p.date.month == mNum).fold<int>(0, (sum, p) => sum + p.amount);
+                  final mExp = expenses.where((e) =>
+                      e.date.year == _selectedYear &&
+                      e.date.month == mNum).fold<int>(0, (sum, e) => sum + e.amount);
+
+                  if (mRev > maxTrendVal) maxTrendVal = mRev;
+                  if (mExp > maxTrendVal) maxTrendVal = mExp;
+
+                  trendData.add({
+                    'monthIndex': mIdx,
+                    'name': _months[mIdx],
+                    'revenue': mRev,
+                    'expenses': mExp,
+                  });
+                }
+
+                return Scaffold(
+                  backgroundColor: AppColors.scaffoldBg,
+                  appBar: widget.isStandalone
+                      ? AppBar(
+                          backgroundColor: Colors.white,
+                          elevation: 0.5,
+                          leading: IconButton(
+                            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textNavy),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          title: const Text(
+                            'Financial Analytics',
+                            style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textNavy, fontSize: 18),
+                          ),
+                        )
+                      : null,
+                  body: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Column(
+                        // Header Row: FINANCIAL Analytics + [+ Expense] (Image 2)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'FINANCIAL',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.0,
-                                color: AppColors.textMuted,
-                              ),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'FINANCIAL',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.0,
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Analytics',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.textNavy,
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Analytics',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.textNavy,
+                            // [+ Expense] Button (Image 2)
+                            InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: _showAddExpenseSheet,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  boxShadow: const [
+                                    BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add_circle, color: Color(0xFFEF4444), size: 18),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Expense',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        color: AppColors.textNavy,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        // [+ Expense] Button (Image 2)
-                        InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: _showAddExpenseSheet,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
-                              ],
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.add_circle, color: Color(0xFFEF4444), size: 18),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Expense',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                    color: AppColors.textNavy,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
+                        const SizedBox(height: 20),
 
-                    // SELECT YEAR (Image 2)
-                    const Row(
-                      children: [
-                        Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textMuted),
-                        SizedBox(width: 6),
-                        Text(
-                          'SELECT YEAR',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: AppColors.textMuted,
-                          ),
+                        // SELECT YEAR (Image 2)
+                        const Row(
+                          children: [
+                            Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textMuted),
+                            SizedBox(width: 6),
+                            Text(
+                              'SELECT YEAR',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _yearPill(2025),
-                        const SizedBox(width: 8),
-                        _yearPill(2026),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _yearPill(2025),
+                            const SizedBox(width: 8),
+                            _yearPill(2026),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
 
-                    // SELECT MONTH (Image 2)
-                    const Row(
-                      children: [
-                        Icon(Icons.access_time_rounded, size: 14, color: AppColors.textMuted),
-                        SizedBox(width: 6),
-                        Text(
-                          'SELECT MONTH',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: AppColors.textMuted,
-                          ),
+                        // SELECT MONTH (Image 2)
+                        const Row(
+                          children: [
+                            Icon(Icons.access_time_rounded, size: 14, color: AppColors.textMuted),
+                            SizedBox(width: 6),
+                            Text(
+                              'SELECT MONTH',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 38,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _months.length,
-                        itemBuilder: (ctx, i) {
-                          final isSelected = _selectedMonthIndex == i;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(10),
-                              onTap: () => setState(() => _selectedMonthIndex = i),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? Colors.white : const Color(0xFFF1F5F9),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 38,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _months.length,
+                            itemBuilder: (ctx, i) {
+                              final isSelected = _selectedMonthIndex == i;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: InkWell(
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: isSelected ? const Color(0xFFCBD5E1) : Colors.transparent,
-                                  ),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  _months[i],
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                    color: isSelected ? AppColors.textNavy : AppColors.textMuted,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-
-                    // PENDING & PAID Badges Row (Image 2)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF3C7),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.info_rounded, color: Color(0xFFD97706), size: 14),
-                                SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'PENDING: Target for all active members.',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF92400E),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 14),
-                                SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'PAID: Collections reached so far.',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1E40AF),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 2x2 CARDS ROW 1 & 2 (Image 2)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _kpiCard(
-                            icon: Icons.calendar_today_outlined,
-                            iconBg: const Color(0xFFE0F2FE),
-                            iconColor: const Color(0xFF0284C7),
-                            title: 'Today Revenue',
-                            amount: '₹$todayRevenue',
-                            accentText: 'Cash: ₹$todayCash • UPI: ₹$todayUPI',
-                            accentColor: const Color(0xFF0D9488),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: _kpiCard(
-                            icon: Icons.calendar_month_outlined,
-                            iconBg: const Color(0xFFF3E8FF),
-                            iconColor: const Color(0xFF9333EA),
-                            title: 'Monthly Revenue',
-                            amount: '₹$monthlyRevenue',
-                            accentText: '$monthlyPaidCount Students Paid',
-                            accentColor: const Color(0xFF6366F1),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _kpiCard(
-                            icon: Icons.trending_down_rounded,
-                            iconBg: const Color(0xFFFEE2E2),
-                            iconColor: const Color(0xFFEF4444),
-                            title: 'Monthly Expenses',
-                            amount: '₹$monthlyExpenses',
-                            accentText: 'Total Spending',
-                            accentColor: const Color(0xFFEF4444),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: _kpiCard(
-                            icon: Icons.account_balance_wallet_outlined,
-                            iconBg: const Color(0xFFDCFCE7),
-                            iconColor: const Color(0xFF16A34A),
-                            title: 'Net Profit',
-                            amount: '₹$netProfit',
-                            accentText: 'Monthly Gain',
-                            accentColor: const Color(0xFF16A34A),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // 2x2 CARDS ROW 3 & 4: Total Dues, Annual Revenue, Annual Expenses, Annual Profit (Image 3)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _kpiCard(
-                            icon: Icons.access_time_rounded,
-                            iconBg: const Color(0xFFFEF3C7),
-                            iconColor: const Color(0xFFD97706),
-                            title: 'Total Dues',
-                            amount: '₹$totalDues',
-                            accentText: '0 Pending',
-                            accentColor: const Color(0xFFD97706),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: _kpiCard(
-                            icon: Icons.bar_chart_rounded,
-                            iconBg: const Color(0xFFFEF9C3),
-                            iconColor: const Color(0xFFCA8A04),
-                            title: 'Annual Revenue',
-                            amount: '₹$annualRevenue',
-                            accentText: 'Gross Income',
-                            accentColor: const Color(0xFFCA8A04),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _kpiCard(
-                            icon: Icons.receipt_long_outlined,
-                            iconBg: const Color(0xFFFCE7F3),
-                            iconColor: const Color(0xFFDB2777),
-                            title: 'Annual Expenses',
-                            amount: '₹$annualExpenses',
-                            accentText: 'Annual Spending',
-                            accentColor: const Color(0xFFDB2777),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: _kpiCard(
-                            icon: Icons.payments_outlined,
-                            iconBg: const Color(0xFFD1FAE5),
-                            iconColor: const Color(0xFF059669),
-                            title: 'Annual Net Profit',
-                            amount: '₹$annualNetProfit',
-                            accentText: 'Yearly Gain',
-                            accentColor: const Color(0xFF059669),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 22),
-
-                    // Financial Trend Card (Images 3 & 4)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFF1F5F9)),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Financial Trend',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.textNavy,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Revenue & Expenses for $_selectedYear',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                                  ),
-                                ],
-                              ),
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: AppColors.mintTipBg,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  icon: const Icon(Icons.refresh_rounded, color: AppColors.primaryTeal, size: 20),
-                                  onPressed: () => setState(() {}),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Visual Bar Chart Mockup (Images 3 & 4)
-                          SizedBox(
-                            height: 120,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                _trendBar('Jun', 30, 20, false),
-                                _trendBar('Jul', 45, 15, false),
-                                _trendBar('Aug', 60, 25, false),
-                                _trendBar('Sep', 50, 30, false),
-                                _trendBar('Oct', monthlyRevenue > 0 ? 80 : 10, monthlyExpenses > 0 ? 40 : 10, true),
-                                _trendBar('Nov', 20, 10, false),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Chart Legend
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(width: 10, height: 10, decoration: BoxDecoration(color: const Color(0xFF0F766E), borderRadius: BorderRadius.circular(2))),
-                              const SizedBox(width: 5),
-                              const Text('Revenue', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-                              const SizedBox(width: 18),
-                              Container(width: 10, height: 10, decoration: BoxDecoration(color: const Color(0xFFEF4444), borderRadius: BorderRadius.circular(2))),
-                              const SizedBox(width: 5),
-                              const Text('Expenses', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-
-                    // Income vs Expenses Switcher (Image 4)
-                    Container(
-                      width: double.infinity,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(11),
-                              onTap: () => setState(() => _isIncomeSelected = true),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _isIncomeSelected ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(11),
-                                  border: _isIncomeSelected ? Border.all(color: const Color(0xFFE2E8F0)) : null,
-                                  boxShadow: _isIncomeSelected
-                                      ? const [BoxShadow(color: Colors.black12, blurRadius: 2)]
-                                      : null,
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Income',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                    color: _isIncomeSelected ? AppColors.primaryTeal : AppColors.textMuted,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(11),
-                              onTap: () => setState(() => _isIncomeSelected = false),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: !_isIncomeSelected ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(11),
-                                  border: !_isIncomeSelected ? Border.all(color: const Color(0xFFE2E8F0)) : null,
-                                  boxShadow: !_isIncomeSelected
-                                      ? const [BoxShadow(color: Colors.black12, blurRadius: 2)]
-                                      : null,
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Expenses',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                    color: !_isIncomeSelected ? AppColors.errorRed : AppColors.textMuted,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Revenue Breakdown Card (Image 4)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFF1F5F9)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _isIncomeSelected ? 'Revenue Breakdown' : 'Expense Breakdown',
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textNavy,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE6F4F1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '${_months[_selectedMonthIndex]} $_selectedYear',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.primaryTeal,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 28),
-                          Center(
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 58,
-                                  height: 58,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: const Color(0xFFE2E8F0), width: 3),
-                                  ),
-                                  child: const Center(
-                                    child: Icon(Icons.pie_chart_outline_rounded, color: Color(0xFF94A3B8), size: 28),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  _isIncomeSelected
-                                      ? (students.isEmpty ? 'No transactions recorded' : '${students.length} Student Memberships Active')
-                                      : (expenses.isEmpty ? 'No expenses recorded' : '${expenses.length} Logged Expenses'),
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textNavy,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Latest Payments Card (Image 4)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFF1F5F9)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Latest Payments',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textNavy,
-                                ),
-                              ),
-                              Icon(Icons.receipt_long_outlined, color: AppColors.textMuted, size: 20),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          if (students.isEmpty)
-                            const Center(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 14),
-                                child: Text(
-                                  'No recent activity',
-                                  style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            )
-                          else
-                            ...students.take(5).map((st) => Container(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                          Text('Seat S-${st.seatNumber ?? "None"} • ${st.paymentMode}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                                        ],
+                                  onTap: () => setState(() => _selectedMonthIndex = i),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? Colors.white : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: isSelected ? const Color(0xFFCBD5E1) : Colors.transparent,
                                       ),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _months[i],
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                        color: isSelected ? AppColors.textNavy : AppColors.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+
+                        // PENDING & PAID Badges Row (Image 2)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.info_rounded, color: Color(0xFFD97706), size: 14),
+                                    SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'PENDING: Target for all active members.',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF92400E),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 14),
+                                    SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'PAID: Collections reached so far.',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF1E40AF),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // 2x2 CARDS ROW 1 & 2 (Image 2)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _kpiCard(
+                                icon: Icons.calendar_today_outlined,
+                                iconBg: const Color(0xFFE0F2FE),
+                                iconColor: const Color(0xFF0284C7),
+                                title: 'Today Revenue',
+                                amount: '₹$todayRevenue',
+                                accentText: 'Cash: ₹$todayCash • UPI: ₹$todayUPI',
+                                accentColor: const Color(0xFF0D9488),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _kpiCard(
+                                icon: Icons.calendar_month_outlined,
+                                iconBg: const Color(0xFFF3E8FF),
+                                iconColor: const Color(0xFF9333EA),
+                                title: 'Monthly Revenue',
+                                amount: '₹$monthlyRevenue',
+                                accentText: '$monthlyPaidCount Collections (${_months[_selectedMonthIndex]})',
+                                accentColor: const Color(0xFF6366F1),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _kpiCard(
+                                icon: Icons.trending_down_rounded,
+                                iconBg: const Color(0xFFFEE2E2),
+                                iconColor: const Color(0xFFEF4444),
+                                title: 'Monthly Expenses',
+                                amount: '₹$monthlyExpenses',
+                                accentText: '${selectedMonthExpenses.length} Outflows (${_months[_selectedMonthIndex]})',
+                                accentColor: const Color(0xFFEF4444),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _kpiCard(
+                                icon: Icons.account_balance_wallet_outlined,
+                                iconBg: const Color(0xFFDCFCE7),
+                                iconColor: const Color(0xFF16A34A),
+                                title: 'Net Profit',
+                                amount: '${netProfit >= 0 ? '' : '-'}₹${netProfit.abs()}',
+                                accentText: netProfit >= 0 ? 'Monthly Gain' : 'Monthly Deficit',
+                                accentColor: netProfit >= 0 ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // 2x2 CARDS ROW 3 & 4: Total Dues, Annual Revenue, Annual Expenses, Annual Profit (Image 3)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _kpiCard(
+                                icon: Icons.access_time_rounded,
+                                iconBg: const Color(0xFFFEF3C7),
+                                iconColor: const Color(0xFFD97706),
+                                title: 'Total Dues',
+                                amount: '₹$totalDues',
+                                accentText: '$totalDuesCount Pending Student${totalDuesCount == 1 ? '' : 's'}',
+                                accentColor: const Color(0xFFD97706),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _kpiCard(
+                                icon: Icons.bar_chart_rounded,
+                                iconBg: const Color(0xFFFEF9C3),
+                                iconColor: const Color(0xFFCA8A04),
+                                title: 'Annual Revenue',
+                                amount: '₹$annualRevenue',
+                                accentText: 'Gross Income $_selectedYear',
+                                accentColor: const Color(0xFFCA8A04),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _kpiCard(
+                                icon: Icons.receipt_long_outlined,
+                                iconBg: const Color(0xFFFCE7F3),
+                                iconColor: const Color(0xFFDB2777),
+                                title: 'Annual Expenses',
+                                amount: '₹$annualExpenses',
+                                accentText: 'Annual Spending $_selectedYear',
+                                accentColor: const Color(0xFFDB2777),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _kpiCard(
+                                icon: Icons.payments_outlined,
+                                iconBg: const Color(0xFFD1FAE5),
+                                iconColor: const Color(0xFF059669),
+                                title: 'Annual Net Profit',
+                                amount: '${annualNetProfit >= 0 ? '' : '-'}₹${annualNetProfit.abs()}',
+                                accentText: annualNetProfit >= 0 ? 'Yearly Gain' : 'Yearly Deficit',
+                                accentColor: annualNetProfit >= 0 ? const Color(0xFF059669) : const Color(0xFFEF4444),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+
+                        // Financial Trend Card (Images 3 & 4)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFF1F5F9)),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Financial Trend',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppColors.textNavy,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
                                       Text(
-                                        '+₹${st.monthlyFee}',
-                                        style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF16A34A)),
+                                        'Revenue vs Expenses for $_selectedYear',
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                                       ),
                                     ],
                                   ),
-                                )),
-                        ],
-                      ),
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.mintTipBg,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(Icons.refresh_rounded, color: AppColors.primaryTeal, size: 20),
+                                      onPressed: () => setState(() {}),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Dynamic Bar Chart with Real Data (Images 3 & 4)
+                              SizedBox(
+                                height: 128,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: trendData.map((item) {
+                                    final mIdx = item['monthIndex'] as int;
+                                    final mName = item['name'] as String;
+                                    final mRev = item['revenue'] as int;
+                                    final mExp = item['expenses'] as int;
+                                    final isActive = mIdx == _selectedMonthIndex;
+
+                                    final revHeight = maxTrendVal > 0
+                                        ? ((mRev / maxTrendVal) * 72.0).clamp(6.0, 78.0)
+                                        : 6.0;
+                                    final expHeight = maxTrendVal > 0
+                                        ? ((mExp / maxTrendVal) * 72.0).clamp(6.0, 78.0)
+                                        : 6.0;
+
+                                    return InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () => setState(() => _selectedMonthIndex = mIdx),
+                                      child: _trendBar(
+                                        mName,
+                                        revHeight,
+                                        expHeight,
+                                        isActive,
+                                        revAmount: mRev,
+                                        expAmount: mExp,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+
+                              // Chart Legend
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(width: 10, height: 10, decoration: BoxDecoration(color: const Color(0xFF0F766E), borderRadius: BorderRadius.circular(2))),
+                                  const SizedBox(width: 5),
+                                  const Text('Revenue', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                                  const SizedBox(width: 18),
+                                  Container(width: 10, height: 10, decoration: BoxDecoration(color: const Color(0xFFEF4444), borderRadius: BorderRadius.circular(2))),
+                                  const SizedBox(width: 5),
+                                  const Text('Expenses', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+
+                        // Income vs Expenses Switcher (Image 4)
+                        Container(
+                          width: double.infinity,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(11),
+                                  onTap: () => setState(() => _isIncomeSelected = true),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: _isIncomeSelected ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(11),
+                                      border: _isIncomeSelected ? Border.all(color: const Color(0xFFE2E8F0)) : null,
+                                      boxShadow: _isIncomeSelected
+                                          ? const [BoxShadow(color: Colors.black12, blurRadius: 2)]
+                                          : null,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      'Income',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                        color: _isIncomeSelected ? AppColors.primaryTeal : AppColors.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(11),
+                                  onTap: () => setState(() => _isIncomeSelected = false),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: !_isIncomeSelected ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(11),
+                                      border: !_isIncomeSelected ? Border.all(color: const Color(0xFFE2E8F0)) : null,
+                                      boxShadow: !_isIncomeSelected
+                                          ? const [BoxShadow(color: Colors.black12, blurRadius: 2)]
+                                          : null,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      'Expenses',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                        color: !_isIncomeSelected ? AppColors.errorRed : AppColors.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Revenue / Expense Breakdown Card (Image 4)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFF1F5F9)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _isIncomeSelected ? 'Revenue Breakdown' : 'Expense Breakdown',
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textNavy,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE6F4F1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '${_months[_selectedMonthIndex]} $_selectedYear',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.primaryTeal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+
+                              if (_isIncomeSelected) ...[
+                                // Breakdown by Payment Mode
+                                _buildModeProgressRow(
+                                  label: 'UPI / Digital Transfer',
+                                  amount: selectedMonthPayments
+                                      .where((p) => p.paymentMode.toLowerCase() == 'upi')
+                                      .fold<int>(0, (s, p) => s + p.amount),
+                                  total: monthlyRevenue,
+                                  color: const Color(0xFF0F766E),
+                                  icon: Icons.qr_code_rounded,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildModeProgressRow(
+                                  label: 'Cash Collections',
+                                  amount: selectedMonthPayments
+                                      .where((p) => p.paymentMode.toLowerCase() == 'cash')
+                                      .fold<int>(0, (s, p) => s + p.amount),
+                                  total: monthlyRevenue,
+                                  color: const Color(0xFF10B981),
+                                  icon: Icons.payments_rounded,
+                                ),
+                              ] else ...[
+                                // Breakdown by Expense Categories
+                                if (selectedMonthExpenses.isEmpty)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 12),
+                                      child: Text(
+                                        'No expenses recorded for this month',
+                                        style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                                      ),
+                                    ),
+                                  )
+                                else ...[
+                                  _buildExpenseCategoryRow(
+                                    category: 'Utility & Electricity',
+                                    amount: selectedMonthExpenses
+                                        .where((e) => e.category.toLowerCase().contains('util'))
+                                        .fold<int>(0, (s, e) => s + e.amount),
+                                    total: monthlyExpenses,
+                                    color: const Color(0xFFF59E0B),
+                                    icon: Icons.bolt_rounded,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _buildExpenseCategoryRow(
+                                    category: 'Internet & Wi-Fi',
+                                    amount: selectedMonthExpenses
+                                        .where((e) => e.category.toLowerCase().contains('inter'))
+                                        .fold<int>(0, (s, e) => s + e.amount),
+                                    total: monthlyExpenses,
+                                    color: const Color(0xFF3B82F6),
+                                    icon: Icons.wifi_rounded,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _buildExpenseCategoryRow(
+                                    category: 'Maintenance & Upkeep',
+                                    amount: selectedMonthExpenses
+                                        .where((e) => !e.category.toLowerCase().contains('util') &&
+                                                      !e.category.toLowerCase().contains('inter'))
+                                        .fold<int>(0, (s, e) => s + e.amount),
+                                    total: monthlyExpenses,
+                                    color: const Color(0xFFEC4899),
+                                    icon: Icons.build_circle_rounded,
+                                  ),
+                                ],
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Latest Activity Card (Latest Payments or Latest Expenses)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFF1F5F9)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _isIncomeSelected ? 'Latest Payments' : 'Latest Expenses',
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textNavy,
+                                    ),
+                                  ),
+                                  Icon(
+                                    _isIncomeSelected ? Icons.receipt_long_outlined : Icons.account_balance_wallet_outlined,
+                                    color: AppColors.textMuted,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              if (_isIncomeSelected) ...[
+                                if (payments.isEmpty)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 14),
+                                      child: Text(
+                                        'No recent payment transactions',
+                                        style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  ...payments.take(5).map((p) => Container(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: const Color(0xFFF1F5F9)),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFECFDF5),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  child: const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 16),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(p.studentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                    Text(
+                                                      'Seat S-${p.seatNumber ?? "None"} • ${p.paymentMode} • ${DateFormat('dd MMM').format(p.date)}',
+                                                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              '+₹${p.amount}',
+                                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF16A34A)),
+                                            ),
+                                          ],
+                                        ),
+                                      )),
+                              ] else ...[
+                                if (expenses.isEmpty)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 14),
+                                      child: Text(
+                                        'No logged expenses yet',
+                                        style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  ...expenses.take(5).map((e) => Container(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: const Color(0xFFF1F5F9)),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFFEE2E2),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 16),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(e.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                    Text(
+                                                      '${e.category} • ${e.paymentMode} • ${DateFormat('dd MMM').format(e.date)}',
+                                                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              '-₹${e.amount}',
+                                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFFEF4444)),
+                                            ),
+                                          ],
+                                        ),
+                                      )),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             );
           },
         );
       },
+    );
+  }
+
+  Widget _buildModeProgressRow({
+    required String label,
+    required int amount,
+    required int total,
+    required Color color,
+    required IconData icon,
+  }) {
+    final pct = total > 0 ? (amount / total).clamp(0.0, 1.0) : 0.0;
+    final pctStr = (pct * 100).toStringAsFixed(0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 6),
+                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textNavy)),
+              ],
+            ),
+            Text('₹$amount ($pctStr%)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: pct,
+            backgroundColor: const Color(0xFFE2E8F0),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 6,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpenseCategoryRow({
+    required String category,
+    required int amount,
+    required int total,
+    required Color color,
+    required IconData icon,
+  }) {
+    final pct = total > 0 ? (amount / total).clamp(0.0, 1.0) : 0.0;
+    final pctStr = (pct * 100).toStringAsFixed(0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 6),
+                Text(category, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textNavy)),
+              ],
+            ),
+            Text('₹$amount ($pctStr%)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: pct,
+            backgroundColor: const Color(0xFFE2E8F0),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 6,
+          ),
+        ),
+      ],
     );
   }
 
@@ -729,7 +1001,7 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
           isSelected ? '$year •' : '$year',
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w800,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
             color: isSelected ? Colors.white : AppColors.textNavy,
           ),
         ),
@@ -759,62 +1031,62 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
+                child: Center(child: Icon(icon, color: iconColor, size: 20)),
+              ),
+              const Icon(Icons.arrow_upward_rounded, color: Color(0xFF94A3B8), size: 16),
+            ],
           ),
           const SizedBox(height: 12),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textNavy,
-            ),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             amount,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textNavy,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
           ),
           const SizedBox(height: 4),
           Text(
             accentText,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: accentColor,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Stable this period',
-            style: TextStyle(
-              fontSize: 10,
-              color: AppColors.textSubtle,
-              fontWeight: FontWeight.w500,
-            ),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accentColor),
           ),
         ],
       ),
     );
   }
 
-  Widget _trendBar(String month, double revHeight, double expHeight, bool isActive) {
+  Widget _trendBar(
+    String month,
+    double revHeight,
+    double expHeight,
+    bool isActive, {
+    int revAmount = 0,
+    int expAmount = 0,
+  }) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        if (isActive)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F766E),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '₹$revAmount',
+              style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -838,12 +1110,19 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        Text(
-          month,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
-            color: isActive ? AppColors.textNavy : AppColors.textMuted,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFFE6F4F1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            month,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
+              color: isActive ? AppColors.primaryTeal : AppColors.textMuted,
+            ),
           ),
         ),
       ],
