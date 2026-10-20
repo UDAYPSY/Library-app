@@ -394,7 +394,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFEF4444),
-                      side: const Border.all(color: Color(0xFFFCA5A5)),
+                      side: const BorderSide(color: Color(0xFFFCA5A5)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
