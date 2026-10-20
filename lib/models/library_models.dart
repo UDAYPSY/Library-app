@@ -159,6 +159,10 @@ class StudentInfo {
   final int monthlyFee;
   final String paymentMode;
 
+  final String note;
+  final int duesAmount;
+  final String sectionName;
+
   const StudentInfo({
     required this.id,
     required this.name,
@@ -170,7 +174,42 @@ class StudentInfo {
     this.joinedAt,
     this.monthlyFee = 500,
     this.paymentMode = 'UPI',
+    this.note = '',
+    this.duesAmount = 0,
+    this.sectionName = 'Main Hall',
   });
+
+  StudentInfo copyWith({
+    String? id,
+    String? name,
+    String? phone,
+    int? seatNumber,
+    String? shift,
+    String? status,
+    DateTime? feeDueDate,
+    DateTime? joinedAt,
+    int? monthlyFee,
+    String? paymentMode,
+    String? note,
+    int? duesAmount,
+    String? sectionName,
+  }) {
+    return StudentInfo(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      seatNumber: seatNumber ?? this.seatNumber,
+      shift: shift ?? this.shift,
+      status: status ?? this.status,
+      feeDueDate: feeDueDate ?? this.feeDueDate,
+      joinedAt: joinedAt ?? this.joinedAt,
+      monthlyFee: monthlyFee ?? this.monthlyFee,
+      paymentMode: paymentMode ?? this.paymentMode,
+      note: note ?? this.note,
+      duesAmount: duesAmount ?? this.duesAmount,
+      sectionName: sectionName ?? this.sectionName,
+    );
+  }
 
   factory StudentInfo.fromFirestore(String id, Map<String, dynamic> data) {
     DateTime? parseDate(dynamic val) {
@@ -190,6 +229,9 @@ class StudentInfo {
       joinedAt: parseDate(data['joined_at']),
       monthlyFee: (data['monthly_fee'] as num?)?.toInt() ?? 500,
       paymentMode: (data['payment_mode'] as String?) ?? 'UPI',
+      note: (data['note'] as String?) ?? '',
+      duesAmount: (data['dues_amount'] as num?)?.toInt() ?? 0,
+      sectionName: (data['section_name'] as String?) ?? 'Main Hall',
     );
   }
 }

@@ -111,6 +111,60 @@ class LibraryService {
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
     );
+    if (_mockStudents.isEmpty) {
+      _mockStudents.addAll([
+        StudentInfo(
+          id: 'demo_1',
+          name: 'Gshsgsg',
+          phone: '6464649199',
+          seatNumber: 1,
+          shift: 'Full Day',
+          status: 'ACTIVE',
+          feeDueDate: DateTime(2026, 11, 20),
+          joinedAt: DateTime(2026, 10, 20),
+          monthlyFee: 500,
+          paymentMode: 'UPI',
+          note: 'Gdgsgsggsgs',
+          duesAmount: 0,
+          sectionName: 'Main Hall',
+        ),
+        StudentInfo(
+          id: 'demo_2',
+          name: 'Uday',
+          phone: '9876543210',
+          seatNumber: 2,
+          shift: 'Full Day',
+          status: 'ACTIVE',
+          feeDueDate: DateTime(2026, 11, 18),
+          joinedAt: DateTime(2026, 10, 18),
+          monthlyFee: 600,
+          paymentMode: 'Cash',
+          note: 'Civil Services Aspirant',
+          duesAmount: 200,
+          sectionName: 'Main Hall',
+        ),
+      ]);
+      if (_mockSeats.isNotEmpty) {
+        _mockSeats[0] = const SeatInfo(
+          seatNumber: 1,
+          isOccupied: true,
+          studentName: 'Gshsgsg',
+          studentId: 'demo_1',
+          shift: 'Full Day',
+          sectionName: 'Main Hall',
+        );
+      }
+      if (_mockSeats.length > 1) {
+        _mockSeats[1] = const SeatInfo(
+          seatNumber: 2,
+          isOccupied: true,
+          studentName: 'Uday',
+          studentId: 'demo_2',
+          shift: 'Full Day',
+          sectionName: 'Main Hall',
+        );
+      }
+    }
     _initialized = true;
   }
 
@@ -472,6 +526,140 @@ class LibraryService {
         }
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+    }
+  }
+
+  // Update Student details (Name, Phone, Shift, Seat, Note, etc.)
+  Future<void> updateStudent({
+    required String studentId,
+    required String name,
+    required String phone,
+    required String shift,
+    int? seatNumber,
+    String note = '',
+    int? monthlyFee,
+    int? duesAmount,
+  }) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      final studentDocRef = _db.collection('students').doc(studentId);
+      final updates = <String, dynamic>{
+        'name': name,
+        'phone': phone,
+        'shift': shift,
+        'note': note,
+      };
+      if (seatNumber != null) updates['seat_number'] = seatNumber;
+      if (monthlyFee != null) updates['monthly_fee'] = monthlyFee;
+      if (duesAmount != null) updates['dues_amount'] = duesAmount;
+      await studentDocRef.update(updates);
+    } else {
+      final idx = _mockStudents.indexWhere((s) => s.id == studentId);
+      if (idx != -1) {
+        final s = _mockStudents[idx];
+        _mockStudents[idx] = s.copyWith(
+          name: name,
+          phone: phone,
+          shift: shift,
+          seatNumber: seatNumber ?? s.seatNumber,
+          note: note,
+          monthlyFee: monthlyFee ?? s.monthlyFee,
+          duesAmount: duesAmount ?? s.duesAmount,
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+    }
+  }
+
+  // Delete Student Record and Vacate their seat
+  Future<void> deleteStudent(String studentId, int? seatNumber) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      final batch = _db.batch();
+      final studentDocRef = _db.collection('students').doc(studentId);
+      batch.delete(studentDocRef);
+      if (seatNumber != null) {
+        final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+        batch.update(seatDocRef, {
+          'is_occupied': false,
+          'student_id': null,
+          'student_name': null,
+          'shift': null,
+        });
+      }
+      await batch.commit();
+    } else {
+      _mockStudents.removeWhere((s) => s.id == studentId);
+      if (seatNumber != null && seatNumber > 0 && seatNumber <= _mockSeats.length) {
+        _mockSeats[seatNumber - 1] = SeatInfo(seatNumber: seatNumber);
+        _mockSeatsController.add(List.unmodifiable(_mockSeats));
+      }
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    }
+  }
+
+  // Quick Fee Collection & Dues Clearance
+  Future<void> collectStudentFee({
+    required String studentId,
+    required int amount,
+    required String paymentMode,
+    String notes = 'Monthly Fee Collection',
+  }) async {
+    ensureInitialized();
+    final now = DateTime.now();
+    final validUntil = now.add(const Duration(days: 30));
+
+    if (isFirebaseConnected) {
+      final studentDocRef = _db.collection('students').doc(studentId);
+      final paymentDocRef = _db.collection('payments').doc();
+      final batch = _db.batch();
+
+      batch.update(studentDocRef, {
+        'status': 'ACTIVE',
+        'dues_amount': 0,
+        'fee_due_date': Timestamp.fromDate(validUntil),
+        'payment_mode': paymentMode,
+      });
+
+      batch.set(paymentDocRef, {
+        'payment_id': paymentDocRef.id,
+        'student_id': studentId,
+        'amount': amount,
+        'date': Timestamp.fromDate(now),
+        'valid_until': Timestamp.fromDate(validUntil),
+        'payment_mode': paymentMode,
+        'notes': notes,
+      });
+
+      await batch.commit();
+    } else {
+      final idx = _mockStudents.indexWhere((s) => s.id == studentId);
+      if (idx != -1) {
+        final s = _mockStudents[idx];
+        _mockStudents[idx] = s.copyWith(
+          status: 'ACTIVE',
+          duesAmount: 0,
+          feeDueDate: validUntil,
+          paymentMode: paymentMode,
+        );
+        _mockPayments.insert(
+          0,
+          PaymentTransaction(
+            id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
+            studentId: studentId,
+            studentName: s.name,
+            studentPhone: s.phone,
+            seatNumber: s.seatNumber ?? 1,
+            shift: s.shift,
+            amount: amount,
+            date: now,
+            paymentMode: paymentMode,
+            notes: notes,
+          ),
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        _mockPaymentsController.add(List.unmodifiable(_mockPayments));
       }
     }
   }
