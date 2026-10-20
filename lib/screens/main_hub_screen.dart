@@ -2628,6 +2628,20 @@ class _MainHubScreenState extends State<MainHubScreen> {
     );
   }
 
+  Future<void> _sendWhatsAppReminder(StudentInfo s) async {
+    final cleanPhone = s.phone.replaceAll(RegExp(r'\D'), '');
+    final msg =
+        'Hello ${s.name}, your monthly library seat renewal fee of Rs.${s.monthlyFee} is scheduled. Please confirm at the desk.';
+    final uri = Uri.parse('https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(msg)}');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (_) {}
+  }
+
   // -------------------------------------------------------------
   // TAB 6: SETTINGS
   // -------------------------------------------------------------
