@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
@@ -25,15 +26,41 @@ class _SeatsScreenState extends State<SeatsScreen> {
   }
 
   void _showAssignSeatModal(SeatInfo seat, List<StudentInfo> students) {
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final feeCtrl = TextEditingController(text: '500');
-    String shift = 'Full Day';
-    String paymentMode = 'UPI';
-    StudentInfo? selectedExistingStudent;
+    bool isNewStudentMode = students.isEmpty;
+    StudentInfo? selectedStudent = students.where((s) => s.seatNumber == null).isNotEmpty
+        ? students.firstWhere((s) => s.seatNumber == null)
+        : (students.isNotEmpty ? students.first : null);
 
-    // Filter unallocated students
-    final unassignedStudents = students.where((s) => s.seatNumber == null).toList();
+    final newNameCtrl = TextEditingController();
+    final newPhoneCtrl = TextEditingController();
+    String? phoneError;
+
+    // Available shifts from library
+    final availableShifts = _service.shifts.isNotEmpty
+        ? _service.shifts.map((s) => s.name).toSet().toList()
+        : ['Full Day', 'Morning Shift', 'Evening Shift', 'Night Shift', '24 Hours'];
+    String selectedShift = selectedStudent?.shift ?? (seat.shift.isNotEmpty ? seat.shift : availableShifts.first);
+    if (!availableShifts.contains(selectedShift)) {
+      selectedShift = availableShifts.first;
+    }
+
+    // Available sections
+    final availableSections = _service.sections.isNotEmpty
+        ? _service.sections.map((s) => s.name).toSet().toList()
+        : ['Main Hall'];
+    String selectedSection = seat.sectionName.isNotEmpty && availableSections.contains(seat.sectionName)
+        ? seat.sectionName
+        : availableSections.first;
+
+    // Fee plans
+    final feePlans = [300, 400, 500, 600, 700, 800, 1000, 1200];
+    int selectedFeePlan = selectedStudent != null && feePlans.contains(selectedStudent.monthlyFee)
+        ? selectedStudent.monthlyFee
+        : 500;
+
+    // Payment collection dropdown
+    int feePaidNow = 0;
+    String paymentMode = 'UPI';
 
     showModalBottomSheet(
       context: context,
@@ -43,294 +70,867 @@ class _SeatsScreenState extends State<SeatsScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (modalCtx, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (modalCtx, setModalState) {
+          // Look up last payment for selected student
+          final lastPayment = selectedStudent != null
+              ? _service.getLastPaymentForStudent(
+                  studentId: selectedStudent!.id,
+                  phone: selectedStudent!.phone,
+                  name: selectedStudent!.name,
+                )
+              : null;
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Assign Seat S-${seat.seatNumber}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textNavy,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$selectedSection • Space Grid',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: AppColors.textNavy),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Mode Switcher: Enrolled Student vs Register New Student
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
                       children: [
-                        Text(
-                          'Assign Seat ${seat.seatNumber}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textNavy,
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                isNewStudentMode = false;
+                                if (selectedStudent != null) {
+                                  selectedShift = selectedStudent!.shift;
+                                  if (!availableShifts.contains(selectedShift)) {
+                                    selectedShift = availableShifts.first;
+                                  }
+                                }
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: !isNewStudentMode ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: !isNewStudentMode
+                                    ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4)]
+                                    : null,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Enrolled Student',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: !isNewStudentMode ? AppColors.textNavy : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Main Hall • Space Grid',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF64748B),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setModalState(() => isNewStudentMode = true),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isNewStudentMode ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: isNewStudentMode
+                                    ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4)]
+                                    : null,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '+ Register New',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: isNewStudentMode ? AppColors.textNavy : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: AppColors.textNavy),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-
-                // Option to select unassigned student
-                if (unassignedStudents.isNotEmpty) ...[
-                  const Text(
-                    'Select Existing Student',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textNavy,
-                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                  const SizedBox(height: 16),
+
+                  if (!isNewStudentMode) ...[
+                    // SELECT STUDENT DROPDOWN
+                    const Text(
+                      'Select Student',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<StudentInfo>(
-                        hint: const Text('Choose an enrolled student', style: TextStyle(fontSize: 13)),
-                        value: selectedExistingStudent,
-                        isExpanded: true,
-                        items: unassignedStudents.map((s) {
-                          return DropdownMenuItem<StudentInfo>(
-                            value: s,
-                            child: Text('${s.name} (${s.phone})', style: const TextStyle(fontSize: 13)),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setModalState(() {
-                              selectedExistingStudent = val;
-                              nameCtrl.text = val.name;
-                              phoneCtrl.text = val.phone;
-                              shift = val.shift;
-                              feeCtrl.text = '${val.monthlyFee}';
-                            });
-                          }
-                        },
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<StudentInfo>(
+                          hint: const Text('Choose an enrolled student', style: TextStyle(fontSize: 13)),
+                          value: selectedStudent,
+                          isExpanded: true,
+                          items: students.map((s) {
+                            final seatTag = s.seatNumber != null ? 'Seat S-${s.seatNumber}' : 'No Seat';
+                            final feeTag = s.hasDues ? 'Dues: ₹${s.effectiveDues}' : (s.status == 'TRIAL' ? 'Trial' : 'Paid');
+                            return DropdownMenuItem<StudentInfo>(
+                              value: s,
+                              child: Text(
+                                '${s.name} (${s.phone}) • $seatTag • $feeTag',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setModalState(() {
+                                selectedStudent = val;
+                                selectedShift = val.shift;
+                                if (!availableShifts.contains(selectedShift)) {
+                                  selectedShift = availableShifts.first;
+                                }
+                                selectedFeePlan = feePlans.contains(val.monthlyFee) ? val.monthlyFee : 500;
+                              });
+                            }
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Row(
-                    children: [
-                      Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                    const SizedBox(height: 14),
+
+                    // AUTO-POPULATED STUDENT DETAILS & 1-SEAT ENFORCEMENT
+                    if (selectedStudent != null) ...[
+                      // Student Details Card
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0284C7),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: const Color(0xFFEAB308), width: 1.5),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      selectedStudent!.name.isNotEmpty
+                                          ? selectedStudent!.name.substring(0, 1).toUpperCase()
+                                          : 'S',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        selectedStudent!.name,
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                                      ),
+                                      Text(
+                                        'Phone: ${selectedStudent!.phone}',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: selectedStudent!.status == 'TRIAL'
+                                        ? const Color(0xFFE0F2FE)
+                                        : (selectedStudent!.hasDues ? const Color(0xFFFFE4E6) : const Color(0xFFDCFCE7)),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    selectedStudent!.status,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: selectedStudent!.status == 'TRIAL'
+                                          ? const Color(0xFF0284C7)
+                                          : (selectedStudent!.hasDues ? const Color(0xFFE11D48) : const Color(0xFF16A34A)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+
+                            // ONE STUDENT ONE SEAT NOTICE
+                            if (selectedStudent!.seatNumber != null && selectedStudent!.seatNumber != seat.seatNumber)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFDE68A)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.info_outline, color: Color(0xFFD97706), size: 16),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Currently assigned to Seat S-${selectedStudent!.seatNumber}. Re-assigning to Seat S-${seat.seatNumber} will vacate Seat S-${selectedStudent!.seatNumber} (One student can only occupy 1 seat).',
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF92400E)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else if (selectedStudent!.seatNumber == null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0FDF4),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.check_circle_outline, color: Color(0xFF16A34A), size: 16),
+                                    SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Student is unallocated. Seat will be allocated exclusively.',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF166534)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // FEE STATUS (PAID OR PENDING DUES AUTOMATICALLY DISPLAYED)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: selectedStudent!.hasDues ? const Color(0xFFFFF1F2) : const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: selectedStudent!.hasDues ? const Color(0xFFFECDD3) : const Color(0xFFBBF7D0),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      selectedStudent!.hasDues
+                                          ? Icons.warning_amber_rounded
+                                          : Icons.check_circle_rounded,
+                                      color: selectedStudent!.hasDues ? const Color(0xFFE11D48) : const Color(0xFF16A34A),
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      selectedStudent!.hasDues ? 'FEE PENDING / DUES' : 'FEE FULLY PAID',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        color: selectedStudent!.hasDues ? const Color(0xFFE11D48) : const Color(0xFF16A34A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  selectedStudent!.hasDues
+                                      ? 'Due Date: ${selectedStudent!.feeDueDate != null ? DateFormat('dd MMM yyyy').format(selectedStudent!.feeDueDate!) : 'Immediate'} • Plan: ₹${selectedStudent!.monthlyFee}/mo'
+                                      : 'Valid Until: ${selectedStudent!.feeDueDate != null ? DateFormat('dd MMM yyyy').format(selectedStudent!.feeDueDate!) : 'Active'} • Plan: ₹${selectedStudent!.monthlyFee}/mo',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              selectedStudent!.hasDues
+                                  ? '₹${selectedStudent!.effectiveDues}'
+                                  : '₹0 Due',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: selectedStudent!.hasDues ? const Color(0xFFE11D48) : const Color(0xFF16A34A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // LAST FEE PAID DETAILS (AUTOMATICALLY DISPLAYED)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.receipt_long_outlined, size: 16, color: AppColors.textNavy),
+                                SizedBox(width: 6),
+                                Text(
+                                  'LAST FEE PAID DETAILS',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.6,
+                                    color: AppColors.textNavy,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (lastPayment != null) ...[
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    '₹${lastPayment.amount}',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0D766E),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE6FFFA),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      lastPayment.paymentMode,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0D766E),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Paid on ${DateFormat('dd MMM yyyy, hh:mm a').format(lastPayment.date)}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              ),
+                              if (lastPayment.notes.isNotEmpty)
+                                Text(
+                                  'Note: ${lastPayment.notes}',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                ),
+                            ] else ...[
+                              const Text(
+                                'No previous fee payment transactions on record for this student.',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                  ] else ...[
+                    // REGISTER NEW STUDENT FORM (WITH DUPLICATE VALIDATION)
+                    const Text(
+                      'Student Name',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: TextField(
+                        controller: newNameCtrl,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Rahul Sharma',
+                          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    const Text(
+                      'Phone Number (No Duplicates Allowed)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: phoneError != null ? const Color(0xFFE11D48) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: newPhoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        onChanged: (val) {
+                          if (_service.isDuplicateStudentPhone(val.trim())) {
+                            final dup = _service.findStudentByPhone(val.trim());
+                            setModalState(() => phoneError = 'Duplicate: Already enrolled as "${dup?.name}"');
+                          } else {
+                            setModalState(() => phoneError = null);
+                          }
+                        },
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. 9876543210',
+                          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    if (phoneError != null)
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10),
+                        padding: const EdgeInsets.only(top: 4, left: 4),
                         child: Text(
-                          'OR ENTER DETAILS',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF94A3B8),
+                          phoneError!,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFE11D48)),
+                        ),
+                      ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // ALL OTHER DETAILS IN DROPDOWNS (Shift, Section, Plan, Mode, Collect)
+                  const Text(
+                    'ASSIGNMENT SETTINGS (DROPDOWNS)',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Shift & Section Dropdowns
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Shift', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: selectedShift,
+                                  isExpanded: true,
+                                  items: availableShifts
+                                      .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setModalState(() => selectedShift = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Section', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: selectedSection,
+                                  isExpanded: true,
+                                  items: availableSections
+                                      .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setModalState(() => selectedSection = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Monthly Fee Plan & Payment Collection Dropdowns
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Monthly Fee Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: selectedFeePlan,
+                                  isExpanded: true,
+                                  items: feePlans
+                                      .map((fee) => DropdownMenuItem(value: fee, child: Text('₹$fee / mo', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setModalState(() => selectedFeePlan = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Collect Fee Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: feePaidNow,
+                                  isExpanded: true,
+                                  items: [
+                                    const DropdownMenuItem(value: 0, child: Text('₹0 (No pay now)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                                    DropdownMenuItem(value: selectedFeePlan, child: Text('₹$selectedFeePlan (Full)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setModalState(() => feePaidNow = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Payment Mode Dropdown
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Payment Mode', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: paymentMode,
+                            isExpanded: true,
+                            items: ['UPI', 'Cash', 'Card', 'Net Banking']
+                                .map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
+                                .toList(),
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => paymentMode = val);
+                            },
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Color(0xFFE2E8F0))),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
+
+                  // SUBMIT BUTTON
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D766E),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        if (!isNewStudentMode) {
+                          if (selectedStudent == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please select a student from the dropdown')),
+                            );
+                            return;
+                          }
+                          Navigator.pop(ctx);
+                          await _service.assignSeatToExistingStudent(
+                            newSeatNumber: seat.seatNumber,
+                            studentId: selectedStudent!.id,
+                            shift: selectedShift,
+                            sectionName: selectedSection,
+                            feePaidNow: feePaidNow,
+                            paymentMode: paymentMode,
+                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Seat S-${seat.seatNumber} successfully assigned to ${selectedStudent!.name}!'),
+                                backgroundColor: const Color(0xFF0D766E),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } else {
+                          final name = newNameCtrl.text.trim();
+                          final phone = newPhoneCtrl.text.trim();
+                          if (name.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter student name')),
+                            );
+                            return;
+                          }
+                          if (phone.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter phone number')),
+                            );
+                            return;
+                          }
+                          if (_service.isDuplicateStudentPhone(phone)) {
+                            final dup = _service.findStudentByPhone(phone);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Duplicate: Student "${dup?.name}" already exists with this phone! No duplicate entry allowed.'),
+                                backgroundColor: const Color(0xFFE11D48),
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.pop(ctx);
+                          await _service.assignSeatAndRegisterStudent(
+                            seatNumber: seat.seatNumber,
+                            studentName: name,
+                            phone: phone,
+                            shift: selectedShift,
+                            deviceUserId: _service.profile.adminName,
+                            feeAmount: feePaidNow,
+                            monthlyFee: selectedFeePlan,
+                            duesAmount: (selectedFeePlan - feePaidNow).clamp(0, 999999),
+                            paymentMode: paymentMode,
+                            status: (feePaidNow >= selectedFeePlan && feePaidNow > 0) ? 'ACTIVE' : 'DUES',
+                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('New student $name registered & assigned to Seat S-${seat.seatNumber}!'),
+                                backgroundColor: const Color(0xFF0D766E),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Text(
+                        !isNewStudentMode ? 'Confirm Seat S-${seat.seatNumber} Assignment' : 'Register & Assign Seat S-${seat.seatNumber}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                      ),
+                    ),
+                  ),
                 ],
-
-                // Student Name
-                const Text(
-                  'Student Name',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: nameCtrl,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
-                    decoration: const InputDecoration(
-                      hintText: 'e.g. Rahul Sharma',
-                      hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Phone Number
-                const Text(
-                  'Phone Number',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: phoneCtrl,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
-                    decoration: const InputDecoration(
-                      hintText: 'e.g. 9876543210',
-                      hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Shift & Monthly Fee
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Shift',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: shift,
-                                isExpanded: true,
-                                items: ['Full Day', 'Morning Shift', 'Evening Shift', 'Night Shift', '24 Hours']
-                                    .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
-                                    .toList(),
-                                onChanged: (val) {
-                                  if (val != null) setModalState(() => shift = val);
-                                },
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Fee (₹)',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: TextField(
-                              controller: feeCtrl,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Assign Seat Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D766E),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () async {
-                      final studentName = nameCtrl.text.trim().isEmpty ? 'Student' : nameCtrl.text.trim();
-                      final phone = phoneCtrl.text.trim().isEmpty ? '9876543210' : phoneCtrl.text.trim();
-                      final fee = int.tryParse(feeCtrl.text.trim()) ?? 500;
-
-                      Navigator.pop(ctx);
-
-                      await _service.assignSeatAndRegisterStudent(
-                        seatNumber: seat.seatNumber,
-                        studentName: studentName,
-                        phone: phone,
-                        shift: shift,
-                        deviceUserId: 'admin_device',
-                        feeAmount: fee,
-                        paymentMode: paymentMode,
-                      );
-
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.check_circle_rounded, color: Colors.white),
-                                const SizedBox(width: 8),
-                                Text('Seat ${seat.seatNumber} successfully assigned to $studentName!'),
-                              ],
-                            ),
-                            backgroundColor: const Color(0xFF0D766E),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text(
-                      'Assign Seat',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showChangeSeatDialog(SeatInfo currentSeat, List<SeatInfo> allSeats) {
+    final vacantSeats = allSeats.where((s) => !s.isOccupied).toList();
+    if (vacantSeats.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No other vacant seats available right now.')),
+      );
+      return;
+    }
+    int selectedNewSeat = vacantSeats.first.seatNumber;
+
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Move ${currentSeat.studentName}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Move from Seat S-${currentSeat.seatNumber} to an available seat:',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    value: selectedNewSeat,
+                    isExpanded: true,
+                    items: vacantSeats.map((vs) {
+                      return DropdownMenuItem<int>(
+                        value: vs.seatNumber,
+                        child: Text('Seat S-${vs.seatNumber} (${vs.sectionName})', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setDlgState(() => selectedNewSeat = val);
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D766E),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(dlgCtx);
+                await _service.changeSeat(
+                  fromSeatNumber: currentSeat.seatNumber,
+                  toSeatNumber: selectedNewSeat,
+                  studentId: currentSeat.studentId,
+                  shift: currentSeat.shift,
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${currentSeat.studentName} moved to Seat S-$selectedNewSeat. Seat S-${currentSeat.seatNumber} is now vacant.'),
+                      backgroundColor: const Color(0xFF0D766E),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Confirm Move'),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  void _showSeatOccupiedModal(SeatInfo seat) {
+  void _showSeatOccupiedModal(SeatInfo seat, List<SeatInfo> allSeats) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -372,7 +972,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
                         ),
                         Text(
-                          'Seat ${seat.seatNumber} • ${seat.shift}',
+                          'Seat S-${seat.seatNumber} • ${seat.shift}',
                           style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -406,7 +1006,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Seat ${seat.seatNumber} is now vacant and available.'),
+                            content: Text('Seat S-${seat.seatNumber} is now vacant and available.'),
                             backgroundColor: Colors.black87,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -429,9 +1029,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                     label: const Text('Change Seat', style: TextStyle(fontWeight: FontWeight.w800)),
                     onPressed: () {
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Select another available seat to reassign.')),
-                      );
+                      _showChangeSeatDialog(seat, allSeats);
                     },
                   ),
                 ),
@@ -519,6 +1117,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
             final studentsCount = students.length;
 
             // Apply search filter
+            // Apply search, shift, status, and dues filters
             final query = _searchCtrl.text.trim().toLowerCase();
             final filteredSeats = seats.where((seat) {
               if (query.isNotEmpty) {
@@ -528,13 +1127,39 @@ class _SeatsScreenState extends State<SeatsScreen> {
               }
 
               // Shift filter
-              if (_selectedShift != 'ALL') {
-                if (seat.shift.toLowerCase() != _selectedShift.toLowerCase()) return false;
+              if (_selectedShift.toUpperCase() != 'ALL') {
+                if (!seat.isOccupied) return false;
+                final seatShift = seat.shift.trim().toUpperCase();
+                final selShift = _selectedShift.trim().toUpperCase();
+                if (seatShift != selShift &&
+                    !seatShift.contains(selShift) &&
+                    !selShift.contains(seatShift)) {
+                  return false;
+                }
               }
 
               // Status filter
               if (_selectedStatus == 'VACANT' && seat.isOccupied) return false;
               if (_selectedStatus == 'OCCUPIED' && !seat.isOccupied) return false;
+
+              // Dues filter (PAID, UNPAID, TRIAL)
+              if (_selectedDues != 'ALL') {
+                if (!seat.isOccupied) return false;
+                final student = students.firstWhere(
+                  (s) => (seat.studentId.isNotEmpty && s.id == seat.studentId) || s.seatNumber == seat.seatNumber,
+                  orElse: () => StudentInfo(id: '', name: seat.studentName, phone: ''),
+                );
+                final hasDues = student.hasDues || student.effectiveDues > 0 || student.duesAmount > 0 || student.status == 'DUES';
+                final isTrial = student.status == 'TRIAL';
+
+                if (_selectedDues == 'PAID') {
+                  if (hasDues || isTrial) return false;
+                } else if (_selectedDues == 'UNPAID') {
+                  if (!hasDues) return false;
+                } else if (_selectedDues == 'TRIAL') {
+                  if (!isTrial) return false;
+                }
+              }
 
               return true;
             }).toList();
@@ -690,7 +1315,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         children: [
                           _filterRow(
                             'SHIFT',
-                            ['ALL', 'FULL DAY'],
+                            ['ALL', ..._service.shifts.map((s) => s.name.toUpperCase()).toSet()],
                             _selectedShift,
                             (val) => setState(() => _selectedShift = val),
                           ),
@@ -786,8 +1411,15 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           final seat = filteredSeats[idx - 1];
                           final isOccupied = seat.isOccupied;
 
-                          // OCCUPIED / ASSIGNED SEAT CARD (Image 2)
+                          // OCCUPIED / ASSIGNED SEAT CARD
                           if (isOccupied) {
+                            final student = students.firstWhere(
+                              (s) => (seat.studentId.isNotEmpty && s.id == seat.studentId) || s.seatNumber == seat.seatNumber,
+                              orElse: () => StudentInfo(id: '', name: seat.studentName, phone: ''),
+                            );
+                            final hasDues = student.hasDues || student.effectiveDues > 0 || student.duesAmount > 0 || student.status == 'DUES';
+                            final isTrial = student.status == 'TRIAL';
+
                             final initials = seat.studentName.trim().isNotEmpty
                                 ? (seat.studentName.trim().split(' ').length > 1
                                     ? '${seat.studentName.trim().split(' ')[0][0]}${seat.studentName.trim().split(' ')[1][0]}'.toUpperCase()
@@ -795,14 +1427,16 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                 : 'GS';
 
                             return InkWell(
-                              onTap: () => _showSeatOccupiedModal(seat),
+                              onTap: () => _showSeatOccupiedModal(seat, seats),
                               borderRadius: BorderRadius.circular(18),
                               child: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  border: Border.all(
+                                    color: hasDues ? const Color(0xFFFECDD3) : const Color(0xFFE2E8F0),
+                                  ),
                                   boxShadow: const [
                                     BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
                                   ],
@@ -810,7 +1444,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    // Top row: Green dot, Seat number, and Trial badge (Image 2)
+                                    // Top row: Status dot, Seat number, and dynamic Dues/Paid/Trial badge
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
@@ -819,8 +1453,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                             Container(
                                               width: 7,
                                               height: 7,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFF16A34A),
+                                              decoration: BoxDecoration(
+                                                color: isTrial
+                                                    ? const Color(0xFF0284C7)
+                                                    : (hasDues ? const Color(0xFFEF4444) : const Color(0xFF16A34A)),
                                                 shape: BoxShape.circle,
                                               ),
                                             ),
@@ -835,25 +1471,58 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                             ),
                                           ],
                                         ),
-                                        const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 14),
-                                            SizedBox(width: 2),
-                                            Text(
-                                              '1d',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w800,
-                                                color: Color(0xFF0284C7),
+                                        if (hasDues)
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 13),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                'Due ₹${student.effectiveDues}',
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFFE11D48),
+                                                ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
+                                            ],
+                                          )
+                                        else if (isTrial)
+                                          const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 13),
+                                              SizedBox(width: 2),
+                                              Text(
+                                                'Trial',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFF0284C7),
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        else
+                                          const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 13),
+                                              SizedBox(width: 2),
+                                              Text(
+                                                'Paid',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFF16A34A),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                       ],
                                     ),
 
-                                    // Circular Avatar with Gold/Yellow Border (Image 2)
+                                    // Circular Avatar with Gold/Yellow Border
                                     Container(
                                       width: 48,
                                       height: 48,
@@ -874,7 +1543,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                       ),
                                     ),
 
-                                    // Student Name & Shift Badge (Image 2)
+                                    // Student Name & Shift Badge
                                     Column(
                                       children: [
                                         Text(
@@ -1032,29 +1701,34 @@ class _SeatsScreenState extends State<SeatsScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 58,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-                color: Color(0xFF64748B),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: SizedBox(
+              width: 58,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: Color(0xFF64748B),
+                ),
               ),
             ),
           ),
           Expanded(
             child: Wrap(
               spacing: 8,
+              runSpacing: 6,
               children: options.map((opt) {
-                final isSel = selected == opt;
+                final isSel = selected.toUpperCase() == opt.toUpperCase();
                 return InkWell(
                   onTap: () => onSelected(opt),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: isSel ? const Color(0xFF0D766E) : Colors.white,
                       borderRadius: BorderRadius.circular(10),

@@ -110,9 +110,21 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       );
       return;
     }
-    if (_phoneCtrl.text.trim().isEmpty) {
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter phone number')),
+      );
+      return;
+    }
+    if (_service.isDuplicateStudentPhone(phone)) {
+      final existing = _service.findStudentByPhone(phone);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Duplicate Entry: Student "${existing?.name ?? "Enrolled"}" is already registered with phone $phone. No duplicate student entry can be done!'),
+          backgroundColor: const Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -137,6 +149,18 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final name = _fullNameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     final seatNum = _selectedSeat;
+
+    if (_service.isDuplicateStudentPhone(phone)) {
+      final existing = _service.findStudentByPhone(phone);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Duplicate Entry: Student "${existing?.name ?? "Enrolled"}" already exists with phone $phone!'),
+          backgroundColor: const Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     final shiftFee = _selectedShift.monthlyFee > 0 ? _selectedShift.monthlyFee : 500;
     final parsedMonthly = int.tryParse(_feeCtrl.text.trim()) ?? shiftFee;

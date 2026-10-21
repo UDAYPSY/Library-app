@@ -137,6 +137,46 @@ class LibraryService {
     _mockSeatsController.add(List.unmodifiable(_mockSeats));
   }
 
+  static String normalizePhone(String phone) {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length > 10) {
+      return digits.substring(digits.length - 10);
+    }
+    return digits;
+  }
+
+  bool isDuplicateStudentPhone(String phone, {String? excludeStudentId}) {
+    final norm = normalizePhone(phone);
+    if (norm.isEmpty) return false;
+    return _mockStudents.any((s) {
+      if (excludeStudentId != null && s.id == excludeStudentId) return false;
+      return normalizePhone(s.phone) == norm;
+    });
+  }
+
+  StudentInfo? findStudentByPhone(String phone) {
+    final norm = normalizePhone(phone);
+    if (norm.isEmpty) return null;
+    try {
+      return _mockStudents.firstWhere((s) => normalizePhone(s.phone) == norm);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<StudentInfo> get currentStudents => List.unmodifiable(_mockStudents);
+  List<PaymentTransaction> get currentPayments => List.unmodifiable(_mockPayments);
+
+  PaymentTransaction? getLastPaymentForStudent({String? studentId, String? phone, String? name}) {
+    final normPhone = phone != null ? normalizePhone(phone) : null;
+    for (var p in _mockPayments) {
+      if (studentId != null && studentId.isNotEmpty && p.studentId == studentId) return p;
+      if (normPhone != null && normPhone.isNotEmpty && normalizePhone(p.studentPhone) == normPhone) return p;
+      if (name != null && name.trim().isNotEmpty && p.studentName.trim().toLowerCase() == name.trim().toLowerCase()) return p;
+    }
+    return null;
+  }
+
   bool get isFirebaseConnected => Firebase.apps.isNotEmpty;
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
@@ -317,7 +357,173 @@ class LibraryService {
     }
   }
 
-  // Atomic Seat Assignment Transaction
+  // Assign Seat to Existing Student (Enforces: 1 student can ONLY be on 1 seat)
+  Future<void> assignSeatToExistingStudent({
+    required int newSeatNumber,
+    required String studentId,
+    String? shift,
+    String? sectionName,
+    int feePaidNow = 0,
+    String paymentMode = 'UPI',
+    String deviceUserId = 'Desk_Manager',
+  }) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      await _db.runTransaction((transaction) async {
+        final studentDocRef = _db.collection('students').doc(studentId);
+        final studentSnap = await transaction.get(studentDocRef);
+        if (!studentSnap.exists) {
+          throw Exception('Student not found');
+        }
+        final sData = studentSnap.data()!;
+        final oldSeat = (sData['seat_number'] as num?)?.toInt();
+        final studentName = (sData['name'] as String?) ?? 'Student';
+        final effectiveShift = shift ?? (sData['shift'] as String?) ?? 'Full Day';
+        final effectiveSection = sectionName ?? (sData['section_name'] as String?) ?? 'Main Hall';
+
+        // 1. Vacate old seat if exists and different
+        if (oldSeat != null && oldSeat != newSeatNumber) {
+          final oldSeatRef = _db.collection('seats').doc('seat_$oldSeat');
+          transaction.set(oldSeatRef, {
+            'seat_number': oldSeat,
+            'is_occupied': false,
+            'student_id': null,
+            'student_name': null,
+            'shift': null,
+          }, SetOptions(merge: true));
+        }
+
+        // 2. Assign new seat
+        final newSeatRef = _db.collection('seats').doc('seat_$newSeatNumber');
+        transaction.set(newSeatRef, {
+          'seat_number': newSeatNumber,
+          'is_occupied': true,
+          'student_id': studentId,
+          'student_name': studentName,
+          'shift': effectiveShift,
+          'section_name': effectiveSection,
+          'last_updated_by': deviceUserId,
+        }, SetOptions(merge: true));
+
+        // 3. Update student
+        final updateData = <String, dynamic>{
+          'seat_number': newSeatNumber,
+          'shift': effectiveShift,
+          'section_name': effectiveSection,
+          'status': 'ACTIVE',
+        };
+        if (feePaidNow > 0) {
+          final payRef = _db.collection('payments').doc();
+          transaction.set(payRef, {
+            'payment_id': payRef.id,
+            'student_id': studentId,
+            'student_name': studentName,
+            'amount': feePaidNow,
+            'date': Timestamp.now(),
+            'payment_mode': paymentMode,
+            'valid_until': Timestamp.fromDate(DateTime.now().add(const Duration(days: 30))),
+            'collected_by': deviceUserId,
+          });
+          updateData['fee_due_date'] = Timestamp.fromDate(DateTime.now().add(const Duration(days: 30)));
+          updateData['dues_amount'] = 0;
+        }
+        transaction.update(studentDocRef, updateData);
+      });
+    } else {
+      final sIdx = _mockStudents.indexWhere((s) => s.id == studentId);
+      if (sIdx == -1) return;
+      final s = _mockStudents[sIdx];
+      final effectiveShift = shift ?? s.shift;
+      final effectiveSection = sectionName ?? s.sectionName;
+
+      // 1. Ensure this student vacates any previous seats across the entire library (enforcing 1 seat per student)
+      for (int i = 0; i < _mockSeats.length; i++) {
+        if (_mockSeats[i].studentId == studentId ||
+            (_mockSeats[i].studentName.isNotEmpty &&
+                _mockSeats[i].studentName.toLowerCase() == s.name.toLowerCase() &&
+                _mockSeats[i].seatNumber != newSeatNumber)) {
+          _mockSeats[i] = SeatInfo(seatNumber: _mockSeats[i].seatNumber);
+        }
+      }
+
+      // 2. Ensure new seat doesn't belong to any other student
+      for (int i = 0; i < _mockStudents.length; i++) {
+        if (_mockStudents[i].id != studentId && _mockStudents[i].seatNumber == newSeatNumber) {
+          _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null);
+        }
+      }
+
+      // 3. Assign new seat
+      final newIdx = newSeatNumber - 1;
+      if (newIdx >= 0 && newIdx < _mockSeats.length) {
+        _mockSeats[newIdx] = SeatInfo(
+          seatNumber: newSeatNumber,
+          isOccupied: true,
+          studentId: studentId,
+          studentName: s.name,
+          shift: effectiveShift,
+          sectionName: effectiveSection,
+        );
+      }
+
+      // 4. Update dues & log payment if fee paid now
+      int updatedDues = s.duesAmount;
+      DateTime? updatedDueDate = s.feeDueDate;
+      String updatedStatus = s.status;
+
+      if (feePaidNow > 0) {
+        updatedDues = (updatedDues - feePaidNow).clamp(0, 999999);
+        updatedDueDate = DateTime.now().add(const Duration(days: 30));
+        if (updatedDues == 0 && updatedStatus == 'DUES') {
+          updatedStatus = 'ACTIVE';
+        }
+        _mockPayments.insert(
+          0,
+          PaymentTransaction(
+            id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
+            studentId: studentId,
+            studentName: s.name,
+            studentPhone: s.phone,
+            seatNumber: newSeatNumber,
+            shift: effectiveShift,
+            amount: feePaidNow,
+            date: DateTime.now(),
+            paymentMode: paymentMode,
+            notes: 'Seat assignment payment',
+          ),
+        );
+        _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+      }
+
+      _mockStudents[sIdx] = s.copyWith(
+        seatNumber: newSeatNumber,
+        shift: effectiveShift,
+        sectionName: effectiveSection,
+        feeDueDate: updatedDueDate,
+        duesAmount: updatedDues,
+        status: updatedStatus,
+      );
+
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    }
+  }
+
+  // Change Seat
+  Future<void> changeSeat({
+    required int fromSeatNumber,
+    required int toSeatNumber,
+    required String studentId,
+    String? shift,
+  }) async {
+    await assignSeatToExistingStudent(
+      newSeatNumber: toSeatNumber,
+      studentId: studentId,
+      shift: shift,
+    );
+  }
+
+  // Atomic Seat Assignment Transaction (prevents duplicate student entries)
   Future<void> assignSeatAndRegisterStudent({
     int? seatNumber,
     required String studentName,
@@ -333,6 +539,23 @@ class LibraryService {
     int duesAmount = 0,
   }) async {
     ensureInitialized();
+
+    // Prevent duplicate student creation: if phone exists, re-assign existing student!
+    final existingStudent = findStudentByPhone(phone);
+    if (existingStudent != null) {
+      if (seatNumber != null) {
+        await assignSeatToExistingStudent(
+          newSeatNumber: seatNumber,
+          studentId: existingStudent.id,
+          shift: shift,
+          feePaidNow: feeAmount,
+          paymentMode: paymentMode,
+          deviceUserId: deviceUserId,
+        );
+      }
+      return;
+    }
+
     final now = joiningDate ?? DateTime.now();
     final effectiveMonthly = (monthlyFee != null && monthlyFee > 0)
         ? monthlyFee
@@ -409,9 +632,6 @@ class LibraryService {
       if (seatNumber != null) {
         final index = seatNumber - 1;
         if (index >= 0 && index < _mockSeats.length) {
-          if (_mockSeats[index].isOccupied) {
-            throw Exception('Seat $seatNumber is already occupied!');
-          }
           _mockSeats[index] = SeatInfo(
             seatNumber: seatNumber,
             isOccupied: true,
@@ -464,7 +684,7 @@ class LibraryService {
     }
   }
 
-  // Vacate Seat
+  // Vacate Seat (Sets seat isOccupied: false, and student.seatNumber: null without marking inactive)
   Future<void> vacateSeat(int seatNumber, String? studentId) async {
     ensureInitialized();
     if (isFirebaseConnected) {
@@ -481,7 +701,6 @@ class LibraryService {
       if (studentId != null && studentId.trim().isNotEmpty) {
         final studentDocRef = _db.collection('students').doc(studentId.trim());
         batch.update(studentDocRef, {
-          'status': 'INACTIVE',
           'seat_number': null,
         });
       }
@@ -496,17 +715,8 @@ class LibraryService {
               _mockStudents.indexWhere((s) => s.id == studentId);
           if (studentIndex != -1) {
             final s = _mockStudents[studentIndex];
-            _mockStudents[studentIndex] = StudentInfo(
-              id: s.id,
-              name: s.name,
-              phone: s.phone,
+            _mockStudents[studentIndex] = s.copyWith(
               seatNumber: null,
-              shift: s.shift,
-              status: 'INACTIVE',
-              feeDueDate: s.feeDueDate,
-              joinedAt: s.joinedAt,
-              monthlyFee: s.monthlyFee,
-              paymentMode: s.paymentMode,
             );
           }
         }

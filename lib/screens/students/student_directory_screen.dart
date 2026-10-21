@@ -287,8 +287,17 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                       ),
                       onPressed: () async {
                         final name = nameCtrl.text.trim();
-                        final phone = phoneCtrl.text.trim();
                         if (name.isEmpty || phone.isEmpty) return;
+                        if (_service.isDuplicateStudentPhone(phone)) {
+                          final existing = _service.findStudentByPhone(phone);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Duplicate: Student "${existing?.name ?? "Enrolled"}" already registered with phone $phone. No duplicates allowed!'),
+                              backgroundColor: const Color(0xFFE11D48),
+                            ),
+                          );
+                          return;
+                        }
                         Navigator.pop(ctx);
 
                         final parsedFee = int.tryParse(feeCtrl.text.trim()) ?? initialFee;
