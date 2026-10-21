@@ -2576,7 +2576,6 @@ Have a productive study session!
                       if (newName.isNotEmpty) {
                         await _service.saveBranding(
                           libraryName: newName,
-                          themeColorValue: profile.themeColorValue,
                           logoBase64: profile.logoBase64,
                         );
                         if (mounted) setState(() {});
