@@ -160,6 +160,20 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   }
 
   void _goToStep3() {
+    if (_selectedSeat != null) {
+      final isCurrent = widget.studentToEdit != null && widget.studentToEdit!.seatNumber == _selectedSeat;
+      if (!isCurrent && _service.isSeatOccupied(_selectedSeat!)) {
+        final occ = _service.getStudentForSeat(_selectedSeat!);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Seat S-$_selectedSeat is already occupied${occ != null ? " by ${occ.name}" : ""}. It cannot be assigned to another member.'),
+            backgroundColor: const Color(0xFFE11D48),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
     final fee = int.tryParse(_feeCtrl.text.trim());
     if (fee == null || fee < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -177,6 +191,21 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final name = _fullNameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     final seatNum = _selectedSeat;
+
+    if (seatNum != null) {
+      final isCurrent = widget.studentToEdit != null && widget.studentToEdit!.seatNumber == seatNum;
+      if (!isCurrent && _service.isSeatOccupied(seatNum)) {
+        final occ = _service.getStudentForSeat(seatNum);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Seat S-$seatNum is already occupied${occ != null ? " by ${occ.name}" : ""}. It cannot be assigned to another member.'),
+            backgroundColor: const Color(0xFFE11D48),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
 
     if (_service.isDuplicateStudentPhone(phone, excludeStudentId: widget.studentToEdit?.id)) {
       final existing = _service.findStudentByPhone(phone);
@@ -223,71 +252,83 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       finalStatus = 'ACTIVE';
     }
 
-    if (widget.studentToEdit != null) {
-      await _service.updateStudent(
-        studentId: widget.studentToEdit!.id,
-        name: name,
+    try {
+      if (widget.studentToEdit != null) {
+        await _service.updateStudent(
+          studentId: widget.studentToEdit!.id,
+          name: name,
+          phone: phone,
+          shift: _selectedShift.name,
+          seatNumber: seatNum,
+          note: _notesCtrl.text.trim(),
+          monthlyFee: finalMonthlyFee,
+          duesAmount: finalDuesAmount,
+          status: finalStatus,
+          fatherName: _fatherNameCtrl.text.trim(),
+          address: _addressCtrl.text.trim(),
+          aadhaarNumber: _aadhaarCtrl.text.trim(),
+          preparationFor: _preparationCtrl.text.trim(),
+          gender: _gender,
+          sectionName: _selectedSection,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Student $name profile updated successfully!'),
+              backgroundColor: AppColors.primaryTeal,
+            ),
+          );
+          Navigator.pop(context, true);
+        }
+        return;
+      }
+
+      await _service.assignSeatAndRegisterStudent(
+        seatNumber: seatNum,
+        studentName: name,
         phone: phone,
         shift: _selectedShift.name,
-        seatNumber: seatNum,
-        note: _notesCtrl.text.trim(),
+        deviceUserId: _service.profile.adminName,
+        feeAmount: finalPaidAmount,
         monthlyFee: finalMonthlyFee,
         duesAmount: finalDuesAmount,
+        paymentMode: 'UPI',
         status: finalStatus,
+        joiningDate: _joiningDate,
+        note: _notesCtrl.text.trim(),
         fatherName: _fatherNameCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
         aadhaarNumber: _aadhaarCtrl.text.trim(),
         preparationFor: _preparationCtrl.text.trim(),
         gender: _gender,
-        sectionName: _selectedSection,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Student $name profile updated successfully!'),
-            backgroundColor: AppColors.primaryTeal,
+            content: Text(_isTrial
+                ? 'Trial Student $name registered successfully!'
+                : (finalDuesAmount > 0
+                    ? 'Student $name registered with ₹$finalDuesAmount pending due (categorized in DUES & REMAINING)!'
+                    : 'Student $name added successfully (Fully Paid)!')),
+            backgroundColor: _isTrial
+                ? const Color(0xFFD97706)
+                : (finalDuesAmount > 0 ? const Color(0xFFE11D48) : AppColors.successGreen),
           ),
         );
         Navigator.pop(context, true);
       }
-      return;
-    }
-
-    await _service.assignSeatAndRegisterStudent(
-      seatNumber: seatNum,
-      studentName: name,
-      phone: phone,
-      shift: _selectedShift.name,
-      deviceUserId: _service.profile.adminName,
-      feeAmount: finalPaidAmount,
-      monthlyFee: finalMonthlyFee,
-      duesAmount: finalDuesAmount,
-      paymentMode: 'UPI',
-      status: finalStatus,
-      joiningDate: _joiningDate,
-      note: _notesCtrl.text.trim(),
-      fatherName: _fatherNameCtrl.text.trim(),
-      address: _addressCtrl.text.trim(),
-      aadhaarNumber: _aadhaarCtrl.text.trim(),
-      preparationFor: _preparationCtrl.text.trim(),
-      gender: _gender,
-    );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isTrial
-              ? 'Trial Student $name registered successfully!'
-              : (finalDuesAmount > 0
-                  ? 'Student $name registered with ₹$finalDuesAmount pending due (categorized in DUES & REMAINING)!'
-                  : 'Student $name added successfully (Fully Paid)!')),
-          backgroundColor: _isTrial
-              ? const Color(0xFFD97706)
-              : (finalDuesAmount > 0 ? const Color(0xFFE11D48) : AppColors.successGreen),
-        ),
-      );
-      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: const Color(0xFFE11D48),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -780,13 +821,66 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                 items: [
                   const DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('Unallocated', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: Text('Unallocated (No Seat)', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                   ...List.generate(_service.totalSeatsCount, (i) => i + 1).map(
-                    (s) => DropdownMenuItem<int?>(
-                      value: s,
-                      child: Text('Seat S-$s', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    ),
+                    (s) {
+                      final isCurrent = widget.studentToEdit != null && widget.studentToEdit!.seatNumber == s;
+                      final isOcc = _service.isSeatOccupied(s) && !isCurrent;
+                      final occStudent = isOcc ? _service.getStudentForSeat(s) : null;
+                      return DropdownMenuItem<int?>(
+                        value: s,
+                        enabled: !isOcc,
+                        child: Row(
+                          children: [
+                            Text(
+                              'Seat S-$s',
+                              style: TextStyle(
+                                fontWeight: isOcc ? FontWeight.w500 : FontWeight.w700,
+                                color: isOcc ? const Color(0xFF94A3B8) : (isCurrent ? const Color(0xFF0D9488) : AppColors.textNavy),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (isCurrent)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFCCFBF1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Current',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF0F766E)),
+                                ),
+                              )
+                            else if (isOcc)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Occupied${occStudent != null ? " • ${occStudent.name}" : ""}',
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Available',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF16A34A)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
                 onChanged: (v) => setState(() => _selectedSeat = v),

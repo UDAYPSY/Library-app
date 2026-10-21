@@ -166,8 +166,30 @@ class LibraryService {
 
   bool isSeatOccupied(int seatNum) {
     ensureInitialized();
-    if (seatNum <= 0 || seatNum > _mockSeats.length) return false;
-    return _mockSeats[seatNum - 1].isOccupied;
+    if (seatNum <= 0) return false;
+    final seatOccupiedInSeats = (seatNum <= _mockSeats.length) && _mockSeats[seatNum - 1].isOccupied;
+    final seatOccupiedInStudents = _mockStudents.any((s) => s.seatNumber == seatNum && s.status != 'INACTIVE');
+    return seatOccupiedInSeats || seatOccupiedInStudents;
+  }
+
+  StudentInfo? getStudentForSeat(int seatNum) {
+    ensureInitialized();
+    try {
+      return _mockStudents.firstWhere((s) => s.seatNumber == seatNum && s.status != 'INACTIVE');
+    } catch (_) {
+      try {
+        if (seatNum > 0 && seatNum <= _mockSeats.length) {
+          final seat = _mockSeats[seatNum - 1];
+          if (seat.studentId.isNotEmpty) {
+            return _mockStudents.firstWhere((s) => s.id == seat.studentId);
+          }
+          if (seat.studentName.isNotEmpty) {
+            return _mockStudents.firstWhere((s) => s.name.toLowerCase() == seat.studentName.toLowerCase());
+          }
+        }
+      } catch (_) {}
+      return null;
+    }
   }
 
   List<StudentInfo> get currentStudents => List.unmodifiable(_mockStudents);
@@ -567,6 +589,14 @@ class LibraryService {
       return;
     }
 
+    // Ensure seat is not already occupied by another student
+    if (seatNumber != null && isSeatOccupied(seatNumber)) {
+      final occ = getStudentForSeat(seatNumber);
+      if (occ != null) {
+        throw Exception('Seat S-$seatNumber is already occupied by ${occ.name}. It cannot be assigned to another member.');
+      }
+    }
+
     final now = joiningDate ?? DateTime.now();
     final effectiveMonthly = (monthlyFee != null && monthlyFee > 0)
         ? monthlyFee
@@ -646,6 +676,12 @@ class LibraryService {
       // In-memory mock assignment
       final studentId = 'std_${DateTime.now().millisecondsSinceEpoch}';
       if (seatNumber != null) {
+        // Enforce strictly 1 student per seat: unassign this seat from any previous student
+        for (int i = 0; i < _mockStudents.length; i++) {
+          if (_mockStudents[i].seatNumber == seatNumber) {
+            _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null);
+          }
+        }
         final index = seatNumber - 1;
         if (index >= 0 && index < _mockSeats.length) {
           _mockSeats[index] = SeatInfo(
@@ -955,6 +991,14 @@ class LibraryService {
         final s = _mockStudents[idx];
         final oldSeat = s.seatNumber;
         final newSeat = seatNumber ?? oldSeat;
+
+        // If changing to a new seat, ensure it is not already occupied by another student
+        if (newSeat != null && newSeat != oldSeat && isSeatOccupied(newSeat)) {
+          final occ = getStudentForSeat(newSeat);
+          if (occ != null && occ.id != studentId) {
+            throw Exception('Seat S-$newSeat is already occupied by ${occ.name}. It cannot be assigned to another member.');
+          }
+        }
 
         // Reallocate seats if seat changed
         if (oldSeat != null && newSeat != oldSeat && oldSeat > 0 && oldSeat <= _mockSeats.length) {

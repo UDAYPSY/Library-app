@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/library_models.dart';
 import '../services/library_service.dart';
+import 'students/member_profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final bool isFirebaseReady;
@@ -271,59 +273,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _handleSeatClick(SeatInfo seat) {
     if (seat.isOccupied) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Seat S-${seat.seatNumber} Details'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Student: ${seat.studentName}',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              Text('Shift: ${seat.shift}'),
-              const SizedBox(height: 6),
-              const Text('Monthly Fee: ₹500 (Collected)',
-                  style: TextStyle(color: Colors.green)),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                try {
-                  await _service.vacateSeat(seat.seatNumber, seat.studentId);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Seat S-${seat.seatNumber} is now vacant.')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error vacating seat: $e')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Vacate Seat'),
-            ),
-          ],
+      final student = _service.currentStudents.firstWhere(
+        (s) => (seat.studentId.isNotEmpty && s.id == seat.studentId) || s.seatNumber == seat.seatNumber,
+        orElse: () => _service.getStudentForSeat(seat.seatNumber) ?? StudentInfo(
+          id: seat.studentId.isNotEmpty ? seat.studentId : 'S-${seat.seatNumber}',
+          name: seat.studentName.isNotEmpty ? seat.studentName : 'Student S-${seat.seatNumber}',
+          phone: '',
+          seatNumber: seat.seatNumber,
+          shift: seat.shift,
         ),
       );
-    } else {
-      _showRegistrationSheet(seat.seatNumber);
+      final idx = _service.currentStudents.indexWhere((s) => s.id == student.id);
+      final memberId = idx != -1 ? idx + 1 : seat.seatNumber;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MemberProfileScreen(student: student, memberId: memberId),
+        ),
+      );
+      return;
     }
+    _showRegistrationSheet(seat.seatNumber);
   }
 
   void _showRegistrationSheet(int seatNum) {

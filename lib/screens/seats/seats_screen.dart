@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import '../students/member_profile_screen.dart';
 
 class SeatsScreen extends StatefulWidget {
   const SeatsScreen({super.key});
@@ -985,7 +986,43 @@ class _SeatsScreenState extends State<SeatsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            // View Member Profile (Image 2)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.person_outline_rounded, size: 20),
+                label: const Text('View Member Profile', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  final student = _service.currentStudents.firstWhere(
+                    (s) => (seat.studentId.isNotEmpty && s.id == seat.studentId) || s.seatNumber == seat.seatNumber,
+                    orElse: () => _service.getStudentForSeat(seat.seatNumber) ?? StudentInfo(
+                      id: seat.studentId.isNotEmpty ? seat.studentId : 'S-${seat.seatNumber}',
+                      name: seat.studentName.isNotEmpty ? seat.studentName : 'Student S-${seat.seatNumber}',
+                      phone: '',
+                      seatNumber: seat.seatNumber,
+                      shift: seat.shift,
+                    ),
+                  );
+                  final idx = _service.currentStudents.indexWhere((s) => s.id == student.id);
+                  final memberId = idx != -1 ? idx + 1 : seat.seatNumber;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MemberProfileScreen(student: student, memberId: memberId),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
 
             // Action Buttons
             Row(
@@ -1415,8 +1452,16 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           if (isOccupied) {
                             final student = students.firstWhere(
                               (s) => (seat.studentId.isNotEmpty && s.id == seat.studentId) || s.seatNumber == seat.seatNumber,
-                              orElse: () => StudentInfo(id: '', name: seat.studentName, phone: ''),
+                              orElse: () => _service.getStudentForSeat(seat.seatNumber) ?? StudentInfo(
+                                id: seat.studentId.isNotEmpty ? seat.studentId : 'S-${seat.seatNumber}',
+                                name: seat.studentName.isNotEmpty ? seat.studentName : 'Student S-${seat.seatNumber}',
+                                phone: '',
+                                seatNumber: seat.seatNumber,
+                                shift: seat.shift,
+                              ),
                             );
+                            final studentIdx = students.indexWhere((s) => s.id == student.id);
+                            final memberId = studentIdx != -1 ? studentIdx + 1 : seat.seatNumber;
                             final hasDues = student.hasDues || student.effectiveDues > 0 || student.duesAmount > 0 || student.status == 'DUES';
                             final isTrial = student.status == 'TRIAL';
 
@@ -1427,7 +1472,18 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                 : 'GS';
 
                             return InkWell(
-                              onTap: () => _showSeatOccupiedModal(seat, seats),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => MemberProfileScreen(
+                                      student: student,
+                                      memberId: memberId,
+                                    ),
+                                  ),
+                                );
+                              },
+                              onLongPress: () => _showSeatOccupiedModal(seat, seats),
                               borderRadius: BorderRadius.circular(18),
                               child: Container(
                                 padding: const EdgeInsets.all(12),
