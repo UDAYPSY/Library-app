@@ -1353,16 +1353,16 @@ class LibraryService {
   }
 
   void saveBranding({
-    required String logoEmblem,
-    required String tagline,
+    String? logoEmblem,
+    String? tagline,
     String? libraryName,
     String? city,
     String? logoBase64,
     String? logoUrl,
     bool clearCustomLogo = false,
   }) {
-    profile.logoEmblem = logoEmblem;
-    profile.tagline = tagline;
+    if (logoEmblem != null) profile.logoEmblem = logoEmblem;
+    if (tagline != null) profile.tagline = tagline;
     if (clearCustomLogo) {
       profile.logoBase64 = null;
       profile.logoUrl = null;

@@ -2574,8 +2574,10 @@ Have a productive study session!
                     onPressed: () async {
                       final newName = nameCtrl.text.trim();
                       if (newName.isNotEmpty) {
-                        await _service.saveBranding(
+                        _service.saveBranding(
                           libraryName: newName,
+                          logoEmblem: profile.logoEmblem,
+                          tagline: profile.tagline,
                           logoBase64: profile.logoBase64,
                         );
                         if (mounted) setState(() {});
