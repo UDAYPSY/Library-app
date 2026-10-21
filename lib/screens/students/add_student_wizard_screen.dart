@@ -33,6 +33,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int? _selectedSeat; // null = unallocated
   late ShiftConfig _selectedShift;
   final TextEditingController _feeCtrl = TextEditingController();
+  bool _isTrial = false;
 
   // Step 3: Review Options
   bool _saveToContacts = true;
@@ -40,7 +41,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   @override
   void initState() {
     super.initState();
-    if (_service.shifts.isNotEmpty) {
+    final activeShifts = _service.shifts.where((s) => s.isActive).toList();
+    if (activeShifts.isNotEmpty) {
+      _selectedShift = activeShifts.first;
+      _feeCtrl.text = '${_selectedShift.monthlyFee}';
+    } else if (_service.shifts.isNotEmpty) {
       _selectedShift = _service.shifts.first;
       _feeCtrl.text = '${_selectedShift.monthlyFee}';
     } else {
@@ -126,7 +131,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final name = _fullNameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     final fee = int.tryParse(_feeCtrl.text.trim()) ?? _selectedShift.monthlyFee;
-    final seatNum = _selectedSeat ?? 1;
+    final seatNum = _selectedSeat;
 
     await _service.assignSeatAndRegisterStudent(
       seatNumber: seatNum,
@@ -136,13 +141,18 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       deviceUserId: _service.profile.adminName,
       feeAmount: fee,
       paymentMode: 'UPI',
+      status: _isTrial ? 'TRIAL' : 'ACTIVE',
+      joiningDate: _joiningDate,
+      note: _notesCtrl.text.trim(),
     );
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Student $name added successfully!'),
-          backgroundColor: AppColors.successGreen,
+          content: Text(_isTrial
+              ? 'Trial Student $name registered successfully!'
+              : 'Student $name added successfully!'),
+          backgroundColor: _isTrial ? const Color(0xFFD97706) : AppColors.successGreen,
         ),
       );
       Navigator.pop(context);
@@ -605,7 +615,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Shift Selection Row with Manage Shifts link (Image 4)
+          // Shift Selection Row with Manage Shifts link
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -635,60 +645,109 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Shift Card (Image 4)
-          Container(
-            width: 180,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.primaryTeal,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x330D9488),
-                  blurRadius: 8,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _selectedShift.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
+          // Active Shifts Horizontal List (Only active shifts shown)
+          Builder(
+            builder: (context) {
+              final activeShifts = _service.shifts.where((s) => s.isActive).toList();
+              final shiftsToDisplay = activeShifts.isNotEmpty ? activeShifts : _service.shifts;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: shiftsToDisplay.map((sh) {
+                    final isSelected = _selectedShift.id == sh.id || _selectedShift.name == sh.name;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12.0),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () {
+                          setState(() {
+                            _selectedShift = sh;
+                            _feeCtrl.text = '${sh.monthlyFee}';
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 170,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primaryTeal : Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isSelected ? AppColors.primaryTeal : const Color(0xFFE2E8F0),
+                              width: isSelected ? 2 : 1,
+                            ),
+                            boxShadow: isSelected
+                                ? const [
+                                    BoxShadow(
+                                      color: Color(0x330D9488),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ]
+                                : const [
+                                    BoxShadow(
+                                      color: Colors.black12,
+                                      blurRadius: 2,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      sh.name,
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.white : AppColors.textNavy,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Icon(
+                                    isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                    color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Divider(
+                                color: isSelected ? Colors.white24 : const Color(0xFFF1F5F9),
+                                height: 1,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                '${sh.startsAt} - ${sh.endsAt}',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white.withOpacity(0.85) : const Color(0xFF64748B),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '₹${sh.monthlyFee}',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.primaryTeal,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                  ],
+                    );
+                  }).toList(),
                 ),
-                const SizedBox(height: 10),
-                const Divider(color: Colors.white24, height: 1),
-                const SizedBox(height: 10),
-                Text(
-                  '${_selectedShift.startsAt} - ${_selectedShift.endsAt}',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '₹${_selectedShift.monthlyFee}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
           const SizedBox(height: 20),
 
@@ -698,6 +757,69 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
             controller: _feeCtrl,
             hintText: '500',
             keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 18),
+
+          // Trial Student Registration Option
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _isTrial ? const Color(0xFFFEF3C7) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _isTrial ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _isTrial ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.school_rounded,
+                    color: _isTrial ? const Color(0xFFD97706) : const Color(0xFF64748B),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Trial Student Registration',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: _isTrial ? const Color(0xFF92400E) : AppColors.textNavy,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _isTrial
+                            ? 'Member registered as TRIAL with no immediate dues'
+                            : 'Regular active member with standard fee cycle',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _isTrial ? const Color(0xFFB45309) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _isTrial,
+                  activeColor: const Color(0xFFD97706),
+                  onChanged: (val) {
+                    setState(() => _isTrial = val);
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -787,7 +909,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _reviewItem('PREPARING FOR', prep)),
+                  Expanded(
+                    child: _reviewItem(
+                      'STATUS',
+                      _isTrial ? 'TRIAL STUDENT' : 'ACTIVE MEMBER',
+                    ),
+                  ),
                   Expanded(child: _reviewItem('SHIFTS', _selectedShift.name)),
                 ],
               ),
@@ -796,6 +923,19 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: _reviewItem('FEES', '₹$fee')),
+                  Expanded(
+                    child: _reviewItem(
+                      'SEAT',
+                      _selectedSeat != null ? 'Seat S-$_selectedSeat' : 'Unallocated',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _reviewItem('PREPARING FOR', prep)),
                   Expanded(child: _reviewItem('FATHER', father)),
                 ],
               ),

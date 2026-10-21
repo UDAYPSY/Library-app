@@ -319,31 +319,50 @@ class LibraryService {
 
   // Atomic Seat Assignment Transaction
   Future<void> assignSeatAndRegisterStudent({
-    required int seatNumber,
+    int? seatNumber,
     required String studentName,
     required String phone,
     required String shift,
     required String deviceUserId,
     int feeAmount = 500,
     String paymentMode = 'UPI',
+    String status = 'ACTIVE',
+    DateTime? joiningDate,
+    String note = '',
+    int duesAmount = 0,
   }) async {
     ensureInitialized();
-    final now = DateTime.now();
+    final now = joiningDate ?? DateTime.now();
     final validUntil = now.add(const Duration(days: 30));
 
     if (isFirebaseConnected) {
-      final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
       final studentDocRef = _db.collection('students').doc();
       final paymentDocRef = _db.collection('payments').doc();
 
       await _db.runTransaction((transaction) async {
-        final seatSnapshot = await transaction.get(seatDocRef);
+        if (seatNumber != null) {
+          final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+          final seatSnapshot = await transaction.get(seatDocRef);
 
-        if (seatSnapshot.exists) {
-          final data = seatSnapshot.data();
-          if (data != null && data['is_occupied'] == true) {
-            throw Exception('Seat $seatNumber is already occupied!');
+          if (seatSnapshot.exists) {
+            final data = seatSnapshot.data();
+            if (data != null && data['is_occupied'] == true) {
+              throw Exception('Seat $seatNumber is already occupied!');
+            }
           }
+
+          transaction.set(
+            seatDocRef,
+            {
+              'seat_number': seatNumber,
+              'is_occupied': true,
+              'student_id': studentDocRef.id,
+              'student_name': studentName,
+              'shift': shift,
+              'last_updated_by': deviceUserId,
+            },
+            SetOptions(merge: true),
+          );
         }
 
         // 1. Create Student record
@@ -354,68 +373,67 @@ class LibraryService {
           'seat_number': seatNumber,
           'shift': shift,
           'fee_due_date': Timestamp.fromDate(validUntil),
-          'status': 'ACTIVE',
+          'status': status,
           'joined_at': Timestamp.fromDate(now),
           'monthly_fee': feeAmount,
           'payment_mode': paymentMode,
+          'note': note,
+          'dues_amount': duesAmount,
         });
 
-        // 2. Lock Seat
-        transaction.set(
-          seatDocRef,
-          {
-            'seat_number': seatNumber,
-            'is_occupied': true,
+        // 2. Log payment if not trial and fee > 0
+        if (status != 'TRIAL' && feeAmount > 0) {
+          transaction.set(paymentDocRef, {
+            'payment_id': paymentDocRef.id,
             'student_id': studentDocRef.id,
             'student_name': studentName,
-            'shift': shift,
-            'last_updated_by': deviceUserId,
-          },
-          SetOptions(merge: true),
-        );
-
-        // 3. Log payment
-        transaction.set(paymentDocRef, {
-          'payment_id': paymentDocRef.id,
-          'student_id': studentDocRef.id,
-          'student_name': studentName,
-          'amount': feeAmount,
-          'date': Timestamp.fromDate(now),
-          'valid_until': Timestamp.fromDate(validUntil),
-          'collected_by': deviceUserId,
-          'payment_mode': paymentMode,
-        });
+            'amount': feeAmount,
+            'date': Timestamp.fromDate(now),
+            'valid_until': Timestamp.fromDate(validUntil),
+            'collected_by': deviceUserId,
+            'payment_mode': paymentMode,
+          });
+        }
       });
     } else {
       // In-memory mock assignment
-      final index = seatNumber - 1;
-      if (index >= 0 && index < _mockSeats.length) {
-        if (_mockSeats[index].isOccupied) {
-          throw Exception('Seat $seatNumber is already occupied!');
-        }
-        final studentId = 'demo_${DateTime.now().millisecondsSinceEpoch}';
-        _mockSeats[index] = SeatInfo(
-          seatNumber: seatNumber,
-          isOccupied: true,
-          studentId: studentId,
-          studentName: studentName,
-          shift: shift,
-        );
-        _mockStudents.insert(
-          0,
-          StudentInfo(
-            id: studentId,
-            name: studentName,
-            phone: phone,
+      final studentId = 'std_${DateTime.now().millisecondsSinceEpoch}';
+      if (seatNumber != null) {
+        final index = seatNumber - 1;
+        if (index >= 0 && index < _mockSeats.length) {
+          if (_mockSeats[index].isOccupied) {
+            throw Exception('Seat $seatNumber is already occupied!');
+          }
+          _mockSeats[index] = SeatInfo(
             seatNumber: seatNumber,
+            isOccupied: true,
+            studentId: studentId,
+            studentName: studentName,
             shift: shift,
-            status: 'ACTIVE',
-            feeDueDate: validUntil,
-            joinedAt: now,
-            monthlyFee: feeAmount,
-            paymentMode: paymentMode,
-          ),
-        );
+          );
+          _mockSeatsController.add(List.unmodifiable(_mockSeats));
+        }
+      }
+
+      _mockStudents.insert(
+        0,
+        StudentInfo(
+          id: studentId,
+          name: studentName,
+          phone: phone,
+          seatNumber: seatNumber,
+          shift: shift,
+          status: status,
+          feeDueDate: validUntil,
+          joinedAt: now,
+          monthlyFee: feeAmount,
+          paymentMode: paymentMode,
+          note: note,
+          duesAmount: duesAmount,
+        ),
+      );
+
+      if (status != 'TRIAL' && feeAmount > 0) {
         _mockPayments.insert(
           0,
           PaymentTransaction(
@@ -428,13 +446,13 @@ class LibraryService {
             amount: feeAmount,
             date: now,
             paymentMode: paymentMode,
-            notes: 'Initial fee on seat S-$seatNumber',
+            notes: 'Registration fee',
           ),
         );
-        _mockSeatsController.add(List.unmodifiable(_mockSeats));
-        _mockStudentsController.add(List.unmodifiable(_mockStudents));
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));
       }
+
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
     }
   }
 
@@ -490,50 +508,49 @@ class LibraryService {
     }
   }
 
-  // Update Student details (Name, Phone, Shift, Seat, Note, etc.)
-  Future<void> updateStudent({
-    required String studentId,
-    required String name,
-    required String phone,
-    required String shift,
-    int? seatNumber,
-    String note = '',
-    int? monthlyFee,
-    int? duesAmount,
-  }) async {
+  // Move Student to Inactive (frees seat, keeps record in INACTIVE tab)
+  Future<void> markStudentInactive(String studentId, int? seatNumber) async {
     ensureInitialized();
     if (isFirebaseConnected) {
+      final batch = _db.batch();
       final studentDocRef = _db.collection('students').doc(studentId);
-      final updates = <String, dynamic>{
-        'name': name,
-        'phone': phone,
-        'shift': shift,
-        'note': note,
-      };
-      if (seatNumber != null) updates['seat_number'] = seatNumber;
-      if (monthlyFee != null) updates['monthly_fee'] = monthlyFee;
-      if (duesAmount != null) updates['dues_amount'] = duesAmount;
-      await studentDocRef.update(updates);
+      batch.update(studentDocRef, {
+        'status': 'INACTIVE',
+        'seat_number': null,
+      });
+      if (seatNumber != null) {
+        final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+        batch.update(seatDocRef, {
+          'is_occupied': false,
+          'student_id': null,
+          'student_name': null,
+          'shift': null,
+        });
+      }
+      await batch.commit();
     } else {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
-        final s = _mockStudents[idx];
-        _mockStudents[idx] = s.copyWith(
-          name: name,
-          phone: phone,
-          shift: shift,
-          seatNumber: seatNumber ?? s.seatNumber,
-          note: note,
-          monthlyFee: monthlyFee ?? s.monthlyFee,
-          duesAmount: duesAmount ?? s.duesAmount,
+        _mockStudents[idx] = _mockStudents[idx].copyWith(
+          status: 'INACTIVE',
+          seatNumber: null,
         );
-        _mockStudentsController.add(List.unmodifiable(_mockStudents));
       }
+      if (seatNumber != null && seatNumber > 0 && seatNumber <= _mockSeats.length) {
+        _mockSeats[seatNumber - 1] = SeatInfo(seatNumber: seatNumber);
+        _mockSeatsController.add(List.unmodifiable(_mockSeats));
+      }
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
     }
   }
 
-  // Delete Student Record and Vacate their seat
+  // Delete Student alias to markStudentInactive (moves student to INACTIVE tab)
   Future<void> deleteStudent(String studentId, int? seatNumber) async {
+    await markStudentInactive(studentId, seatNumber);
+  }
+
+  // Permanently purge student from records
+  Future<void> permanentlyDeleteStudent(String studentId, int? seatNumber) async {
     ensureInitialized();
     if (isFirebaseConnected) {
       final batch = _db.batch();
@@ -556,6 +573,148 @@ class LibraryService {
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
       }
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    }
+  }
+
+  // Mark Student as Trial
+  Future<void> markStudentTrial(String studentId) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      await _db.collection('students').doc(studentId).update({
+        'status': 'TRIAL',
+        'dues_amount': 0,
+      });
+    } else {
+      final idx = _mockStudents.indexWhere((s) => s.id == studentId);
+      if (idx != -1) {
+        _mockStudents[idx] = _mockStudents[idx].copyWith(
+          status: 'TRIAL',
+          duesAmount: 0,
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+    }
+  }
+
+  // Mark Student with Dues
+  Future<void> markStudentDues(
+    String studentId,
+    int duesAmount, [
+    DateTime? dueDate,
+  ]) async {
+    ensureInitialized();
+    final dDate = dueDate ?? DateTime.now();
+    if (isFirebaseConnected) {
+      await _db.collection('students').doc(studentId).update({
+        'status': 'DUES',
+        'dues_amount': duesAmount,
+        'fee_due_date': Timestamp.fromDate(dDate),
+      });
+    } else {
+      final idx = _mockStudents.indexWhere((s) => s.id == studentId);
+      if (idx != -1) {
+        _mockStudents[idx] = _mockStudents[idx].copyWith(
+          status: 'DUES',
+          duesAmount: duesAmount,
+          feeDueDate: dDate,
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+    }
+  }
+
+  // Reactivate / Restore Inactive Student
+  Future<void> reactivateStudent(
+    String studentId, [
+    int? seatNumber,
+  ]) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      final batch = _db.batch();
+      final studentDocRef = _db.collection('students').doc(studentId);
+      final updates = <String, dynamic>{
+        'status': 'ACTIVE',
+        'dues_amount': 0,
+      };
+      if (seatNumber != null) {
+        updates['seat_number'] = seatNumber;
+        final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+        batch.update(seatDocRef, {
+          'is_occupied': true,
+          'student_id': studentId,
+        });
+      }
+      batch.update(studentDocRef, updates);
+      await batch.commit();
+    } else {
+      final idx = _mockStudents.indexWhere((s) => s.id == studentId);
+      if (idx != -1) {
+        final s = _mockStudents[idx];
+        if (seatNumber != null && seatNumber > 0 && seatNumber <= _mockSeats.length) {
+          _mockSeats[seatNumber - 1] = SeatInfo(
+            seatNumber: seatNumber,
+            isOccupied: true,
+            studentId: studentId,
+            studentName: s.name,
+            shift: s.shift,
+          );
+          _mockSeatsController.add(List.unmodifiable(_mockSeats));
+        }
+        _mockStudents[idx] = s.copyWith(
+          status: 'ACTIVE',
+          seatNumber: seatNumber ?? s.seatNumber,
+          duesAmount: 0,
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+    }
+  }
+
+  // Update Student details (Name, Phone, Shift, Seat, Note, Status, Due Date, etc.)
+  Future<void> updateStudent({
+    required String studentId,
+    required String name,
+    required String phone,
+    required String shift,
+    int? seatNumber,
+    String note = '',
+    int? monthlyFee,
+    int? duesAmount,
+    String? status,
+    DateTime? feeDueDate,
+  }) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      final studentDocRef = _db.collection('students').doc(studentId);
+      final updates = <String, dynamic>{
+        'name': name,
+        'phone': phone,
+        'shift': shift,
+        'note': note,
+      };
+      if (seatNumber != null) updates['seat_number'] = seatNumber;
+      if (monthlyFee != null) updates['monthly_fee'] = monthlyFee;
+      if (duesAmount != null) updates['dues_amount'] = duesAmount;
+      if (status != null) updates['status'] = status;
+      if (feeDueDate != null) updates['fee_due_date'] = Timestamp.fromDate(feeDueDate);
+      await studentDocRef.update(updates);
+    } else {
+      final idx = _mockStudents.indexWhere((s) => s.id == studentId);
+      if (idx != -1) {
+        final s = _mockStudents[idx];
+        _mockStudents[idx] = s.copyWith(
+          name: name,
+          phone: phone,
+          shift: shift,
+          seatNumber: seatNumber ?? s.seatNumber,
+          note: note,
+          monthlyFee: monthlyFee ?? s.monthlyFee,
+          duesAmount: duesAmount ?? s.duesAmount,
+          status: status ?? s.status,
+          feeDueDate: feeDueDate ?? s.feeDueDate,
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
     }
   }
 

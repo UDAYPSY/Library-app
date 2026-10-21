@@ -180,6 +180,7 @@ class StudentInfo {
   });
 
   bool get hasDues {
+    if (status == 'INACTIVE' || status == 'TRIAL') return false;
     if (status == 'DUES' || duesAmount > 0) return true;
     if (feeDueDate != null && feeDueDate!.isBefore(DateTime.now())) return true;
     return false;

@@ -77,8 +77,9 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   void _openAddMemberSheet() {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
-    String shift = _service.shifts.isNotEmpty ? _service.shifts.first.name : 'Full Day';
-    int fee = _service.shifts.isNotEmpty ? _service.shifts.first.monthlyFee : 500;
+    final activeShifts = _service.shifts.where((s) => s.isActive).toList();
+    String shift = activeShifts.isNotEmpty ? activeShifts.first.name : (_service.shifts.isNotEmpty ? _service.shifts.first.name : 'Full Day');
+    int fee = activeShifts.isNotEmpty ? activeShifts.first.monthlyFee : (_service.shifts.isNotEmpty ? _service.shifts.first.monthlyFee : 500);
     int? allocatedSeat;
     String status = 'ACTIVE';
     String paymentMode = 'UPI';
@@ -145,7 +146,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: shift,
-                        items: _service.shifts
+                        items: (activeShifts.isNotEmpty ? activeShifts : _service.shifts)
                             .map((s) => DropdownMenuItem(value: s.name, child: Text(s.name)))
                             .toList(),
                         onChanged: (v) {
@@ -229,15 +230,15 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                       if (name.isEmpty || phone.isEmpty) return;
                       Navigator.pop(ctx);
 
-                      final seatNum = allocatedSeat ?? 1;
                       await _service.assignSeatAndRegisterStudent(
-                        seatNumber: seatNum,
+                        seatNumber: allocatedSeat,
                         studentName: name,
                         phone: phone,
                         shift: shift,
                         deviceUserId: _service.profile.adminName,
                         feeAmount: fee,
                         paymentMode: paymentMode,
+                        status: status,
                       );
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -300,13 +301,19 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   }
 
   void _confirmDeleteStudent(StudentInfo s) {
+    final isInactive = s.status == 'INACTIVE';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Student', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+        title: Text(
+          isInactive ? 'Permanently Delete Student' : 'Move to Inactive Tab',
+          style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy),
+        ),
         content: Text(
-          'Are you sure you want to remove ${s.name}? This will also vacate ${s.seatNumber != null ? "Seat #${s.seatNumber}" : "their seat"}.',
+          isInactive
+              ? 'Are you sure you want to permanently delete ${s.name}? This student record will be completely removed.'
+              : 'Are you sure you want to remove ${s.name}? They will be moved to the INACTIVE tab and their seat (${s.seatNumber != null ? "Seat #${s.seatNumber}" : "unallocated"}) will be vacated. You can restore them anytime from the INACTIVE tab.',
           style: const TextStyle(fontSize: 14, color: AppColors.textNavy),
         ),
         actions: [
@@ -321,20 +328,266 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              await _service.deleteStudent(s.id, s.seatNumber);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${s.name} removed and seat vacated successfully.'),
-                    backgroundColor: Colors.black87,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+              if (isInactive) {
+                await _service.permanentlyDeleteStudent(s.id, s.seatNumber);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${s.name} permanently deleted.'),
+                      backgroundColor: Colors.black87,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } else {
+                await _service.markStudentInactive(s.id, s.seatNumber);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${s.name} moved to Inactive tab and seat vacated.'),
+                      backgroundColor: Colors.black87,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
               }
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(isInactive ? 'Delete Permanently' : 'Move to Inactive', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _restoreStudent(StudentInfo s) async {
+    await _service.reactivateStudent(s.id, null);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${s.name} restored to Active members!'),
+          backgroundColor: AppColors.primaryTeal,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _toggleTrialStatus(StudentInfo st) {
+    final isTrial = st.status == 'TRIAL';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isTrial ? 'Convert to Regular Active Member' : 'Mark as Trial Student',
+          style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy),
+        ),
+        content: Text(
+          isTrial
+              ? 'Do you want to convert ${st.name} from a Trial student to a regular Active Member?'
+              : 'Do you want to mark ${st.name} as a Trial Student? Trial students are tagged under the TRIAL tab.',
+          style: const TextStyle(fontSize: 14, color: AppColors.textNavy),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isTrial ? AppColors.primaryTeal : const Color(0xFFD97706),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (isTrial) {
+                await _service.reactivateStudent(st.id, st.seatNumber);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${st.name} is now a regular Active Member!'), backgroundColor: AppColors.primaryTeal),
+                  );
+                }
+              } else {
+                await _service.markStudentTrial(st.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${st.name} marked as Trial Student!'), backgroundColor: const Color(0xFFD97706)),
+                  );
+                }
+              }
+            },
+            child: Text(isTrial ? 'Convert to Active' : 'Mark as Trial', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openMarkDuesSheet(StudentInfo st) {
+    final defaultDues = st.effectiveDues > 0 ? st.effectiveDues : st.monthlyFee;
+    final duesCtrl = TextEditingController(text: defaultDues.toString());
+    DateTime selectedDate = st.feeDueDate ?? DateTime.now().add(const Duration(days: 7));
+    final noteCtrl = TextEditingController(
+      text: 'Fee due for ${DateFormat('MMMM yyyy').format(DateTime.now())}',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (sheetContext, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Mark Fee Due - ${st.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                      const SizedBox(height: 2),
+                      Text('Seat: ${st.seatNumber != null ? "S-${st.seatNumber}" : "Unallocated"} • Shift: ${st.shift}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: duesCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Due Amount (₹)',
+                  hintText: 'Enter pending fee amount',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.currency_rupee, color: Color(0xFFEF4444)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2035),
+                  );
+                  if (picked != null) {
+                    setModalState(() => selectedDate = picked);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_month_outlined, color: Color(0xFF0284C7), size: 20),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Payment Due Date', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                          Text(DateFormat('dd MMM yyyy').format(selectedDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                        ],
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Reason / Note',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.edit_note_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => setModalState(() => duesCtrl.text = '${st.monthlyFee}'),
+                      child: Text('Full Fee (₹${st.monthlyFee})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF10B981),
+                        side: const BorderSide(color: Color(0xFFA7F3D0)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => setModalState(() => duesCtrl.text = '0'),
+                      child: const Text('Clear Dues (₹0)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE11D48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () async {
+                    final dues = int.tryParse(duesCtrl.text.trim()) ?? 0;
+                    Navigator.pop(ctx);
+                    if (dues <= 0) {
+                      await _service.updateStudent(
+                        studentId: st.id,
+                        name: st.name,
+                        phone: st.phone,
+                        shift: st.shift,
+                        seatNumber: st.seatNumber,
+                        duesAmount: 0,
+                        status: st.status == 'DUES' ? 'ACTIVE' : st.status,
+                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Cleared all dues for ${st.name}!'), backgroundColor: const Color(0xFF10B981)),
+                        );
+                      }
+                    } else {
+                      await _service.markStudentDues(st.id, dues, selectedDate);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Marked ₹$dues due for ${st.name}!'), backgroundColor: const Color(0xFFE11D48)),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Save Due Fee', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -578,9 +831,14 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     final nameCtrl = TextEditingController(text: st.name);
     final phoneCtrl = TextEditingController(text: st.phone);
     final feeCtrl = TextEditingController(text: st.monthlyFee.toString());
+    final duesCtrl = TextEditingController(text: st.duesAmount.toString());
     final noteCtrl = TextEditingController(text: st.note);
-    String shift = st.shift;
+    final activeShifts = _service.shifts.where((s) => s.isActive).toList();
+    String shift = activeShifts.any((s) => s.name == st.shift)
+        ? st.shift
+        : (activeShifts.isNotEmpty ? activeShifts.first.name : st.shift);
     int? seatNumber = st.seatNumber;
+    String status = ['ACTIVE', 'TRIAL', 'INACTIVE'].contains(st.status) ? st.status : 'ACTIVE';
 
     showModalBottomSheet(
       context: context,
@@ -623,18 +881,45 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _service.shifts.any((s) => s.name == shift) ? shift : (_service.shifts.isNotEmpty ? _service.shifts.first.name : 'Full Day'),
-                        items: _service.shifts.map((s) => DropdownMenuItem(value: s.name, child: Text(s.name))).toList(),
+                        value: (activeShifts.any((s) => s.name == shift))
+                            ? shift
+                            : (activeShifts.isNotEmpty ? activeShifts.first.name : null),
+                        items: (activeShifts.isNotEmpty ? activeShifts : _service.shifts)
+                            .map((s) => DropdownMenuItem(value: s.name, child: Text(s.name)))
+                            .toList(),
                         onChanged: (v) => setModalState(() => shift = v ?? shift),
                         decoration: const InputDecoration(labelText: 'Shift', border: OutlineInputBorder()),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: status,
+                        items: ['ACTIVE', 'TRIAL', 'INACTIVE']
+                            .map((st) => DropdownMenuItem(value: st, child: Text(st)))
+                            .toList(),
+                        onChanged: (v) => setModalState(() => status = v ?? status),
+                        decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
                       child: TextField(
                         controller: feeCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Monthly Fee (₹)', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(labelText: 'Monthly Fee (₹)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.currency_rupee)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: duesCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Pending Dues (₹)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.warning_amber_rounded)),
                       ),
                     ),
                   ],
@@ -656,15 +941,21 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     onPressed: () async {
                       if (nameCtrl.text.isEmpty || phoneCtrl.text.isEmpty) return;
                       Navigator.pop(ctx);
+                      final dues = int.tryParse(duesCtrl.text.trim()) ?? 0;
                       await _service.updateStudent(
                         studentId: st.id,
                         name: nameCtrl.text.trim(),
                         phone: phoneCtrl.text.trim(),
                         shift: shift,
-                        seatNumber: seatNumber,
+                        seatNumber: status == 'INACTIVE' ? null : seatNumber,
                         monthlyFee: int.tryParse(feeCtrl.text.trim()) ?? st.monthlyFee,
+                        duesAmount: dues,
+                        status: status,
                         note: noteCtrl.text.trim(),
                       );
+                      if (status == 'INACTIVE' && st.status != 'INACTIVE') {
+                        await _service.markStudentInactive(st.id, st.seatNumber);
+                      }
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -792,26 +1083,31 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
           if (query.isNotEmpty) {
             final matchName = s.name.toLowerCase().contains(query);
             final matchPhone = s.phone.contains(query);
-            final matchSeat = 's-${s.seatNumber}'.contains(query);
+            final matchSeat = s.seatNumber != null ? 's-${s.seatNumber}'.contains(query) : 'unallocated'.contains(query);
             if (!matchName && !matchPhone && !matchSeat) return false;
           }
 
           // Shift filter
           if (_selectedShiftFilter != 'ALL SHIFTS') {
-            if (s.shift.toUpperCase() != _selectedShiftFilter) return false;
+            if (s.shift.trim().toUpperCase() != _selectedShiftFilter.trim().toUpperCase()) return false;
           }
+
+          // INACTIVE tab strictly shows inactive students
+          if (_selectedStatusFilter == 'INACTIVE') {
+            return s.status == 'INACTIVE';
+          }
+          // For all other status filters, inactive students must not appear
+          if (s.status == 'INACTIVE') return false;
 
           // Status filter
           if (_selectedStatusFilter == 'RECENT' || _selectedStatusFilter == 'ALL') {
             return true;
           } else if (_selectedStatusFilter == 'PAID') {
-            return !s.hasDues && s.status != 'INACTIVE';
-          } else if (_selectedStatusFilter == 'DUES') {
+            return !s.hasDues && s.status != 'TRIAL';
+          } else if (_selectedStatusFilter == 'DUES' || _selectedStatusFilter == 'REMAINING') {
             return s.hasDues;
           } else if (_selectedStatusFilter == 'ACTIVE') {
-            return s.status != 'INACTIVE';
-          } else if (_selectedStatusFilter == 'INACTIVE') {
-            return s.status == 'INACTIVE';
+            return s.status == 'ACTIVE' || s.status == 'PAID';
           } else if (_selectedStatusFilter == 'UNALLOCATED') {
             return s.seatNumber == null;
           } else if (_selectedStatusFilter == 'TRIAL') {
@@ -949,7 +1245,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Shift Filter Chips Row: ALL SHIFTS, FULL DAY, etc. (Image 2 & 5)
+                    // Shift Filter Chips Row: ALL SHIFTS, FULL DAY, etc. (only active shifts)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: SingleChildScrollView(
@@ -957,7 +1253,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                         child: Row(
                           children: [
                             _shiftChip('ALL SHIFTS', null),
-                            ..._service.shifts.map((sh) {
+                            ..._service.shifts.where((sh) => sh.isActive).map((sh) {
                               return Padding(
                                 padding: const EdgeInsets.only(left: 8.0),
                                 child: _shiftChip(sh.name.toUpperCase(), Icons.wb_cloudy_rounded),
@@ -1072,6 +1368,19 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                         : (st.name.trim().length >= 2 ? st.name.trim().substring(0, 2).toUpperCase() : st.name.trim().toUpperCase()))
                                     : 'ST';
 
+                                final matchedShift = _service.shifts.firstWhere(
+                                  (sh) => sh.name.toLowerCase() == st.shift.toLowerCase(),
+                                  orElse: () => ShiftConfig(
+                                    id: 'custom',
+                                    name: st.shift,
+                                    startsAt: '06:00 AM',
+                                    endsAt: '10:00 PM',
+                                    monthlyFee: st.monthlyFee,
+                                    isActive: true,
+                                  ),
+                                );
+                                final shiftTimingStr = '${matchedShift.startsAt} - ${matchedShift.endsAt}';
+
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 14),
                                   padding: const EdgeInsets.all(16),
@@ -1120,7 +1429,13 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                   width: 12,
                                                   height: 12,
                                                   decoration: BoxDecoration(
-                                                    color: const Color(0xFF22C55E),
+                                                    color: st.status == 'INACTIVE'
+                                                        ? const Color(0xFF94A3B8)
+                                                        : (st.status == 'TRIAL'
+                                                            ? const Color(0xFFF59E0B)
+                                                            : (st.hasDues
+                                                                ? const Color(0xFFEF4444)
+                                                                : const Color(0xFF22C55E))),
                                                     shape: BoxShape.circle,
                                                     border: Border.all(color: Colors.white, width: 2),
                                                   ),
@@ -1157,21 +1472,24 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              if (st.duesAmount > 0)
-                                                Container(
-                                                  margin: const EdgeInsets.only(right: 6),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFFEF2F2),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    border: Border.all(color: const Color(0xFFFECACA)),
-                                                  ),
-                                                  child: Text(
-                                                    '₹${st.duesAmount}',
-                                                    style: const TextStyle(
-                                                      color: Color(0xFFEF4444),
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w900,
+                                              if (st.effectiveDues > 0)
+                                                InkWell(
+                                                  onTap: () => _openMarkDuesSheet(st),
+                                                  child: Container(
+                                                    margin: const EdgeInsets.only(right: 4),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFFEF2F2),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(color: const Color(0xFFFECACA)),
+                                                    ),
+                                                    child: Text(
+                                                      '₹${st.effectiveDues}',
+                                                      style: const TextStyle(
+                                                        color: Color(0xFFEF4444),
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w900,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -1182,6 +1500,72 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                   size: 20,
                                                 ),
                                                 onPressed: () => _openNoteSheet(st),
+                                              ),
+                                              PopupMenuButton<String>(
+                                                icon: const Icon(Icons.more_vert, color: AppColors.textMuted, size: 20),
+                                                onSelected: (val) {
+                                                  if (val == 'dues') _openMarkDuesSheet(st);
+                                                  if (val == 'trial') _toggleTrialStatus(st);
+                                                  if (val == 'edit') _openEditStudentSheet(st);
+                                                  if (val == 'delete') _confirmDeleteStudent(st);
+                                                  if (val == 'restore') _restoreStudent(st);
+                                                },
+                                                itemBuilder: (ctx) => [
+                                                  const PopupMenuItem(
+                                                    value: 'dues',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(Icons.currency_rupee, size: 18, color: Color(0xFFE11D48)),
+                                                        SizedBox(width: 8),
+                                                        Text('Mark Due Fees'),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  PopupMenuItem(
+                                                    value: 'trial',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(Icons.science_outlined, size: 18, color: Color(0xFFD97706)),
+                                                        SizedBox(width: 8),
+                                                        Text(st.status == 'TRIAL' ? 'Convert to Active' : 'Mark as Trial'),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const PopupMenuItem(
+                                                    value: 'edit',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(Icons.edit_outlined, size: 18, color: AppColors.textNavy),
+                                                        SizedBox(width: 8),
+                                                        Text('Edit Student'),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  if (st.status == 'INACTIVE')
+                                                    const PopupMenuItem(
+                                                      value: 'restore',
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.restore_rounded, size: 18, color: Color(0xFF0D9488)),
+                                                          SizedBox(width: 8),
+                                                          Text('Restore Student'),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  PopupMenuItem(
+                                                    value: 'delete',
+                                                    child: Row(
+                                                      children: [
+                                                        const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                                                        const SizedBox(width: 8),
+                                                        Text(
+                                                          st.status == 'INACTIVE' ? 'Delete Permanently' : 'Move to Inactive',
+                                                          style: const TextStyle(color: Color(0xFFEF4444)),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           ),
@@ -1307,11 +1691,21 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    st.status == 'ACTIVE' ? 'Active' : st.status,
-                                                    style: const TextStyle(
+                                                    st.status == 'INACTIVE'
+                                                        ? 'Inactive'
+                                                        : (st.status == 'TRIAL'
+                                                            ? 'Trial'
+                                                            : (st.hasDues ? 'Due: ₹${st.effectiveDues}' : 'Active')),
+                                                    style: TextStyle(
                                                       fontSize: 13,
                                                       fontWeight: FontWeight.w800,
-                                                      color: Color(0xFF16A34A),
+                                                      color: st.status == 'INACTIVE'
+                                                          ? const Color(0xFFEF4444)
+                                                          : (st.status == 'TRIAL'
+                                                              ? const Color(0xFFD97706)
+                                                              : (st.hasDues
+                                                                  ? const Color(0xFFE11D48)
+                                                                  : const Color(0xFF16A34A))),
                                                     ),
                                                   ),
                                                 ],
@@ -1432,197 +1826,371 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                               ],
                                             ),
                                           ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                                            ),
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF64748B)),
-                                                SizedBox(width: 4),
-                                                Text(
-                                                  '06:00 AM - 10:00 PM',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF64748B),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF0F9FF),
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: const Color(0xFFBAE6FD)),
-                                            ),
-                                            child: const Text(
-                                              'TRIAL • 1 DAYS IN',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w800,
-                                                color: Color(0xFF0284C7),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 16),
+                                           Container(
+                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                             decoration: BoxDecoration(
+                                               color: Colors.white,
+                                               borderRadius: BorderRadius.circular(8),
+                                               border: Border.all(color: const Color(0xFFE2E8F0)),
+                                             ),
+                                             child: Row(
+                                               mainAxisSize: MainAxisSize.min,
+                                               children: [
+                                                 const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF64748B)),
+                                                 const SizedBox(width: 4),
+                                                 Text(
+                                                   shiftTimingStr,
+                                                   style: const TextStyle(
+                                                     fontSize: 10,
+                                                     fontWeight: FontWeight.w600,
+                                                     color: Color(0xFF64748B),
+                                                   ),
+                                                 ),
+                                               ],
+                                             ),
+                                           ),
+                                           if (st.status == 'INACTIVE')
+                                             Container(
+                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                               decoration: BoxDecoration(
+                                                 color: const Color(0xFFFEF2F2),
+                                                 borderRadius: BorderRadius.circular(8),
+                                                 border: Border.all(color: const Color(0xFFFECACA)),
+                                               ),
+                                               child: const Text(
+                                                 'INACTIVE MEMBER',
+                                                 style: TextStyle(
+                                                   fontSize: 10,
+                                                   fontWeight: FontWeight.w800,
+                                                   color: Color(0xFFEF4444),
+                                                 ),
+                                               ),
+                                             )
+                                           else if (st.status == 'TRIAL')
+                                             Container(
+                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                               decoration: BoxDecoration(
+                                                 color: const Color(0xFFFFFBEB),
+                                                 borderRadius: BorderRadius.circular(8),
+                                                 border: Border.all(color: const Color(0xFFFDE68A)),
+                                               ),
+                                               child: Text(
+                                                 st.joinedAt != null
+                                                     ? 'TRIAL • ${(DateTime.now().difference(st.joinedAt!).inDays + 1)} DAYS IN'
+                                                     : 'TRIAL MEMBER',
+                                                 style: const TextStyle(
+                                                   fontSize: 10,
+                                                   fontWeight: FontWeight.w800,
+                                                   color: Color(0xFFD97706),
+                                                 ),
+                                               ),
+                                             )
+                                           else if (st.hasDues)
+                                             Container(
+                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                               decoration: BoxDecoration(
+                                                 color: const Color(0xFFFFF1F2),
+                                                 borderRadius: BorderRadius.circular(8),
+                                                 border: Border.all(color: const Color(0xFFFECDD3)),
+                                               ),
+                                               child: Text(
+                                                 'DUE: ₹${st.effectiveDues}',
+                                                 style: const TextStyle(
+                                                   fontSize: 10,
+                                                   fontWeight: FontWeight.w800,
+                                                   color: Color(0xFFE11D48),
+                                                 ),
+                                               ),
+                                             )
+                                           else
+                                             Container(
+                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                               decoration: BoxDecoration(
+                                                 color: const Color(0xFFECFDF5),
+                                                 borderRadius: BorderRadius.circular(8),
+                                                 border: Border.all(color: const Color(0xFFA7F3D0)),
+                                               ),
+                                               child: const Text(
+                                                 'PAID • ACTIVE',
+                                                 style: TextStyle(
+                                                   fontSize: 10,
+                                                   fontWeight: FontWeight.w800,
+                                                   color: Color(0xFF059669),
+                                                 ),
+                                               ),
+                                             ),
+                                         ],
+                                       ),
+                                       const SizedBox(height: 16),
 
-                                      // Row 1: View | Edit | Pay (Image 1)
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: OutlinedButton.icon(
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor: AppColors.textNavy,
-                                                side: const BorderSide(color: Color(0xFFE2E8F0)),
-                                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(14),
-                                                ),
-                                              ),
-                                              icon: const Icon(Icons.visibility_outlined, size: 18),
-                                              label: const Text(
-                                                'View',
-                                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                              ),
-                                              onPressed: () => _openViewStudentSheet(st, memberId),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: OutlinedButton.icon(
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor: AppColors.textNavy,
-                                                side: const BorderSide(color: Color(0xFFE2E8F0)),
-                                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(14),
-                                                ),
-                                              ),
-                                              icon: const Icon(Icons.edit_outlined, size: 18),
-                                              label: const Text(
-                                                'Edit',
-                                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                              ),
-                                              onPressed: () => _openEditStudentSheet(st),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: ElevatedButton.icon(
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFF0D6E66),
-                                                foregroundColor: Colors.white,
-                                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                                elevation: 0,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(14),
-                                                ),
-                                              ),
-                                              icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
-                                              label: const Text(
-                                                'Pay',
-                                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
-                                              ),
-                                              onPressed: () => _openPaySheet(st),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
+                                       // Actions
+                                       if (st.status == 'INACTIVE') ...[
+                                         Row(
+                                           children: [
+                                             Expanded(
+                                               child: ElevatedButton.icon(
+                                                 style: ElevatedButton.styleFrom(
+                                                   backgroundColor: AppColors.primaryTeal,
+                                                   foregroundColor: Colors.white,
+                                                   padding: const EdgeInsets.symmetric(vertical: 12),
+                                                   shape: RoundedRectangleBorder(
+                                                     borderRadius: BorderRadius.circular(14),
+                                                   ),
+                                                 ),
+                                                 icon: const Icon(Icons.restore_rounded, size: 18),
+                                                 label: const Text(
+                                                   'Restore Member',
+                                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                                 ),
+                                                 onPressed: () => _restoreStudent(st),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             InkWell(
+                                               borderRadius: BorderRadius.circular(14),
+                                               onTap: () => _confirmDeleteStudent(st),
+                                               child: Container(
+                                                 padding: const EdgeInsets.all(11),
+                                                 decoration: BoxDecoration(
+                                                   color: const Color(0xFFFEF2F2),
+                                                   borderRadius: BorderRadius.circular(14),
+                                                   border: Border.all(color: const Color(0xFFFECACA)),
+                                                 ),
+                                                 child: const Icon(
+                                                   Icons.delete_forever_rounded,
+                                                   color: Color(0xFFEF4444),
+                                                   size: 20,
+                                                 ),
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ] else ...[
+                                         // Row 1: View | Edit | Pay (Image 1)
+                                         Row(
+                                           children: [
+                                             Expanded(
+                                               child: OutlinedButton.icon(
+                                                 style: OutlinedButton.styleFrom(
+                                                   foregroundColor: AppColors.textNavy,
+                                                   side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                                   padding: const EdgeInsets.symmetric(vertical: 12),
+                                                   shape: RoundedRectangleBorder(
+                                                     borderRadius: BorderRadius.circular(14),
+                                                   ),
+                                                 ),
+                                                 icon: const Icon(Icons.visibility_outlined, size: 18),
+                                                 label: const Text(
+                                                   'View',
+                                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                                 ),
+                                                 onPressed: () => _openViewStudentSheet(st, memberId),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             Expanded(
+                                               child: OutlinedButton.icon(
+                                                 style: OutlinedButton.styleFrom(
+                                                   foregroundColor: AppColors.textNavy,
+                                                   side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                                   padding: const EdgeInsets.symmetric(vertical: 12),
+                                                   shape: RoundedRectangleBorder(
+                                                     borderRadius: BorderRadius.circular(14),
+                                                   ),
+                                                 ),
+                                                 icon: const Icon(Icons.edit_outlined, size: 18),
+                                                 label: const Text(
+                                                   'Edit',
+                                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                                 ),
+                                                 onPressed: () => _openEditStudentSheet(st),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             Expanded(
+                                               child: ElevatedButton.icon(
+                                                 style: ElevatedButton.styleFrom(
+                                                   backgroundColor: const Color(0xFF0D6E66),
+                                                   foregroundColor: Colors.white,
+                                                   padding: const EdgeInsets.symmetric(vertical: 12),
+                                                   elevation: 0,
+                                                   shape: RoundedRectangleBorder(
+                                                     borderRadius: BorderRadius.circular(14),
+                                                   ),
+                                                 ),
+                                                 icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
+                                                 label: const Text(
+                                                   'Pay',
+                                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                                                 ),
+                                                 onPressed: () => _openPaySheet(st),
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                         const SizedBox(height: 10),
 
-                                      // Row 2: WhatsApp | SMS Reminder | Delete (Image 1)
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            flex: 5,
-                                            child: InkWell(
-                                              borderRadius: BorderRadius.circular(14),
-                                              onTap: () => _sendWhatsApp(st),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(vertical: 11),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFECFDF5),
-                                                  borderRadius: BorderRadius.circular(14),
-                                                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                                                ),
-                                                child: const Row(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF10B981), size: 16),
-                                                    SizedBox(width: 6),
-                                                    Text(
-                                                      'WhatsApp',
-                                                      style: TextStyle(
-                                                        color: Color(0xFF059669),
-                                                        fontSize: 13,
-                                                        fontWeight: FontWeight.w800,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            flex: 6,
-                                            child: InkWell(
-                                              borderRadius: BorderRadius.circular(14),
-                                              onTap: () => _sendSmsReminder(st),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(vertical: 11),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFF0F9FF),
-                                                  borderRadius: BorderRadius.circular(14),
-                                                  border: Border.all(color: const Color(0xFFBAE6FD)),
-                                                ),
-                                                child: const Row(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    Icon(Icons.message_outlined, color: Color(0xFF0284C7), size: 16),
-                                                    SizedBox(width: 6),
-                                                    Text(
-                                                      'SMS Reminder',
-                                                      style: TextStyle(
-                                                        color: Color(0xFF0284C7),
-                                                        fontSize: 13,
-                                                        fontWeight: FontWeight.w800,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          InkWell(
-                                            borderRadius: BorderRadius.circular(14),
-                                            onTap: () => _confirmDeleteStudent(st),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(11),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFFEF2F2),
-                                                borderRadius: BorderRadius.circular(14),
-                                                border: Border.all(color: const Color(0xFFFECACA)),
-                                              ),
-                                              child: const Icon(
-                                                Icons.delete_outline_rounded,
-                                                color: Color(0xFFEF4444),
-                                                size: 20,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                         // Row 2: WhatsApp | SMS Reminder | Delete
+                                         Row(
+                                           children: [
+                                             Expanded(
+                                               flex: 5,
+                                               child: InkWell(
+                                                 borderRadius: BorderRadius.circular(14),
+                                                 onTap: () => _sendWhatsApp(st),
+                                                 child: Container(
+                                                   padding: const EdgeInsets.symmetric(vertical: 11),
+                                                   decoration: BoxDecoration(
+                                                     color: const Color(0xFFECFDF5),
+                                                     borderRadius: BorderRadius.circular(14),
+                                                     border: Border.all(color: const Color(0xFFA7F3D0)),
+                                                   ),
+                                                   child: const Row(
+                                                     mainAxisAlignment: MainAxisAlignment.center,
+                                                     children: [
+                                                       Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF10B981), size: 16),
+                                                       SizedBox(width: 6),
+                                                       Text(
+                                                         'WhatsApp',
+                                                         style: TextStyle(
+                                                           color: Color(0xFF059669),
+                                                           fontSize: 13,
+                                                           fontWeight: FontWeight.w800,
+                                                         ),
+                                                       ),
+                                                     ],
+                                                   ),
+                                                 ),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             Expanded(
+                                               flex: 6,
+                                               child: InkWell(
+                                                 borderRadius: BorderRadius.circular(14),
+                                                 onTap: () => _sendSmsReminder(st),
+                                                 child: Container(
+                                                   padding: const EdgeInsets.symmetric(vertical: 11),
+                                                   decoration: BoxDecoration(
+                                                     color: const Color(0xFFF0F9FF),
+                                                     borderRadius: BorderRadius.circular(14),
+                                                     border: Border.all(color: const Color(0xFFBAE6FD)),
+                                                   ),
+                                                   child: const Row(
+                                                     mainAxisAlignment: MainAxisAlignment.center,
+                                                     children: [
+                                                       Icon(Icons.message_outlined, color: Color(0xFF0284C7), size: 16),
+                                                       SizedBox(width: 6),
+                                                       Text(
+                                                         'SMS Reminder',
+                                                         style: TextStyle(
+                                                           color: Color(0xFF0284C7),
+                                                           fontSize: 13,
+                                                           fontWeight: FontWeight.w800,
+                                                         ),
+                                                       ),
+                                                     ],
+                                                   ),
+                                                 ),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             InkWell(
+                                               borderRadius: BorderRadius.circular(14),
+                                               onTap: () => _confirmDeleteStudent(st),
+                                               child: Container(
+                                                 padding: const EdgeInsets.all(11),
+                                                 decoration: BoxDecoration(
+                                                   color: const Color(0xFFFEF2F2),
+                                                   borderRadius: BorderRadius.circular(14),
+                                                   border: Border.all(color: const Color(0xFFFECACA)),
+                                                 ),
+                                                 child: const Icon(
+                                                   Icons.delete_outline_rounded,
+                                                   color: Color(0xFFEF4444),
+                                                   size: 20,
+                                                 ),
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                         const SizedBox(height: 10),
+
+                                         // Row 3: Quick Action Chips: Mark Due & Trial
+                                         Row(
+                                           children: [
+                                             Expanded(
+                                               child: InkWell(
+                                                 borderRadius: BorderRadius.circular(12),
+                                                 onTap: () => _openMarkDuesSheet(st),
+                                                 child: Container(
+                                                   padding: const EdgeInsets.symmetric(vertical: 8),
+                                                   decoration: BoxDecoration(
+                                                     color: const Color(0xFFFFF1F2),
+                                                     borderRadius: BorderRadius.circular(12),
+                                                     border: Border.all(color: const Color(0xFFFECDD3)),
+                                                   ),
+                                                   child: const Row(
+                                                     mainAxisAlignment: MainAxisAlignment.center,
+                                                     children: [
+                                                       Icon(Icons.currency_rupee, size: 14, color: Color(0xFFE11D48)),
+                                                       SizedBox(width: 4),
+                                                       Text(
+                                                         'Mark Due',
+                                                         style: TextStyle(
+                                                           color: Color(0xFFE11D48),
+                                                           fontSize: 12,
+                                                           fontWeight: FontWeight.w800,
+                                                         ),
+                                                       ),
+                                                     ],
+                                                   ),
+                                                 ),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             Expanded(
+                                               child: InkWell(
+                                                 borderRadius: BorderRadius.circular(12),
+                                                 onTap: () => _toggleTrialStatus(st),
+                                                 child: Container(
+                                                   padding: const EdgeInsets.symmetric(vertical: 8),
+                                                   decoration: BoxDecoration(
+                                                     color: st.status == 'TRIAL'
+                                                         ? const Color(0xFFECFDF5)
+                                                         : const Color(0xFFFFFBEB),
+                                                     borderRadius: BorderRadius.circular(12),
+                                                     border: Border.all(
+                                                       color: st.status == 'TRIAL'
+                                                           ? const Color(0xFFA7F3D0)
+                                                           : const Color(0xFFFDE68A),
+                                                     ),
+                                                   ),
+                                                   child: Row(
+                                                     mainAxisAlignment: MainAxisAlignment.center,
+                                                     children: [
+                                                       Icon(
+                                                         st.status == 'TRIAL' ? Icons.check_circle_outline : Icons.science_outlined,
+                                                         size: 14,
+                                                         color: st.status == 'TRIAL' ? const Color(0xFF059669) : const Color(0xFFD97706),
+                                                       ),
+                                                       const SizedBox(width: 4),
+                                                       Text(
+                                                         st.status == 'TRIAL' ? 'Active Member' : 'Mark Trial',
+                                                         style: TextStyle(
+                                                           color: st.status == 'TRIAL' ? const Color(0xFF059669) : const Color(0xFFD97706),
+                                                           fontSize: 12,
+                                                           fontWeight: FontWeight.w800,
+                                                         ),
+                                                       ),
+                                                     ],
+                                                   ),
+                                                 ),
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ],
                                     ],
                                   ),
                                 );
