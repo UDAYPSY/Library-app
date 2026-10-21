@@ -48,18 +48,17 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
   }
 
   String _generatePaymentsCsv(List<PaymentTransaction> list) {
-    final headers = ['Receipt ID', 'Date', 'Student Name', 'Phone', 'Seat #', 'Shift', 'Amount (INR)', 'Payment Mode', 'Valid Until', 'Collected By'];
+    final headers = ['Receipt ID', 'Date', 'Student Name', 'Phone', 'Seat #', 'Shift', 'Amount (INR)', 'Payment Mode', 'Notes'];
     final rows = list.map((p) => [
       p.id,
       DateFormat('dd-MM-yyyy').format(p.date),
       p.studentName,
       p.studentPhone,
-      'S-${p.seatNumber}',
+      p.seatNumber != null ? 'S-${p.seatNumber}' : 'Unallocated',
       p.shift,
       '${p.amount}',
       p.paymentMode,
-      DateFormat('dd-MM-yyyy').format(p.validUntil),
-      p.collectedBy,
+      p.notes,
     ].map(_cleanCsvField).join(',')).join('\n');
     return '${headers.join(',')}\n$rows';
   }
@@ -73,7 +72,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
       e.category,
       '${e.amount}',
       e.paymentMode,
-      e.notes,
+      e.note,
     ].map(_cleanCsvField).join(',')).join('\n');
     return '${headers.join(',')}\n$rows';
   }
@@ -417,18 +416,17 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                                 subtitle: '$paymentsCount payments in $monthStr (₹$collectedAmount)',
                                 onDownload: () {
                                   final csv = _generatePaymentsCsv(monthPayments);
-                                  final headers = ['Receipt', 'Date', 'Student', 'Phone', 'Seat', 'Shift', 'Amount', 'Mode', 'Valid Until', 'Collected By'];
+                                  final headers = ['Receipt', 'Date', 'Student', 'Phone', 'Seat', 'Shift', 'Amount', 'Mode', 'Notes'];
                                   final previewRows = monthPayments.map((p) => [
                                     p.id,
                                     DateFormat('dd-MM-yy').format(p.date),
                                     p.studentName,
                                     p.studentPhone,
-                                    'S-${p.seatNumber}',
+                                    p.seatNumber != null ? 'S-${p.seatNumber}' : 'Unallocated',
                                     p.shift,
                                     '₹${p.amount}',
                                     p.paymentMode,
-                                    DateFormat('dd-MM-yy').format(p.validUntil),
-                                    p.collectedBy,
+                                    p.notes,
                                   ]).toList();
                                   final summary = '${_service.profile.libraryName} - Payments Report ($monthStr)\nTotal Collected: ₹$collectedAmount across $paymentsCount transactions.';
                                   _exportCategory(
@@ -452,7 +450,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                                 subtitle: '$expenseCount entries in $monthStr (₹$expenseAmount)',
                                 onDownload: () {
                                   final csv = _generateExpensesCsv(monthExpenses);
-                                  final headers = ['ID', 'Date', 'Title', 'Category', 'Amount', 'Mode', 'Notes'];
+                                  final headers = ['ID', 'Date', 'Title', 'Category', 'Amount', 'Mode', 'Note'];
                                   final previewRows = monthExpenses.map((e) => [
                                     e.id,
                                     DateFormat('dd-MM-yy').format(e.date),
@@ -460,7 +458,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                                     e.category,
                                     '₹${e.amount}',
                                     e.paymentMode,
-                                    e.notes,
+                                    e.note,
                                   ]).toList();
                                   final summary = '${_service.profile.libraryName} - Expenses Report ($monthStr)\nTotal Expenses: ₹$expenseAmount across $expenseCount entries.';
                                   _exportCategory(
