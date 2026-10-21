@@ -953,6 +953,7 @@ class LibraryService {
   /// Convenience helper for direct student registration or bulk onboarding
   Future<void> addStudent(StudentInfo student) async {
     await assignSeatAndRegisterStudent(
+      studentId: student.id,
       seatNumber: student.seatNumber,
       studentName: student.name,
       phone: student.phone,
@@ -960,7 +961,7 @@ class LibraryService {
       deviceUserId: 'admin_bulk_import',
       feeAmount: 0,
       monthlyFee: student.monthlyFee,
-      duesAmount: student.monthlyFee,
+      duesAmount: student.duesAmount,
       status: student.status,
       joiningDate: student.joinedAt ?? DateTime.now(),
       fatherName: student.fatherName,
@@ -972,6 +973,7 @@ class LibraryService {
 
   // Atomic Seat Assignment Transaction (prevents duplicate student entries)
   Future<void> assignSeatAndRegisterStudent({
+    String? studentId,
     int? seatNumber,
     required String studentName,
     required String phone,
@@ -1028,7 +1030,9 @@ class LibraryService {
         : now.add(const Duration(days: 30));
 
     if (isFirebaseConnected) {
-      final studentDocRef = _db.collection('students').doc();
+      final studentDocRef = (studentId != null && studentId.isNotEmpty)
+          ? _db.collection('students').doc(studentId)
+          : _db.collection('students').doc();
       final paymentDocRef = _db.collection('payments').doc();
 
       await _db.runTransaction((transaction) async {
@@ -1095,7 +1099,9 @@ class LibraryService {
       });
     } else {
       // In-memory mock assignment
-      final studentId = 'std_${DateTime.now().millisecondsSinceEpoch}';
+      final effectiveStudentId = (studentId != null && studentId.isNotEmpty)
+          ? studentId
+          : 'std_${DateTime.now().millisecondsSinceEpoch}';
       if (seatNumber != null) {
         // Enforce strictly 1 student per seat: unassign this seat from any previous student
         for (int i = 0; i < _mockStudents.length; i++) {
@@ -1108,7 +1114,7 @@ class LibraryService {
           _mockSeats[index] = SeatInfo(
             seatNumber: seatNumber,
             isOccupied: true,
-            studentId: studentId,
+            studentId: effectiveStudentId,
             studentName: studentName,
             shift: shift,
           );
@@ -1119,7 +1125,7 @@ class LibraryService {
       _mockStudents.insert(
         0,
         StudentInfo(
-          id: studentId,
+          id: effectiveStudentId,
           name: studentName,
           phone: phone,
           seatNumber: seatNumber,
@@ -1145,7 +1151,7 @@ class LibraryService {
           0,
           PaymentTransaction(
             id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
-            studentId: studentId,
+            studentId: effectiveStudentId,
             studentName: studentName,
             studentPhone: phone,
             seatNumber: seatNumber,

@@ -7,9 +7,10 @@ void main() {
 
   late LibraryService service;
 
-  setUp(() {
+  setUp(() async {
     service = LibraryService();
     service.ensureInitialized();
+    await service.clearAllData();
   });
 
   group('Excel & CSV Spreadsheet Import Tests', () {

@@ -7,9 +7,10 @@ void main() {
 
   late LibraryService service;
 
-  setUp(() {
+  setUp(() async {
     service = LibraryService();
     service.ensureInitialized();
+    await service.clearAllData();
   });
 
   group('Seat Allocation and Student Management Tests', () {
@@ -21,7 +22,7 @@ void main() {
       expect(LibraryService.normalizePhone('919876543210'), equals('9876543210'));
     });
 
-    test('Duplicate phone detection across active students', () {
+    test('Duplicate phone detection across active students', () async {
       final student = StudentInfo(
         id: 'std_dup_1',
         name: 'Amit Patel',
@@ -31,7 +32,7 @@ void main() {
         monthlyFee: 800,
         status: 'Active',
       );
-      service.addStudent(student);
+      await service.addStudent(student);
 
       // Testing duplicate checks
       expect(service.isDuplicateStudentPhone('9876512345'), isTrue);
@@ -45,7 +46,7 @@ void main() {
       expect(service.isDuplicateStudentPhone('9123456789'), isFalse);
     });
 
-    test('Seat collision check and student association', () {
+    test('Seat collision check and student association', () async {
       final seatNum = 8;
       final student = StudentInfo(
         id: 'std_seat_8',
@@ -56,7 +57,7 @@ void main() {
         monthlyFee: 600,
         status: 'Active',
       );
-      service.addStudent(student);
+      await service.addStudent(student);
 
       expect(service.isSeatOccupied(seatNum), isTrue);
 

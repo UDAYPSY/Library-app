@@ -7,9 +7,10 @@ void main() {
 
   late LibraryService service;
 
-  setUp(() {
+  setUp(() async {
     service = LibraryService();
     service.ensureInitialized();
+    await service.clearAllData();
   });
 
   group('Financial Ledger & Payment Reconciliation Tests', () {
@@ -26,7 +27,7 @@ void main() {
         status: 'Active',
         joinedAt: DateTime(2026, 1, 1),
       );
-      service.addStudent(testStudent);
+      await service.addStudent(testStudent);
 
       expect(service.isSeatOccupied(1), isTrue);
 
