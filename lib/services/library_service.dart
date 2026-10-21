@@ -64,6 +64,87 @@ class LibraryService {
     ),
   ];
 
+  List<StaffMember> staffList = [
+    StaffMember(
+      id: 'staff_1',
+      name: 'Ramesh Kumar',
+      phone: '9876543210',
+      role: 'Receptionist & Desk',
+      addedAt: DateTime.now().subtract(const Duration(days: 45)),
+      isActive: true,
+    ),
+    StaffMember(
+      id: 'staff_2',
+      name: 'Sunita Mishra',
+      phone: '9812345678',
+      role: 'Shift Manager',
+      addedAt: DateTime.now().subtract(const Duration(days: 20)),
+      isActive: true,
+    ),
+  ];
+
+  List<LibraryBranch> branches = [
+    const LibraryBranch(
+      id: 'branch_1',
+      name: 'Main Campus (Central)',
+      address: 'City Center, Main St, Patna',
+      totalSeats: 35,
+      isDefault: true,
+    ),
+  ];
+  String activeBranchId = 'branch_1';
+
+  LibraryBranch get currentBranch {
+    try {
+      return branches.firstWhere((b) => b.id == activeBranchId);
+    } catch (_) {
+      return branches.isNotEmpty
+          ? branches.first
+          : const LibraryBranch(id: 'branch_1', name: 'Main Campus', address: 'Patna', totalSeats: 35);
+    }
+  }
+
+  void switchBranch(String branchId) {
+    if (branches.any((b) => b.id == branchId)) {
+      activeBranchId = branchId;
+      final b = currentBranch;
+      profile.libraryName = b.name;
+      profile.city = b.address;
+      _saveLocalState();
+    }
+  }
+
+  void addBranch(LibraryBranch branch) {
+    branches.add(branch);
+    _saveLocalState();
+  }
+
+  void addStaffMember(StaffMember staff) {
+    staffList.add(staff);
+    _saveLocalState();
+  }
+
+  void removeStaffMember(String staffId) {
+    staffList.removeWhere((s) => s.id == staffId);
+    _saveLocalState();
+  }
+
+  void toggleStaffActive(String staffId) {
+    final idx = staffList.indexWhere((s) => s.id == staffId);
+    if (idx != -1) {
+      final cur = staffList[idx];
+      staffList[idx] = StaffMember(
+        id: cur.id,
+        name: cur.name,
+        phone: cur.phone,
+        role: cur.role,
+        addedAt: cur.addedAt,
+        isActive: !cur.isActive,
+      );
+      _saveLocalState();
+    }
+  }
+
   void toggleShiftActive(String shiftId) {
     final idx = shifts.indexWhere((s) => s.id == shiftId);
     if (idx != -1) {
@@ -92,6 +173,7 @@ class LibraryService {
     }
     return total > 0 ? total : 35;
   }
+
 
   // In-memory mock fallback state
   static late List<SeatInfo> _mockSeats;
@@ -219,6 +301,27 @@ class LibraryService {
           }
         }
       }
+
+      final staffStr = await LocalStorageService.getString('app_library_staff');
+      if (staffStr != null && staffStr.isNotEmpty) {
+        final decoded = json.decode(staffStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          staffList = decoded.map((s) => StaffMember.fromMap(Map<String, dynamic>.from(s))).toList();
+        }
+      }
+
+      final branchesStr = await LocalStorageService.getString('app_library_branches');
+      if (branchesStr != null && branchesStr.isNotEmpty) {
+        final decoded = json.decode(branchesStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          branches = decoded.map((b) => LibraryBranch.fromMap(Map<String, dynamic>.from(b))).toList();
+        }
+      }
+
+      final activeBranchStr = await LocalStorageService.getString('app_library_active_branch');
+      if (activeBranchStr != null && activeBranchStr.isNotEmpty) {
+        activeBranchId = activeBranchStr;
+      }
     } catch (_) {}
   }
 
@@ -230,8 +333,132 @@ class LibraryService {
       await LocalStorageService.saveString('app_library_students', json.encode(_mockStudents.map((s) => s.toMap()).toList()));
       await LocalStorageService.saveString('app_library_payments', json.encode(_mockPayments.map((p) => p.toJsonMap()).toList()));
       await LocalStorageService.saveString('app_library_expenses', json.encode(_mockExpenses.map((e) => e.toJsonMap()).toList()));
+      await LocalStorageService.saveString('app_library_staff', json.encode(staffList.map((s) => s.toMap()).toList()));
+      await LocalStorageService.saveString('app_library_branches', json.encode(branches.map((b) => b.toMap()).toList()));
+      await LocalStorageService.saveString('app_library_active_branch', activeBranchId);
     } catch (_) {}
   }
+
+  String exportFullBackupJson() {
+    ensureInitialized();
+    final backupData = {
+      'app': 'TrackMyLibrary',
+      'version': '2.0.0',
+      'exported_at': DateTime.now().toIso8601String(),
+      'profile': profile.toMap(),
+      'sections': sections.map((s) => s.toMap()).toList(),
+      'shifts': shifts.map((s) => s.toMap()).toList(),
+      'branches': branches.map((b) => b.toMap()).toList(),
+      'staff': staffList.map((m) => m.toMap()).toList(),
+      'students': _mockStudents.map((s) => s.toMap()).toList(),
+      'payments': _mockPayments.map((p) => p.toJsonMap()).toList(),
+      'expenses': _mockExpenses.map((e) => e.toJsonMap()).toList(),
+      'stats': {
+        'total_students': _mockStudents.length,
+        'total_payments': _mockPayments.length,
+        'total_expenses': _mockExpenses.length,
+        'total_seats': totalSeatsCount,
+      }
+    };
+    return const JsonEncoder.withIndent('  ').convert(backupData);
+  }
+
+  Future<Map<String, dynamic>> restoreFromBackupJson(String jsonString) async {
+    ensureInitialized();
+    try {
+      final decoded = json.decode(jsonString);
+      if (decoded is! Map<String, dynamic>) {
+        return {'success': false, 'error': 'Invalid backup format: Root is not a valid JSON object.'};
+      }
+
+      if (decoded['profile'] is Map) {
+        profile = LibraryProfile.fromMap(Map<String, dynamic>.from(decoded['profile']));
+      }
+
+      if (decoded['sections'] is List) {
+        final secList = (decoded['sections'] as List)
+            .map((s) => SectionConfig.fromMap(Map<String, dynamic>.from(s)))
+            .toList();
+        if (secList.isNotEmpty) {
+          sections = secList;
+        }
+      }
+
+      if (decoded['shifts'] is List) {
+        final shiftList = (decoded['shifts'] as List)
+            .map((s) => ShiftConfig.fromMap(Map<String, dynamic>.from(s)))
+            .toList();
+        if (shiftList.isNotEmpty) {
+          shifts = shiftList;
+        }
+      }
+
+      int restoredStudents = 0;
+      if (decoded['students'] is List) {
+        _mockStudents.clear();
+        for (var item in decoded['students']) {
+          final map = Map<String, dynamic>.from(item);
+          _mockStudents.add(StudentInfo.fromFirestore(map['id']?.toString() ?? '', map));
+          restoredStudents++;
+        }
+        _syncSeatsWithStudents();
+        if (!_mockStudentsController.isClosed) {
+          _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        }
+      }
+
+      int restoredPayments = 0;
+      if (decoded['payments'] is List) {
+        _mockPayments.clear();
+        for (var item in decoded['payments']) {
+          final map = Map<String, dynamic>.from(item);
+          _mockPayments.add(PaymentTransaction.fromFirestore(map['payment_id']?.toString() ?? '', map));
+          restoredPayments++;
+        }
+        if (!_mockPaymentsController.isClosed) {
+          _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+        }
+      }
+
+      int restoredExpenses = 0;
+      if (decoded['expenses'] is List) {
+        _mockExpenses.clear();
+        for (var item in decoded['expenses']) {
+          final map = Map<String, dynamic>.from(item);
+          _mockExpenses.add(ExpenseItem.fromFirestore(map['id']?.toString() ?? '', map));
+          restoredExpenses++;
+        }
+        if (!_mockExpensesController.isClosed) {
+          _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+        }
+      }
+
+      if (decoded['staff'] is List) {
+        staffList = (decoded['staff'] as List)
+            .map((s) => StaffMember.fromMap(Map<String, dynamic>.from(s)))
+            .toList();
+      }
+
+      if (decoded['branches'] is List) {
+        branches = (decoded['branches'] as List)
+            .map((b) => LibraryBranch.fromMap(Map<String, dynamic>.from(b)))
+            .toList();
+      }
+
+      await _saveLocalState();
+
+      return {
+        'success': true,
+        'students': restoredStudents,
+        'payments': restoredPayments,
+        'expenses': restoredExpenses,
+        'library_name': profile.libraryName,
+      };
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
 
   Future<void> clearAllData() async {
     _mockStudents.clear();

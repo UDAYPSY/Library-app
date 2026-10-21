@@ -514,3 +514,80 @@ class PaymentTransaction {
   }
 }
 
+class StaffMember {
+  final String id;
+  final String name;
+  final String phone;
+  final String role;
+  final DateTime addedAt;
+  final bool isActive;
+
+  const StaffMember({
+    required this.id,
+    required this.name,
+    required this.phone,
+    this.role = 'Receptionist',
+    required this.addedAt,
+    this.isActive = true,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'phone': phone,
+      'role': role,
+      'added_at': addedAt.toIso8601String(),
+      'is_active': isActive,
+    };
+  }
+
+  factory StaffMember.fromMap(Map<String, dynamic> map) {
+    return StaffMember(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      phone: map['phone'] ?? '',
+      role: map['role'] ?? 'Receptionist',
+      addedAt: map['added_at'] != null ? (DateTime.tryParse(map['added_at']) ?? DateTime.now()) : DateTime.now(),
+      isActive: map['is_active'] ?? true,
+    );
+  }
+}
+
+class LibraryBranch {
+  final String id;
+  final String name;
+  final String address;
+  final int totalSeats;
+  final bool isDefault;
+
+  const LibraryBranch({
+    required this.id,
+    required this.name,
+    required this.address,
+    this.totalSeats = 35,
+    this.isDefault = false,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'total_seats': totalSeats,
+      'is_default': isDefault,
+    };
+  }
+
+  factory LibraryBranch.fromMap(Map<String, dynamic> map) {
+    return LibraryBranch(
+      id: map['id'] ?? '',
+      name: map['name'] ?? 'Main Branch',
+      address: map['address'] ?? '',
+      totalSeats: (map['total_seats'] as num?)?.toInt() ?? 35,
+      isDefault: map['is_default'] ?? false,
+    );
+  }
+}
+
+
