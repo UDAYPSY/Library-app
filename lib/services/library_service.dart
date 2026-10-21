@@ -551,6 +551,25 @@ class LibraryService {
     );
   }
 
+  /// Convenience helper for direct student registration or bulk onboarding
+  Future<void> addStudent(StudentInfo student) async {
+    await assignSeatAndRegisterStudent(
+      seatNumber: student.seatNumber,
+      studentName: student.name,
+      phone: student.phone,
+      shift: student.shift,
+      deviceUserId: 'admin_bulk_import',
+      feeAmount: 0,
+      monthlyFee: student.monthlyFee,
+      duesAmount: student.monthlyFee,
+      status: student.status,
+      joiningDate: student.joinedAt ?? DateTime.now(),
+      fatherName: student.fatherName,
+      address: student.address,
+      aadhaarNumber: student.aadhaarNumber,
+    );
+  }
+
   // Atomic Seat Assignment Transaction (prevents duplicate student entries)
   Future<void> assignSeatAndRegisterStudent({
     int? seatNumber,
