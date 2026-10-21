@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
@@ -43,6 +46,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
 
   // Step 3: Review Options
   bool _saveToContacts = true;
+  String? _photoBase64;
 
   @override
   void initState() {
@@ -81,6 +85,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       if (s.gender.isNotEmpty) _gender = s.gender;
       _selectedSection = s.sectionName;
       _selectedSeat = s.seatNumber;
+      _photoBase64 = s.photoBase64;
       _feeCtrl.text = '${s.monthlyFee}';
       final paidAmt = s.hasDues ? (s.monthlyFee - s.effectiveDues).clamp(0, s.monthlyFee) : s.monthlyFee;
       _amountPaidCtrl.text = '$paidAmt';
@@ -91,6 +96,100 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         _selectedShift = shiftMatch.first;
       }
     }
+  }
+
+  Future<void> _pickPhoto() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Member Profile Photo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.photo_library_outlined, color: Color(0xFF0D9488)),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final picker = ImagePicker();
+                    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 600, imageQuality: 80);
+                    if (image != null) {
+                      final bytes = await image.readAsBytes();
+                      setState(() {
+                        _photoBase64 = base64Encode(bytes);
+                      });
+                    }
+                  } catch (_) {}
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF16A34A)),
+                ),
+                title: const Text('Take a Photo (Camera)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final picker = ImagePicker();
+                    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 600, imageQuality: 80);
+                    if (image != null) {
+                      final bytes = await image.readAsBytes();
+                      setState(() {
+                        _photoBase64 = base64Encode(bytes);
+                      });
+                    }
+                  } catch (_) {}
+                },
+              ),
+              if (_photoBase64 != null)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                  ),
+                  title: const Text('Remove Photo', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _photoBase64 = null;
+                    });
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendWelcomeWhatsApp(String name, String phone, int? seatNum, String shift) async {
+    final cleanPhone = LibraryService.normalizePhone(phone);
+    final msg = _service.profile.welcomeTemplate
+        .replaceAll('{student_name}', name)
+        .replaceAll('{library_name}', _service.profile.libraryName)
+        .replaceAll('{seat_number}', seatNum != null ? '$seatNum' : 'Unallocated')
+        .replaceAll('{shift}', shift);
+    final uri = Uri.parse('https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(msg)}');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -270,6 +369,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           preparationFor: _preparationCtrl.text.trim(),
           gender: _gender,
           sectionName: _selectedSection,
+          photoBase64: _photoBase64,
         );
 
         if (mounted) {
@@ -302,15 +402,19 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         aadhaarNumber: _aadhaarCtrl.text.trim(),
         preparationFor: _preparationCtrl.text.trim(),
         gender: _gender,
+        photoBase64: _photoBase64,
       );
 
       if (mounted) {
+        if (!_isTrial && _service.profile.autoWelcomeMessage) {
+          _sendWelcomeWhatsApp(name, phone, seatNum, _selectedShift.name);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isTrial
                 ? 'Trial Student $name registered successfully!'
                 : (finalDuesAmount > 0
-                    ? 'Student $name registered with ₹$finalDuesAmount pending due (categorized in DUES & REMAINING)!'
+                    ? 'Student $name registered with ₹$finalDuesAmount pending due!'
                     : 'Student $name added successfully (Fully Paid)!')),
             backgroundColor: _isTrial
                 ? const Color(0xFFD97706)
@@ -533,20 +637,13 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Circular Dashed "Add Photo" Picker (Image 6)
+        // Circular Dashed "Add Photo" Picker (Real ImagePicker)
         Center(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 20, top: 4),
             child: InkWell(
               borderRadius: BorderRadius.circular(60),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Photo selected from gallery/camera'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
+              onTap: _pickPhoto,
               child: Container(
                 width: 120,
                 height: 120,
@@ -561,21 +658,30 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                     BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
                   ],
                 ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.camera_alt_outlined, size: 36, color: Color(0xFF0D9488)),
-                    SizedBox(height: 6),
-                    Text(
-                      'Add Photo',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0D9488),
+                child: _photoBase64 != null
+                    ? ClipOval(
+                        child: Image.memory(
+                          base64Decode(_photoBase64!),
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.camera_alt_outlined, size: 36, color: Color(0xFF0D9488)),
+                          SizedBox(height: 6),
+                          Text(
+                            'Add Photo',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0D9488),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
@@ -1369,16 +1475,25 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   shape: BoxShape.circle,
                   color: Color(0xFF0284C7),
                 ),
-                child: Center(
-                  child: Text(
-                    initials.isNotEmpty ? initials : 'ST',
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+                child: _photoBase64 != null
+                    ? ClipOval(
+                        child: Image.memory(
+                          base64Decode(_photoBase64!),
+                          width: 76,
+                          height: 76,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          initials.isNotEmpty ? initials : 'ST',
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
               ),
               const SizedBox(height: 12),
               Text(

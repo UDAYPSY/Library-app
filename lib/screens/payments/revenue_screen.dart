@@ -18,10 +18,10 @@ class _RevenueScreenState extends State<RevenueScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   final ScrollController _monthScrollCtrl = ScrollController();
 
-  String _selectedYear = '2026'; // Selected in 2.jpeg
-  String _selectedMonth = 'Oct'; // Selected in 2.jpeg
+  late String _selectedYear;
+  late String _selectedMonth;
+  late final List<String> _years;
 
-  final List<String> _years = ['All Years', '2025', '2026'];
   final List<String> _months = [
     'All Months',
     'Jan',
@@ -41,6 +41,10 @@ class _RevenueScreenState extends State<RevenueScreen> {
   @override
   void initState() {
     super.initState();
+    final curY = DateTime.now().year;
+    _years = ['All Years', '${curY - 2}', '${curY - 1}', '$curY', '${curY + 1}'];
+    _selectedYear = '$curY';
+    _selectedMonth = DateFormat('MMM').format(DateTime.now());
     _applyInitialFilter();
   }
 

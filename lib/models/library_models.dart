@@ -234,6 +234,7 @@ class StudentInfo {
   final String aadhaarNumber;
   final String preparationFor;
   final String gender;
+  final String? photoBase64;
 
   const StudentInfo({
     required this.id,
@@ -254,7 +255,10 @@ class StudentInfo {
     this.aadhaarNumber = '',
     this.preparationFor = '',
     this.gender = 'Male',
+    this.photoBase64,
   });
+
+  bool get hasPhoto => photoBase64 != null && photoBase64!.isNotEmpty;
 
   bool get hasDues {
     if (status == 'INACTIVE' || status == 'TRIAL') return false;
@@ -288,6 +292,7 @@ class StudentInfo {
     String? aadhaarNumber,
     String? preparationFor,
     String? gender,
+    String? photoBase64,
   }) {
     return StudentInfo(
       id: id ?? this.id,
@@ -308,6 +313,7 @@ class StudentInfo {
       aadhaarNumber: aadhaarNumber ?? this.aadhaarNumber,
       preparationFor: preparationFor ?? this.preparationFor,
       gender: gender ?? this.gender,
+      photoBase64: photoBase64 ?? this.photoBase64,
     );
   }
 
@@ -331,6 +337,7 @@ class StudentInfo {
       'aadhaar_number': aadhaarNumber,
       'preparation_for': preparationFor,
       'gender': gender,
+      'photo_base64': photoBase64,
     };
   }
 
@@ -363,6 +370,7 @@ class StudentInfo {
       aadhaarNumber: (data['aadhaar_number'] as String?) ?? '',
       preparationFor: (data['preparation_for'] as String?) ?? '',
       gender: (data['gender'] as String?) ?? 'Male',
+      photoBase64: data['photo_base64'] as String?,
     );
   }
 }

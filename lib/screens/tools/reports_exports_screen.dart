@@ -17,7 +17,7 @@ class ReportsExportsScreen extends StatefulWidget {
 
 class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
   final LibraryService _service = LibraryService();
-  DateTime _selectedMonth = DateTime(2026, 10, 1);
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
 
   void _prevMonth() {
     setState(() {

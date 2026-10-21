@@ -233,9 +233,11 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _yearPill(2025),
+                            _yearPill(DateTime.now().year - 1),
                             const SizedBox(width: 8),
-                            _yearPill(2026),
+                            _yearPill(DateTime.now().year),
+                            const SizedBox(width: 8),
+                            _yearPill(DateTime.now().year + 1),
                           ],
                         ),
                         const SizedBox(height: 16),

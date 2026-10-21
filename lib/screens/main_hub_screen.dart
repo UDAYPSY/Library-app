@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../models/library_models.dart';
@@ -11,6 +13,7 @@ import 'seats/seats_screen.dart';
 import 'shifts/shift_system_screen.dart';
 import 'students/add_student_wizard_screen.dart';
 import 'students/student_directory_screen.dart';
+import 'students/member_profile_screen.dart';
 import 'tools/whatsapp_automation_screen.dart';
 import 'tools/reports_exports_screen.dart';
 import 'tools/share_qr_screen.dart';
@@ -1637,6 +1640,16 @@ class _MainHubScreenState extends State<MainHubScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
+        final shifts = _service.shifts;
+        final students = _service.currentStudents;
+        final colors = [
+          const Color(0xFF3B82F6),
+          const Color(0xFF10B981),
+          const Color(0xFF8B5CF6),
+          const Color(0xFFF97316),
+          const Color(0xFF06B6D4),
+        ];
+
         return Container(
           padding: const EdgeInsets.all(22),
           decoration: const BoxDecoration(
@@ -1674,32 +1687,40 @@ class _MainHubScreenState extends State<MainHubScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Configured shifts with monthly pricing and active seats.',
+                'Live configured shifts with monthly pricing and active seat counts.',
                 style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
               ),
               const SizedBox(height: 18),
-              _shiftConfigItem(
-                name: 'Morning Shift',
-                timings: '06:00 AM - 02:00 PM',
-                fee: '₹500 / month',
-                activeCount: '12 active students',
-                color: const Color(0xFF3B82F6),
-              ),
-              const SizedBox(height: 10),
-              _shiftConfigItem(
-                name: 'Evening Shift',
-                timings: '02:00 PM - 10:00 PM',
-                fee: '₹500 / month',
-                activeCount: '8 active students',
-                color: const Color(0xFF10B981),
-              ),
-              const SizedBox(height: 10),
-              _shiftConfigItem(
-                name: 'Full Day Shift',
-                timings: '06:00 AM - 10:00 PM',
-                fee: '₹800 / month',
-                activeCount: '15 active students',
-                color: const Color(0xFF8B5CF6),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.45),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: shifts.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, idx) {
+                    final shift = shifts[idx];
+                    final activeCount = students.where((s) => s.shift == shift.name && s.status != 'INACTIVE').length;
+                    final color = colors[idx % colors.length];
+
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ShiftSystemScreen()),
+                        );
+                      },
+                      child: _shiftConfigItem(
+                        name: shift.name,
+                        timings: '${shift.startsAt} - ${shift.endsAt}',
+                        fee: '₹${shift.monthlyFee} / month',
+                        activeCount: '$activeCount active students',
+                        color: color,
+                      ),
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 20),
               SizedBox(
@@ -1711,12 +1732,13 @@ class _MainHubScreenState extends State<MainHubScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add Custom Shift', style: TextStyle(fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.tune_rounded),
+                  label: const Text('Manage & Add Custom Shifts', style: TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: () {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Shift configuration saved!')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ShiftSystemScreen()),
                     );
                   },
                 ),
@@ -1782,6 +1804,11 @@ class _MainHubScreenState extends State<MainHubScreen> {
 
   void _showStudentIDModal() {
     final profile = _service.profile;
+    final students = _service.currentStudents;
+    final student = students.isNotEmpty
+        ? students.firstWhere((s) => s.status != 'INACTIVE', orElse: () => students.first)
+        : null;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1818,149 +1845,234 @@ class _MainHubScreenState extends State<MainHubScreen> {
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
               const SizedBox(height: 20),
-              // ID Card Graphic
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              if (student == null) ...[
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x330F766E), blurRadius: 14, offset: Offset(0, 6)),
-                  ],
+                  child: Column(
+                    children: [
+                      const Icon(Icons.badge_outlined, size: 54, color: Color(0xFF94A3B8)),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'No Members Registered Yet',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.textNavy),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Enroll your first student to generate their official scannable digital ID pass.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryTeal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.person_add_rounded, size: 18),
+                        label: const Text('Enroll First Member'),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _openAddStudentSheet();
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-                child: Column(
+              ] else ...[
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x330F766E), blurRadius: 14, offset: Offset(0, 6)),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.12),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        child: Row(
+                          children: [
+                            if (profile.logoBase64 != null && profile.logoBase64!.isNotEmpty)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.memory(base64Decode(profile.logoBase64!), width: 22, height: 22, fit: BoxFit.cover),
+                              )
+                            else
+                              const Icon(Icons.local_library_rounded, color: Colors.white, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                profile.libraryName,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'STUDENT PASS',
+                                style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 62,
+                              height: 62,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: student.hasPhoto
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Image.memory(
+                                        base64Decode(student.photoBase64!),
+                                        width: 62,
+                                        height: 62,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : const Center(
+                                      child: Icon(Icons.person_rounded, size: 40, color: Color(0xFF0F766E)),
+                                    ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    student.name,
+                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Seat #${student.seatNumber ?? 'Unassigned'} • Phone: ${student.phone}',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Shift: ${student.shift}',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    student.feeDueDate != null
+                                        ? 'Valid till: ${DateFormat('dd MMM yyyy').format(student.feeDueDate!)}'
+                                        : 'Active Member',
+                                    style: const TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.w800),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: QrImageView(
+                                data: 'https://trackmylibrary.in/portal?verify=${student.id}&seat=${student.seatNumber ?? 0}',
+                                size: 52,
+                                version: QrVersions.auto,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.12),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.local_library_rounded, color: Colors.white, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              profile.libraryName,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.white24,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              'STUDENT PASS',
-                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                        ],
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Color(0xFF10B981)),
+                        label: const Text('Share on WhatsApp', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          final cleanPhone = student.phone.replaceAll(RegExp(r'\D'), '');
+                          final target = cleanPhone.length == 10 ? '91$cleanPhone' : cleanPhone;
+                          final passMsg = '''
+📇 *OFFICIAL DIGITAL ID CARD*
+🏛️ *${profile.libraryName.toUpperCase()}*
+----------------------------------------
+👤 *Member Name:* ${student.name}
+🪑 *Seat:* #${student.seatNumber ?? 'Unassigned'}
+⏰ *Shift:* ${student.shift}
+📅 *Validity:* ${student.feeDueDate != null ? DateFormat('dd-MMM-yyyy').format(student.feeDueDate!) : 'Active'}
+✅ *Status:* ${student.status}
+----------------------------------------
+📲 *Scan Digital Verification Pass:*
+https://trackmylibrary.in/portal?verify=${student.id}&seat=${student.seatNumber ?? 0}
+'''.trim();
+                          final uri = Uri.parse('https://wa.me/$target?text=${Uri.encodeComponent(passMsg)}');
+                          try {
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            } else {
+                              await launchUrl(uri);
+                            }
+                          } catch (_) {}
+                        },
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: Colors.white, width: 2),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryTeal,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: const Icon(Icons.person_rounded, size: 18),
+                        label: const Text('Member Profile'),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => MemberProfileScreen(student: student, memberId: 1),
                             ),
-                            child: const Center(
-                              child: Icon(Icons.person_rounded, size: 40, color: Color(0xFF0F766E)),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Rahul Sharma',
-                                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'ID: TML-2026-088 • Seat #14',
-                                  style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Shift: Full Day (6 AM - 10 PM)',
-                                  style: TextStyle(color: Colors.white70, fontSize: 11),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Valid till: 31 Dec 2026',
-                                  style: TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.w800),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.qr_code_2_rounded, size: 36, color: Colors.black87),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      icon: const Icon(Icons.share_rounded, size: 18),
-                      label: const Text('Share ID'),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Student ID Card shared successfully!')),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryTeal,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      icon: const Icon(Icons.download_rounded, size: 18),
-                      label: const Text('Download PDF'),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('ID Card PDF saved to device!')),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ],
           ),
         );
@@ -1970,6 +2082,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
 
   void _showQRCodeModal() {
     final profile = _service.profile;
+    final slug = profile.libraryName.toLowerCase().replaceAll(RegExp(r'\s+'), '-');
+    final portalUrl = 'https://trackmylibrary.in/live/$slug';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2008,12 +2123,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Place this QR code at your entrance for automatic student attendance.',
+                'Place this QR code at your entrance for real-time seat check-in & public verification.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
               const SizedBox(height: 22),
-              // QR Display Box
+              // Live QR Display Box
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -2024,30 +2139,24 @@ class _MainHubScreenState extends State<MainHubScreen> {
                 child: Column(
                   children: [
                     Container(
-                      width: 170,
-                      height: 170,
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
                       ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Icon(Icons.qr_code_rounded, size: 148, color: Colors.black87),
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryTeal,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Center(
-                              child: Icon(Icons.local_library_rounded, color: Colors.white, size: 18),
-                            ),
-                          ),
-                        ],
+                      child: QrImageView(
+                        data: portalUrl,
+                        version: QrVersions.auto,
+                        size: 160,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -2056,9 +2165,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.textNavy),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'ID: LIB-PATNA-001',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF64748B)),
+                    SelectableText(
+                      portalUrl,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
@@ -2072,12 +2181,13 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      icon: const Icon(Icons.print_rounded, size: 18),
-                      label: const Text('Print Poster'),
+                      icon: const Icon(Icons.tune_rounded, size: 18),
+                      label: const Text('Open QR Studio'),
                       onPressed: () {
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Sending QR Poster to Printer...')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ShareQrScreen()),
                         );
                       },
                     ),
@@ -2086,18 +2196,24 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   Expanded(
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF8B5CF6),
+                        backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      icon: const Icon(Icons.download_rounded, size: 18),
-                      label: const Text('Save Poster'),
-                      onPressed: () {
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                      label: const Text('Share Link'),
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Check-in QR Poster saved to gallery!')),
-                        );
+                        final text = 'Check live seat availability at ${profile.libraryName} before visiting:\n$portalUrl';
+                        final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
+                        try {
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          } else {
+                            await launchUrl(uri);
+                          }
+                        } catch (_) {}
                       },
                     ),
                   ),
@@ -2168,12 +2284,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
                 icon: Icons.waving_hand_outlined,
                 title: 'Welcome New Admissions',
                 subtitle: 'Send WiFi pass, seat number and library rules',
-                buttonText: 'Preview',
+                buttonText: 'Send Welcome',
                 onPressed: () {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Welcome message template ready!')),
-                  );
+                  _showAdmissionWelcomeDialog();
                 },
               ),
               const SizedBox(height: 12),
@@ -2181,18 +2295,162 @@ class _MainHubScreenState extends State<MainHubScreen> {
                 icon: Icons.campaign_outlined,
                 title: 'Broadcast Announcement',
                 subtitle: 'Notify all active members about timings, holidays or AC notice',
-                buttonText: 'Draft Message',
+                buttonText: 'Draft Notice',
                 onPressed: () {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Broadcast draft created!')),
-                  );
+                  _showBroadcastNoticeDialog();
                 },
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  void _showAdmissionWelcomeDialog() {
+    final welcomeMsg = '''
+🎉 *WELCOME TO ${_service.profile.libraryName.toUpperCase()}!*
+----------------------------------------
+Dear Member,
+Your study seat admission is confirmed!
+
+🔑 *Library Amenities & Guidelines:*
+📶 High-Speed Study WiFi: Available at reception
+🤫 Strict Silence inside reading halls
+🔌 Clean power socket at your assigned desk
+☕ RO Drinking water on-site
+
+For questions, feel free to contact the front desk.
+Have a productive study session!
+'''.trim();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(22),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(width: 44, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+            ),
+            const SizedBox(height: 16),
+            const Text('Welcome Greeting Template', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: SelectableText(welcomeMsg, style: const TextStyle(fontSize: 12, height: 1.4)),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                label: const Text('Share Greeting via WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(welcomeMsg)}');
+                  try {
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } else {
+                      await launchUrl(uri);
+                    }
+                  } catch (_) {}
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBroadcastNoticeDialog() {
+    final noticeCtrl = TextEditingController(
+      text: '📢 *IMPORTANT NOTICE FROM ${_service.profile.libraryName.toUpperCase()}*\n\nPlease note that tomorrow the study hall will operate with revised hours. Thank you for your cooperation.',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(width: 44, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+              ),
+              const SizedBox(height: 16),
+              const Text('Broadcast Notice to Members', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
+              const SizedBox(height: 6),
+              const Text('Draft an announcement to share with your active library members.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              const SizedBox(height: 14),
+              TextField(
+                controller: noticeCtrl,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.send_rounded),
+                  label: const Text('Send Broadcast via WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    final text = noticeCtrl.text.trim();
+                    Navigator.pop(ctx);
+                    if (text.isNotEmpty) {
+                      final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
+                      try {
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } else {
+                          await launchUrl(uri);
+                        }
+                      } catch (_) {}
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -2251,7 +2509,6 @@ class _MainHubScreenState extends State<MainHubScreen> {
   void _showBrandingModal() {
     final profile = _service.profile;
     final nameCtrl = TextEditingController(text: profile.libraryName);
-    final taglineCtrl = TextEditingController(text: 'Study with Peace & Focus');
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2292,7 +2549,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Customize your library brand name, invoice footer, and receipts.',
+                  'Customize your library brand name, receipt logos, and theme styling.',
                   style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 18),
@@ -2302,15 +2559,6 @@ class _MainHubScreenState extends State<MainHubScreen> {
                     labelText: 'Library Display Name',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     prefixIcon: const Icon(Icons.storefront_rounded),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: taglineCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Receipt Header / Tagline',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.short_text_rounded),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -2323,15 +2571,48 @@ class _MainHubScreenState extends State<MainHubScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: () {
-                      profile.libraryName = nameCtrl.text.trim();
+                    onPressed: () async {
+                      final newName = nameCtrl.text.trim();
+                      if (newName.isNotEmpty) {
+                        await _service.saveBranding(
+                          libraryName: newName,
+                          themeColorValue: profile.themeColorValue,
+                          logoBase64: profile.logoBase64,
+                        );
+                        if (mounted) setState(() {});
+                      }
                       Navigator.pop(ctx);
-                      setState(() {});
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Library branding updated!')),
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Library branding saved successfully!'),
+                            backgroundColor: Color(0xFF0D9488),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Save Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFF43F5E),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      side: const BorderSide(color: Color(0xFFF43F5E)),
+                    ),
+                    icon: const Icon(Icons.palette_outlined, size: 18),
+                    label: const Text('Open Full Branding Studio (Logo & Colors)'),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LibraryBrandingScreen()),
                       );
                     },
-                    child: const Text('Save Branding', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   ),
                 ),
               ],
@@ -2433,11 +2714,16 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   icon: const Icon(Icons.chat_bubble_outline_rounded),
                   label: const Text('Join WhatsApp Community', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Opening TrackMyLibrary WhatsApp Community...')),
-                    );
+                    final uri = Uri.parse('https://wa.me/919457464850?text=${Uri.encodeComponent("Hello TrackMyLibrary team, I'd like to join the Official Library Owners Community group.")}');
+                    try {
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        await launchUrl(uri);
+                      }
+                    } catch (_) {}
                   },
                 ),
               ),
@@ -2483,11 +2769,18 @@ class _MainHubScreenState extends State<MainHubScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Connecting to $type support...')),
-              );
+              final uri = type == 'WhatsApp'
+                  ? Uri.parse('https://wa.me/919457464850?text=${Uri.encodeComponent("Hi TrackMyLibrary Support Team, I need assistance with my library management app.")}')
+                  : Uri.parse('mailto:support@trackmylibrary.com?subject=${Uri.encodeComponent("TrackMyLibrary Support Request")}');
+              try {
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  await launchUrl(uri);
+                }
+              } catch (_) {}
             },
             child: Text('Contact on $type'),
           ),

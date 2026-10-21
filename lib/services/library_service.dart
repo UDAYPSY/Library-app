@@ -738,6 +738,7 @@ class LibraryService {
       fatherName: student.fatherName,
       address: student.address,
       aadhaarNumber: student.aadhaarNumber,
+      photoBase64: student.photoBase64,
     );
   }
 
@@ -760,6 +761,7 @@ class LibraryService {
     String aadhaarNumber = '',
     String preparationFor = '',
     String gender = 'Male',
+    String? photoBase64,
   }) async {
     ensureInitialized();
 
@@ -846,6 +848,7 @@ class LibraryService {
           'aadhaar_number': aadhaarNumber,
           'preparation_for': preparationFor,
           'gender': gender,
+          'photo_base64': photoBase64,
         });
 
         // 2. Log payment if not trial and fee > 0
@@ -905,6 +908,7 @@ class LibraryService {
           aadhaarNumber: aadhaarNumber,
           preparationFor: preparationFor,
           gender: gender,
+          photoBase64: photoBase64,
         ),
       );
 
@@ -1160,6 +1164,7 @@ class LibraryService {
     String? preparationFor,
     String? gender,
     String? sectionName,
+    String? photoBase64,
   }) async {
     ensureInitialized();
     if (isFirebaseConnected) {
@@ -1181,6 +1186,7 @@ class LibraryService {
       if (preparationFor != null) updates['preparation_for'] = preparationFor;
       if (gender != null) updates['gender'] = gender;
       if (sectionName != null) updates['section_name'] = sectionName;
+      if (photoBase64 != null) updates['photo_base64'] = photoBase64;
       await studentDocRef.update(updates);
     } else {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
@@ -1229,6 +1235,7 @@ class LibraryService {
           preparationFor: preparationFor ?? s.preparationFor,
           gender: gender ?? s.gender,
           sectionName: sectionName ?? s.sectionName,
+          photoBase64: photoBase64 ?? s.photoBase64,
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
         _saveLocalState();

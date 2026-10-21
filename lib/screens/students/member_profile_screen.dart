@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
@@ -377,6 +380,197 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     );
   }
 
+  Future<void> _pickProfilePhoto(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 600,
+        maxHeight: 600,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        final base64Str = base64Encode(bytes);
+        await _service.updateStudent(
+          studentId: _student.id,
+          name: _student.name,
+          phone: _student.phone,
+          shift: _student.shift,
+          seatNumber: _student.seatNumber,
+          note: _student.note,
+          monthlyFee: _student.monthlyFee,
+          duesAmount: _student.duesAmount,
+          status: _student.status,
+          feeDueDate: _student.feeDueDate,
+          fatherName: _student.fatherName,
+          address: _student.address,
+          aadhaarNumber: _student.aadhaarNumber,
+          preparationFor: _student.preparationFor,
+          gender: _student.gender,
+          sectionName: _student.sectionName,
+          photoBase64: base64Str,
+        );
+        _refreshStudent();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Member profile photo updated successfully!'),
+              backgroundColor: Color(0xFF0D9488),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update photo: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    await _service.updateStudent(
+      studentId: _student.id,
+      name: _student.name,
+      phone: _student.phone,
+      shift: _student.shift,
+      seatNumber: _student.seatNumber,
+      photoBase64: '',
+    );
+    _refreshStudent();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Member photo removed.'),
+          backgroundColor: Colors.black87,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(22),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Update Member Photo',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+              ),
+              const SizedBox(height: 18),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFFF0FDFA), borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF0D9488)),
+                ),
+                title: const Text('Take Photo via Camera', style: TextStyle(fontWeight: FontWeight.w700)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickProfilePhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFFF0F9FF), borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF0284C7)),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickProfilePhoto(ImageSource.gallery);
+                },
+              ),
+              if (_student.hasPhoto)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                  ),
+                  title: const Text('Remove Photo', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _removeProfilePhoto();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _buildIdCardPassText() {
+    final libName = _service.profile.libraryName;
+    final dueStr = _student.feeDueDate != null ? DateFormat('dd-MMM-yyyy').format(_student.feeDueDate!) : 'N/A';
+    final seatStr = _student.seatNumber != null ? '#${_student.seatNumber}' : 'Unallocated';
+    final qrVerifyUrl = 'https://trackmylibrary.in/portal?verify=${_student.id}&seat=${_student.seatNumber ?? 0}&student=${Uri.encodeComponent(_student.name)}';
+
+    return '''
+📇 *OFFICIAL DIGITAL ID CARD*
+🏛️ *${libName.toUpperCase()}*
+----------------------------------------
+👤 *Member Name:* ${_student.name}
+🆔 *Member ID:* #${widget.memberId}
+🪑 *Assigned Seat:* $seatStr
+⏰ *Shift:* ${_student.shift}
+📅 *Valid Till:* $dueStr
+✅ *Status:* ${_student.status}
+----------------------------------------
+📲 *Digital Verification Pass:*
+$qrVerifyUrl
+
+Please present this Digital Pass upon entering the study hall.
+_Powered by TrackMyLibrary_
+'''.trim();
+  }
+
+  Future<void> _shareDigitalIdCardWhatsApp() async {
+    final cleanPhone = _student.phone.replaceAll(RegExp(r'\D'), '');
+    final target = cleanPhone.length == 10 ? '91$cleanPhone' : cleanPhone;
+    final message = _buildIdCardPassText();
+    final uri = Uri.parse('https://wa.me/$target?text=${Uri.encodeComponent(message)}');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (_) {}
+  }
+
+  void _copyDigitalIdCard() {
+    Clipboard.setData(ClipboardData(text: _buildIdCardPassText()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Digital Membership Pass copied to clipboard!'),
+        backgroundColor: Color(0xFF0D9488),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _showIdCardSheet() {
     final initials = _student.name.trim().isNotEmpty
         ? (_student.name.trim().split(' ').length > 1
@@ -384,117 +578,313 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
             : (_student.name.trim().length >= 2 ? _student.name.trim().substring(0, 2).toUpperCase() : _student.name.trim().toUpperCase()))
         : 'ST';
 
+    final enrollDateStr = _student.joinedAt != null
+        ? DateFormat('dd-MMM-yyyy').format(_student.joinedAt!)
+        : DateFormat('dd-MMM-yyyy').format(DateTime.now());
+
+    final dueStr = _student.feeDueDate != null
+        ? DateFormat('dd-MMM-yyyy').format(_student.feeDueDate!)
+        : 'Active Regular';
+
+    final qrVerifyUrl = 'https://trackmylibrary.in/portal?verify=${_student.id}&seat=${_student.seatNumber ?? 0}&student=${Uri.encodeComponent(_student.name)}';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Center(
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(28),
             boxShadow: const [
-              BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 4)),
+              BoxShadow(color: Colors.black26, blurRadius: 20, offset: Offset(0, 6)),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _service.profile.libraryName.toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0D9488), letterSpacing: 1),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 10),
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _student.name,
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: AppColors.textNavy),
-              ),
-              Text(
-                'Member ID: #${widget.memberId}',
-                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
+                    Row(
                       children: [
-                        const Text('SEAT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                        Text('#${_student.seatNumber ?? 'Unallocated'}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.textNavy)),
+                        if (_service.profile.logoBase64 != null && _service.profile.logoBase64!.isNotEmpty) ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              base64Decode(_service.profile.logoBase64!),
+                              width: 30,
+                              height: 30,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0FDFA),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.local_library_rounded, color: Color(0xFF0D9488), size: 18),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          _service.profile.libraryName.toUpperCase(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                            color: Color(0xFF0D9488),
+                            letterSpacing: 0.8,
+                          ),
+                        ),
                       ],
                     ),
-                    Container(height: 24, width: 1, color: const Color(0xFFE2E8F0)),
-                    Column(
-                      children: [
-                        const Text('SHIFT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                        Text(_student.shift, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.textNavy)),
-                      ],
-                    ),
-                    Container(height: 24, width: 1, color: const Color(0xFFE2E8F0)),
-                    Column(
-                      children: [
-                        const Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                        Text(_student.status, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: _student.status == 'ACTIVE' ? const Color(0xFF10B981) : const Color(0xFFE11D48))),
-                      ],
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D9488),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                const Divider(height: 20),
+
+                // Digital Card Container
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+                    ],
                   ),
-                  icon: const Icon(Icons.share_outlined, size: 18),
-                  label: const Text('Share Digital ID Card', style: TextStyle(fontWeight: FontWeight.bold)),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Digital ID Card ready to share!'), backgroundColor: Color(0xFF0D9488)),
-                    );
-                  },
+                  child: Column(
+                    children: [
+                      // Header Ribbon
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 16),
+                                SizedBox(width: 6),
+                                Text(
+                                  'OFFICIAL DIGITAL PASS',
+                                  style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              'PASS #${widget.memberId}',
+                              style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          children: [
+                            // Student Photo & Core Details
+                            Row(
+                              children: [
+                                Container(
+                                  width: 76,
+                                  height: 76,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0284C7),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white24, width: 2),
+                                  ),
+                                  child: _student.hasPhoto
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(18),
+                                          child: Image.memory(
+                                            base64Decode(_student.photoBase64!),
+                                            width: 76,
+                                            height: 76,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            initials,
+                                            style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
+                                          ),
+                                        ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _student.name,
+                                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        'Phone: ${_student.phone}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w600),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        'Enrolled: $enrollDateStr',
+                                        style: const TextStyle(fontSize: 11, color: Colors.white60),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Seat & Shift Matrix
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.06),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.white12),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  Column(
+                                    children: [
+                                      const Text('SEAT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white60)),
+                                      const SizedBox(height: 2),
+                                      Text('#${_student.seatNumber ?? '—'}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white)),
+                                    ],
+                                  ),
+                                  Container(height: 22, width: 1, color: Colors.white24),
+                                  Column(
+                                    children: [
+                                      const Text('SHIFT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white60)),
+                                      const SizedBox(height: 2),
+                                      Text(_student.shift, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white)),
+                                    ],
+                                  ),
+                                  Container(height: 22, width: 1, color: Colors.white24),
+                                  Column(
+                                    children: [
+                                      const Text('STATUS', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white60)),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _student.status,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 12,
+                                          color: _student.status == 'ACTIVE' ? const Color(0xFF34D399) : const Color(0xFFF87171),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Verification QR Container
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                children: [
+                                  QrImageView(
+                                    data: qrVerifyUrl,
+                                    version: QrVersions.auto,
+                                    size: 130,
+                                    eyeStyle: const QrEyeStyle(
+                                      eyeShape: QrEyeShape.square,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                    dataModuleStyle: const QrDataModuleStyle(
+                                      dataModuleShape: QrDataModuleShape.square,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Scan to verify membership at front desk',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Validity Pill
+                            Text(
+                              'VALIDITY: $dueStr',
+                              style: const TextStyle(color: Color(0xFFFDE047), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+
+                // Share Buttons
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
+                    label: const Text('Share Pass via WhatsApp', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _shareDigitalIdCardWhatsApp();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textNavy,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    label: const Text('Copy Membership Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _copyDigitalIdCard();
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -511,7 +901,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
 
     final enrolledDateStr = _student.joinedAt != null
         ? DateFormat('dd-MMM-yyyy').format(_student.joinedAt!)
-        : '21-Oct-2026';
+        : DateFormat('dd-MMM-yyyy').format(DateTime.now());
 
     final daysIn = _student.joinedAt != null
         ? DateTime.now().difference(_student.joinedAt!).inDays + 1
@@ -604,46 +994,60 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Avatar Squircle with Camera Badge
-                              Stack(
-                                children: [
-                                  Container(
-                                    width: 68,
-                                    height: 68,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0284C7),
-                                      borderRadius: BorderRadius.circular(20),
+                              // Avatar Squircle with Camera Badge (Tappable to upload/change photo)
+                              InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: _showPhotoOptions,
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      width: 68,
+                                      height: 68,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0284C7),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: _student.hasPhoto
+                                          ? ClipRRect(
+                                              borderRadius: BorderRadius.circular(20),
+                                              child: Image.memory(
+                                                base64Decode(_student.photoBase64!),
+                                                width: 68,
+                                                height: 68,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                initials,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.w900,
+                                                ),
+                                              ),
+                                            ),
                                     ),
-                                    child: Center(
-                                      child: Text(
-                                        initials,
-                                        style: const TextStyle(
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0D9488),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                        ),
+                                        child: const Icon(
+                                          Icons.camera_alt_outlined,
                                           color: Colors.white,
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w900,
+                                          size: 13,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF0D9488),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 2),
-                                      ),
-                                      child: const Icon(
-                                        Icons.camera_alt_outlined,
-                                        color: Colors.white,
-                                        size: 13,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
