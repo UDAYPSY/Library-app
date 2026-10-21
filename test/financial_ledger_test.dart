@@ -55,8 +55,8 @@ void main() {
 
     test('Adding and deleting expense item', () async {
       final initialExpenses = service.currentExpenses.length;
-      final expense = ExpenseItem(
-        id: 'exp_test_001',
+
+      await service.addExpense(
         title: 'High-Speed Wi-Fi Bill',
         category: 'Utilities',
         amount: 1499,
@@ -64,29 +64,26 @@ void main() {
         paymentMode: 'UPI',
         note: 'Monthly internet broadband',
       );
-
-      service.addExpense(expense);
       expect(service.currentExpenses.length, equals(initialExpenses + 1));
-      expect(service.currentExpenses.any((e) => e.id == 'exp_test_001'), isTrue);
+      final addedExp = service.currentExpenses.first;
+      expect(addedExp.title, equals('High-Speed Wi-Fi Bill'));
 
       // Delete expense
-      service.deleteExpense('exp_test_001');
-      expect(service.currentExpenses.any((e) => e.id == 'exp_test_001'), isFalse);
+      service.deleteExpense(addedExp.id);
+      expect(service.currentExpenses.any((e) => e.id == addedExp.id), isFalse);
     });
 
     test('Payment transaction query by student ID and phone', () async {
-      final payment = PaymentTransaction(
-        id: 'pmt_lookup_test',
+      await service.recordPayment(
         studentId: 'std_lookup_99',
         studentName: 'Pooja Verma',
-        studentPhone: '9988776655',
+        phone: '9988776655',
         seatNumber: 5,
         shift: 'Evening',
         amount: 600,
         date: DateTime.now(),
         paymentMode: 'Cash',
       );
-      service.recordPayment(payment);
 
       final foundById = service.getLastPaymentForStudent(studentId: 'std_lookup_99');
       expect(foundById, isNotNull);

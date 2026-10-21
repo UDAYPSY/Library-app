@@ -35,6 +35,7 @@ jobs:
           cp pubspec.yaml pubspec.yaml.bak
           flutter create --org com.example.library_manager --project-name library_manager --platforms android .
           cp pubspec.yaml.bak pubspec.yaml
+          rm -f test/widget_test.dart
           # Ensure Android minimum SDK satisfies Cloud Firestore (minSdk 23) in both Groovy and Kotlin DSL
           echo "flutter.minSdkVersion=23" >> android/local.properties || true
           find android/app -name "build.gradle*" -exec sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/g' {} + || true
@@ -73,6 +74,7 @@ jobs:
           cp pubspec.yaml pubspec.yaml.bak
           flutter create --org com.example.library_manager --project-name library_manager --platforms web .
           cp pubspec.yaml.bak pubspec.yaml
+          rm -f test/widget_test.dart
           flutter pub get
 
       - name: Run Automated Test Suite
