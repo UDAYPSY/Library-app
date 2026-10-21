@@ -1102,4 +1102,77 @@ class LibraryService {
       }
     }
   }
+
+  // --- Tools & More Helpers ---
+
+  List<StudentInfo> getStudentsWithDues() {
+    ensureInitialized();
+    return _mockStudents.where((s) =>
+        s.status != 'INACTIVE' &&
+        (s.hasDues || s.effectiveDues > 0 || s.duesAmount > 0 || s.status == 'DUES')
+    ).toList();
+  }
+
+  void saveBranding({
+    required String logoEmblem,
+    required String tagline,
+    String? libraryName,
+    String? city,
+  }) {
+    profile.logoEmblem = logoEmblem;
+    profile.tagline = tagline;
+    if (libraryName != null && libraryName.trim().isNotEmpty) {
+      profile.libraryName = libraryName.trim();
+    }
+    if (city != null && city.trim().isNotEmpty) {
+      profile.city = city.trim();
+    }
+    if (isFirebaseConnected) {
+      _db.collection('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+    }
+  }
+
+  void saveWhatsAppSettings({
+    bool? notifications,
+    bool? autoReminders,
+    bool? autoWelcome,
+    bool? autoReceipt,
+    bool? remind3DaysBefore,
+    bool? remindOnExpiry,
+    bool? remindAfterExpiry,
+    String? welcomeTpl,
+    String? reminderTpl,
+    String? receiptTpl,
+  }) {
+    if (notifications != null) profile.whatsappNotifications = notifications;
+    if (autoReminders != null) profile.autoFeeReminders = autoReminders;
+    if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;
+    if (autoReceipt != null) profile.autoPaymentReceipt = autoReceipt;
+    if (remind3DaysBefore != null) profile.remind3DaysBefore = remind3DaysBefore;
+    if (remindOnExpiry != null) profile.remindOnExpiry = remindOnExpiry;
+    if (remindAfterExpiry != null) profile.remindAfterExpiry = remindAfterExpiry;
+    if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
+    if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
+    if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+
+    if (isFirebaseConnected) {
+      _db.collection('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+    }
+  }
+
+  void addWhatsAppCredits(int amount) {
+    profile.whatsappCredits += amount;
+    if (isFirebaseConnected) {
+      _db.collection('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+    }
+  }
+
+  bool useWhatsAppCredit([int count = 1]) {
+    if (profile.whatsappCredits >= count) {
+      profile.whatsappCredits -= count;
+      profile.messagesSentCount += count;
+      return true;
+    }
+    return false;
+  }
 }

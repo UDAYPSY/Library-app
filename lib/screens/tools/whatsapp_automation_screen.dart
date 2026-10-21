@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
@@ -14,22 +16,68 @@ class WhatsAppAutomationScreen extends StatefulWidget {
 class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
   final LibraryService _service = LibraryService();
 
-  // Settings state
-  bool _whatsappNotifications = false;
-  bool _autoFeeReminders = false;
-  bool _autoWelcomeMessage = false;
-  bool _autoPaymentReceipt = false;
+  // Settings state persisted from service
+  late bool _whatsappNotifications;
+  late bool _autoFeeReminders;
+  late bool _autoWelcomeMessage;
+  late bool _autoPaymentReceipt;
 
-  bool _remind3DaysBefore = true;
-  bool _remindOnExpiry = true;
-  bool _remindAfterExpiry = true;
+  late bool _remind3DaysBefore;
+  late bool _remindOnExpiry;
+  late bool _remindAfterExpiry;
 
-  int _credits = 0;
-  int _messagesSent = 0;
+  late int _credits;
+  late int _messagesSent;
+
+  @override
+  void initState() {
+    super.initState();
+    _service.ensureInitialized();
+    _whatsappNotifications = _service.profile.whatsappNotifications;
+    _autoFeeReminders = _service.profile.autoFeeReminders;
+    _autoWelcomeMessage = _service.profile.autoWelcomeMessage;
+    _autoPaymentReceipt = _service.profile.autoPaymentReceipt;
+    _remind3DaysBefore = _service.profile.remind3DaysBefore;
+    _remindOnExpiry = _service.profile.remindOnExpiry;
+    _remindAfterExpiry = _service.profile.remindAfterExpiry;
+    _credits = _service.profile.whatsappCredits;
+    _messagesSent = _service.profile.messagesSentCount;
+  }
+
+  void _persistSettings() {
+    _service.saveWhatsAppSettings(
+      notifications: _whatsappNotifications,
+      autoReminders: _autoFeeReminders,
+      autoWelcome: _autoWelcomeMessage,
+      autoReceipt: _autoPaymentReceipt,
+      remind3DaysBefore: _remind3DaysBefore,
+      remindOnExpiry: _remindOnExpiry,
+      remindAfterExpiry: _remindAfterExpiry,
+    );
+  }
+
+  Future<void> _openWhatsAppToStudent(String studentPhone, String message) async {
+    final cleanPhone = LibraryService.normalizePhone(studentPhone);
+    final phoneToUse = cleanPhone.isNotEmpty ? '91$cleanPhone' : '919457464850';
+    final uri = Uri.parse('https://wa.me/$phoneToUse?text=${Uri.encodeComponent(message)}');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open WhatsApp for $phoneToUse')),
+        );
+      }
+    }
+  }
 
   Future<void> _openWhatsAppSupport(String message) async {
     final cleanPhone = _service.profile.adminPhone.replaceAll(RegExp(r'\D'), '');
-    final phoneToUse = cleanPhone.isNotEmpty ? cleanPhone : '919457464850';
+    final phoneToUse = cleanPhone.isNotEmpty ? '91$cleanPhone' : '919457464850';
     final uri = Uri.parse('https://wa.me/$phoneToUse?text=${Uri.encodeComponent(message)}');
     try {
       if (await canLaunchUrl(uri)) {
@@ -40,138 +88,325 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
     } catch (_) {}
   }
 
+  String _formatTemplate(String tpl, {required StudentInfo student, int? amount, DateTime? dueDate}) {
+    final dueStr = dueDate != null
+        ? DateFormat('dd MMM yyyy').format(dueDate)
+        : (student.feeDueDate != null ? DateFormat('dd MMM yyyy').format(student.feeDueDate!) : 'Due Soon');
+    final dueAmt = amount ?? (student.effectiveDues > 0 ? student.effectiveDues : student.monthlyFee);
+
+    return tpl
+        .replaceAll('{student_name}', student.name)
+        .replaceAll('{seat_number}', student.seatNumber != null ? '${student.seatNumber}' : 'Unallocated')
+        .replaceAll('{shift}', student.shift)
+        .replaceAll('{due_amount}', '$dueAmt')
+        .replaceAll('{due_date}', dueStr)
+        .replaceAll('{amount}', '$dueAmt')
+        .replaceAll('{mode}', student.paymentMode)
+        .replaceAll('{valid_until}', dueStr)
+        .replaceAll('{library_name}', _service.profile.libraryName);
+  }
+
   void _sendAllDueReminders() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.send_rounded, color: AppColors.primaryTeal),
-            SizedBox(width: 8),
-            Text('Send Fee Reminders', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
+    final dueStudents = _service.getStudentsWithDues();
+
+    if (dueStudents.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 24),
+              SizedBox(width: 8),
+              Text('All Caught Up!', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
+            ],
+          ),
+          content: const Text(
+            'No students currently have pending dues! All active memberships are up to date.',
+            style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.4),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryTeal,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Great!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
-        content: const Text(
-          'Send WhatsApp fee reminder to all active students with pending or upcoming dues?',
-          style: TextStyle(fontSize: 14, color: AppColors.textNavy),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryTeal,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Reminders queued! Dispatched to all students with dues.'),
-                  backgroundColor: AppColors.primaryTeal,
-                  behavior: SnackBarBehavior.floating,
+      );
+      return;
+    }
+
+    final totalDuesSum = dueStudents.fold<int>(0, (sum, s) => sum + (s.effectiveDues > 0 ? s.effectiveDues : s.duesAmount));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.send_rounded, color: Color(0xFFDC2626), size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${dueStudents.length} Students with Dues',
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                        ),
+                        Text(
+                          'Total Pending: ₹$totalDuesSum',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              );
-            },
-            child: const Text('Send Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 280,
+              child: ListView.separated(
+                itemCount: dueStudents.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (ctx, i) {
+                  final s = dueStudents[i];
+                  final dueAmt = s.effectiveDues > 0 ? s.effectiveDues : s.duesAmount;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFFFEE2E2),
+                      child: Text(
+                        s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
+                        style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textNavy)),
+                    subtitle: Text('Seat #${s.seatNumber ?? "—"} • Due: ₹$dueAmt • ${s.phone}', style: const TextStyle(fontSize: 12)),
+                    trailing: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
+                      label: const Text('Send', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                      onPressed: () {
+                        _service.useWhatsAppCredit(1);
+                        setState(() {
+                          _credits = _service.profile.whatsappCredits;
+                          _messagesSent = _service.profile.messagesSentCount;
+                        });
+                        final msg = _formatTemplate(_service.profile.reminderTemplate, student: s, amount: dueAmt);
+                        _openWhatsAppToStudent(s.phone, msg);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryTeal,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.copy_all_rounded, color: Colors.white, size: 18),
+                label: const Text('Copy All Reminder Messages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                onPressed: () {
+                  final allText = dueStudents.map((s) {
+                    final dueAmt = s.effectiveDues > 0 ? s.effectiveDues : s.duesAmount;
+                    return 'To: ${s.name} (${s.phone})\n' + _formatTemplate(_service.profile.reminderTemplate, student: s, amount: dueAmt);
+                  }).join('\n\n------------------------\n\n');
+                  Clipboard.setData(ClipboardData(text: allText));
+                  _service.useWhatsAppCredit(dueStudents.length);
+                  setState(() {
+                    _credits = _service.profile.whatsappCredits;
+                    _messagesSent = _service.profile.messagesSentCount;
+                  });
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${dueStudents.length} formatted reminders copied to clipboard! Ready to paste into WhatsApp.'),
+                      backgroundColor: AppColors.primaryTeal,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   void _openChooseSpecificStudentsSheet() {
+    String search = '';
+    String templateType = 'Reminder';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => StreamBuilder<List<StudentInfo>>(
-        stream: _service.streamStudents(),
-        builder: (context, snapshot) {
-          final students = snapshot.data ?? [];
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) => StreamBuilder<List<StudentInfo>>(
+          stream: _service.streamStudents(),
+          builder: (context, snapshot) {
+            final all = snapshot.data ?? _service.currentStudents;
+            final filtered = all.where((s) {
+              final q = search.trim().toLowerCase();
+              if (q.isEmpty) return true;
+              return s.name.toLowerCase().contains(q) ||
+                  s.phone.contains(q) ||
+                  (s.seatNumber != null && '${s.seatNumber}'.contains(q));
+            }).toList();
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+                left: 20,
+                right: 20,
+                top: 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Choose Specific Students',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Send to Specific Student',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                        ),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
                     ),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    const SizedBox(height: 10),
+
+                    // Template Selector Chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: ['Reminder', 'Welcome', 'Receipt'].map((t) {
+                          final isSel = templateType == t;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(t, style: TextStyle(fontWeight: FontWeight.w800, color: isSel ? Colors.white : AppColors.textNavy, fontSize: 12)),
+                              selected: isSel,
+                              selectedColor: AppColors.primaryTeal,
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              onSelected: (_) => setModalState(() => templateType = t),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Search field
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search by student name, phone, seat...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
+                      onChanged: (v) => setModalState(() => search = v),
+                    ),
+                    const SizedBox(height: 14),
+
+                    if (filtered.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: Text('No matching students found.', style: TextStyle(color: Color(0xFF94A3B8)))),
+                      )
+                    else
+                      SizedBox(
+                        height: 260,
+                        child: ListView.separated(
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (ctx, i) {
+                            final s = filtered[i];
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: const Color(0xFF0284C7),
+                                child: Text(
+                                  s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textNavy)),
+                              subtitle: Text('Seat #${s.seatNumber ?? "—"} • ${s.phone} • Status: ${s.status}', style: const TextStyle(fontSize: 11)),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.send_rounded, color: Color(0xFF10B981)),
+                                tooltip: 'Send WhatsApp',
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  _service.useWhatsAppCredit(1);
+                                  setState(() {
+                                    _credits = _service.profile.whatsappCredits;
+                                    _messagesSent = _service.profile.messagesSentCount;
+                                  });
+                                  String rawTpl = _service.profile.reminderTemplate;
+                                  if (templateType == 'Welcome') rawTpl = _service.profile.welcomeTemplate;
+                                  if (templateType == 'Receipt') rawTpl = _service.profile.receiptTemplate;
+
+                                  final msg = _formatTemplate(rawTpl, student: s);
+                                  _openWhatsAppToStudent(s.phone, msg);
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Select students to send an instant fee notification:',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 14),
-                if (students.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: Text('No students registered yet.')),
-                  )
-                else
-                  SizedBox(
-                    height: 280,
-                    child: ListView.separated(
-                      itemCount: students.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (ctx, i) {
-                        final s = students[i];
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(
-                            backgroundColor: const Color(0xFF0284C7),
-                            child: Text(
-                              s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          subtitle: Text('Seat #${s.seatNumber ?? 1} • ${s.phone}'),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.send_rounded, color: Color(0xFF10B981)),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _openWhatsAppSupport(
-                                'Hello ${s.name}, your library fee of Rs.${s.monthlyFee} is scheduled. Please confirm at the desk.',
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
   void _openCustomizeTemplatesSheet() {
-    final welcomeCtrl = TextEditingController(
-      text: 'Hello {student_name}, welcome to {_service.profile.libraryName}! Your assigned seat is {seat_number}. Happy studying!',
-    );
-    final reminderCtrl = TextEditingController(
-      text: 'Dear {student_name}, this is a gentle reminder that your library seat fee of Rs.{monthly_fee} is due on {due_date}. Thank you!',
-    );
-    final receiptCtrl = TextEditingController(
-      text: 'Payment Received! Dear {student_name}, we have received Rs.{amount} via {mode} for your seat renewal. Receipt #{receipt_no}.',
-    );
+    final welcomeCtrl = TextEditingController(text: _service.profile.welcomeTemplate);
+    final reminderCtrl = TextEditingController(text: _service.profile.reminderTemplate);
+    final receiptCtrl = TextEditingController(text: _service.profile.receiptTemplate);
 
     showModalBottomSheet(
       context: context,
@@ -197,8 +432,13 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
-              const SizedBox(height: 12),
-              const Text('Welcome Note', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 6),
+              const Text(
+                'Available dynamic tags: {student_name}, {seat_number}, {due_amount}, {due_date}, {library_name}, {shift}, {mode}',
+                style: TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 14),
+              const Text('Welcome Note Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
               const SizedBox(height: 6),
               TextField(
                 controller: welcomeCtrl,
@@ -206,7 +446,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                 decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
               const SizedBox(height: 14),
-              const Text('Fee Reminder', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const Text('Fee Reminder Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
               const SizedBox(height: 6),
               TextField(
                 controller: reminderCtrl,
@@ -214,14 +454,14 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                 decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
               const SizedBox(height: 14),
-              const Text('Payment Receipt', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const Text('Payment Receipt Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
               const SizedBox(height: 6),
               TextField(
                 controller: receiptCtrl,
                 maxLines: 2,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -231,9 +471,14 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: () {
+                    _service.saveWhatsAppSettings(
+                      welcomeTpl: welcomeCtrl.text.trim(),
+                      reminderTpl: reminderCtrl.text.trim(),
+                      receiptTpl: receiptCtrl.text.trim(),
+                    );
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Templates updated successfully!'), behavior: SnackBarBehavior.floating),
+                      const SnackBar(content: Text('Templates updated and saved successfully!'), behavior: SnackBarBehavior.floating),
                     );
                   },
                   child: const Text('Save Templates', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -242,6 +487,40 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _addCreditsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Add WhatsApp Credits', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+        content: const Text(
+          'Top up WhatsApp credits for demo testing or live notifications.\nChoose top up amount:',
+          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _service.addWhatsAppCredits(100);
+              setState(() {
+                _credits = _service.profile.whatsappCredits;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('+100 WhatsApp Credits Added!'), backgroundColor: Color(0xFF16A34A)),
+              );
+            },
+            child: const Text('+100 Credits', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -268,7 +547,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Page Header (Image 2)
+            // Header
             const Text(
               'WhatsApp Automation',
               style: TextStyle(
@@ -288,7 +567,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Card 1: WhatsApp Credits (Image 2)
+            // Card 1: WhatsApp Credits
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -335,18 +614,27 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
+                          color: _credits > 0 ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
                           children: [
                             Text(
                               '$_credits',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: _credits > 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                              ),
                             ),
-                            const Text(
+                            Text(
                               'CREDITS',
-                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5, color: Color(0xFFDC2626)),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                                color: _credits > 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                              ),
                             ),
                           ],
                         ),
@@ -355,66 +643,45 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Contact Us Button (Image 2)
-                  InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => _openWhatsAppSupport('Hi, I want to purchase WhatsApp Credits for my library on TrackMyLibrary.'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF86EFAC)),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF16A34A), size: 18),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Contact us for WhatsApp\nCredits',
-                              style: TextStyle(
-                                color: Color(0xFF15803D),
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14,
-                                height: 1.2,
-                              ),
-                            ),
+                  // Actions: Top-up / Contact Us
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF0D9488),
+                            side: const BorderSide(color: Color(0xFF99F6E4)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          Icon(Icons.arrow_forward_rounded, color: Color(0xFF16A34A), size: 18),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Warning Banner (Image 2)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFECACA)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'No credits remaining. Tap above to purchase more.',
-                            style: TextStyle(fontSize: 12, color: Color(0xFFDC2626), fontWeight: FontWeight.w700),
-                          ),
+                          icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                          label: const Text('Add Credits', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                          onPressed: _addCreditsDialog,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A34A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                          label: const Text('Contact Support', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                          onPressed: () => _openWhatsAppSupport('Hi, I want to purchase WhatsApp Credits for my library on TrackMyLibrary.'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // CONTROLS Section (Image 2)
+            // CONTROLS Section
             const Text(
               'CONTROLS',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
@@ -436,30 +703,12 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     title: 'WhatsApp Notifications',
                     subtitle: 'Enable sending messages via WhatsApp API',
                     value: _whatsappNotifications,
-                    onChanged: (v) => setState(() => _whatsappNotifications = v),
+                    onChanged: (v) {
+                      setState(() => _whatsappNotifications = v);
+                      _persistSettings();
+                    },
                   ),
-                  const SizedBox(height: 12),
-                  // Lock banner (Image 2)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFEF3C7)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.lock_outline_rounded, color: Color(0xFFD97706), size: 16),
-                        SizedBox(width: 8),
-                        Text(
-                          'Buy credits to unlock WhatsApp features',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFD97706)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
+                  const Divider(height: 20),
                   _switchRow(
                     icon: Icons.access_time_rounded,
                     iconBg: const Color(0xFFF0FDF4),
@@ -467,14 +716,17 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     title: 'Auto Fee Reminders',
                     subtitle: 'Automatically send reminders via Cloud Scheduler daily',
                     value: _autoFeeReminders,
-                    onChanged: (v) => setState(() => _autoFeeReminders = v),
+                    onChanged: (v) {
+                      setState(() => _autoFeeReminders = v);
+                      _persistSettings();
+                    },
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // INSTANT NOTIFICATIONS Section (Image 2 & 3)
+            // INSTANT NOTIFICATIONS Section
             const Text(
               'INSTANT NOTIFICATIONS',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
@@ -496,7 +748,10 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     title: 'Automatic Welcome Message',
                     subtitle: 'Send instant welcome note to newly added students',
                     value: _autoWelcomeMessage,
-                    onChanged: (v) => setState(() => _autoWelcomeMessage = v),
+                    onChanged: (v) {
+                      setState(() => _autoWelcomeMessage = v);
+                      _persistSettings();
+                    },
                   ),
                   const Divider(height: 24),
                   _switchRow(
@@ -506,14 +761,17 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     title: 'Automatic Payment Receipt',
                     subtitle: 'Send automated confirmation receipt after payment',
                     value: _autoPaymentReceipt,
-                    onChanged: (v) => setState(() => _autoPaymentReceipt = v),
+                    onChanged: (v) {
+                      setState(() => _autoPaymentReceipt = v);
+                      _persistSettings();
+                    },
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // REMINDER TIMING Section (Image 3)
+            // REMINDER TIMING Section
             const Text(
               'REMINDER TIMING',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
@@ -541,7 +799,10 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     title: '3 Days Before Expiry',
                     subtitle: 'Proactive reminder before fee expires',
                     value: _remind3DaysBefore,
-                    onChanged: (v) => setState(() => _remind3DaysBefore = v),
+                    onChanged: (v) {
+                      setState(() => _remind3DaysBefore = v);
+                      _persistSettings();
+                    },
                   ),
                   const Divider(height: 24),
                   _switchRow(
@@ -551,7 +812,10 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     title: 'On Expiry Day',
                     subtitle: 'Reminder sent on the exact day fee expires',
                     value: _remindOnExpiry,
-                    onChanged: (v) => setState(() => _remindOnExpiry = v),
+                    onChanged: (v) {
+                      setState(() => _remindOnExpiry = v);
+                      _persistSettings();
+                    },
                   ),
                   const Divider(height: 24),
                   _switchRow(
@@ -561,14 +825,17 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     title: 'After Expiry (Overdue)',
                     subtitle: 'Students whose fee has already passed',
                     value: _remindAfterExpiry,
-                    onChanged: (v) => setState(() => _remindAfterExpiry = v),
+                    onChanged: (v) {
+                      setState(() => _remindAfterExpiry = v);
+                      _persistSettings();
+                    },
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // MANUAL TRIGGER Section (Image 3 & 4)
+            // MANUAL TRIGGER Section
             const Text(
               'MANUAL TRIGGER',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
@@ -605,7 +872,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'Instantly send to all students with due fees',
+                              'Instantly send to students with due fees',
                               style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                             ),
                           ],
@@ -617,14 +884,16 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 48,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textNavy,
-                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryTeal,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
+                      icon: const Icon(Icons.group_rounded, size: 18),
+                      label: const Text('Send to All Due Students', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                       onPressed: _sendAllDueReminders,
-                      child: const Text('Send to All Due Students', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -637,7 +906,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                         side: const BorderSide(color: Color(0xFFE2E8F0)),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      icon: const Icon(Icons.people_outline_rounded, size: 18),
+                      icon: const Icon(Icons.person_search_rounded, size: 18),
                       label: const Text('Choose Specific Students', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                       onPressed: _openChooseSpecificStudentsSheet,
                     ),
@@ -647,7 +916,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
             ),
             const SizedBox(height: 18),
 
-            // Customize Templates Card (Image 4)
+            // Customize Templates Card
             InkWell(
               borderRadius: BorderRadius.circular(20),
               onTap: _openCustomizeTemplatesSheet,
@@ -689,48 +958,6 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 18),
-
-            // Bottom Support Card (Image 4)
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFF1F5F9)),
-              ),
-              child: Column(
-                children: [
-                  const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline_rounded, color: Color(0xFF64748B), size: 18),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Auto reminders run daily at 9 AM via Google Cloud Scheduler. Manual sends happen immediately via the button above.',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textNavy,
-                        side: const BorderSide(color: Color(0xFFE2E8F0)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () => _openWhatsAppSupport('Hello, I need support with WhatsApp Automation on TrackMyLibrary.'),
-                      child: const Text('Contact Support', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                    ),
-                  ),
-                ],
               ),
             ),
             const SizedBox(height: 40),

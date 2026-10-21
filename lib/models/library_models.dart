@@ -6,6 +6,20 @@ class LibraryProfile {
   String adminName;
   String adminEmail;
   String adminPhone;
+  String logoEmblem;
+  String tagline;
+  int whatsappCredits;
+  int messagesSentCount;
+  bool whatsappNotifications;
+  bool autoFeeReminders;
+  bool autoWelcomeMessage;
+  bool autoPaymentReceipt;
+  bool remind3DaysBefore;
+  bool remindOnExpiry;
+  bool remindAfterExpiry;
+  String welcomeTemplate;
+  String reminderTemplate;
+  String receiptTemplate;
 
   LibraryProfile({
     this.libraryName = 'Patna Central Library',
@@ -13,6 +27,20 @@ class LibraryProfile {
     this.adminName = 'Nivi',
     this.adminEmail = 'udaypratapsi2022@gmail.com',
     this.adminPhone = '94574 64850',
+    this.logoEmblem = 'Book & Torch',
+    this.tagline = 'Silence • Focus • Success',
+    this.whatsappCredits = 150,
+    this.messagesSentCount = 24,
+    this.whatsappNotifications = true,
+    this.autoFeeReminders = true,
+    this.autoWelcomeMessage = true,
+    this.autoPaymentReceipt = true,
+    this.remind3DaysBefore = true,
+    this.remindOnExpiry = true,
+    this.remindAfterExpiry = true,
+    this.welcomeTemplate = 'Hello {student_name}, welcome to {library_name}! Your reserved seat is Seat S-{seat_number} ({shift}). Happy studying!',
+    this.reminderTemplate = 'Dear {student_name}, this is a gentle reminder that your seat fee of ₹{due_amount} at {library_name} is due on {due_date}. Thank you!',
+    this.receiptTemplate = 'Payment Received! Dear {student_name}, we have received ₹{amount} via {mode} for your seat renewal at {library_name}. Valid until {valid_until}.',
   });
 
   Map<String, dynamic> toMap() {
@@ -22,6 +50,20 @@ class LibraryProfile {
       'admin_name': adminName,
       'admin_email': adminEmail,
       'admin_phone': adminPhone,
+      'logo_emblem': logoEmblem,
+      'tagline': tagline,
+      'whatsapp_credits': whatsappCredits,
+      'messages_sent_count': messagesSentCount,
+      'whatsapp_notifications': whatsappNotifications,
+      'auto_fee_reminders': autoFeeReminders,
+      'auto_welcome_message': autoWelcomeMessage,
+      'auto_payment_receipt': autoPaymentReceipt,
+      'remind_3_days_before': remind3DaysBefore,
+      'remind_on_expiry': remindOnExpiry,
+      'remind_after_expiry': remindAfterExpiry,
+      'welcome_template': welcomeTemplate,
+      'reminder_template': reminderTemplate,
+      'receipt_template': receiptTemplate,
     };
   }
 
@@ -32,6 +74,20 @@ class LibraryProfile {
       adminName: map['admin_name'] ?? 'Nivi',
       adminEmail: map['admin_email'] ?? '',
       adminPhone: map['admin_phone'] ?? '',
+      logoEmblem: map['logo_emblem'] ?? 'Book & Torch',
+      tagline: map['tagline'] ?? 'Silence • Focus • Success',
+      whatsappCredits: (map['whatsapp_credits'] as num?)?.toInt() ?? 150,
+      messagesSentCount: (map['messages_sent_count'] as num?)?.toInt() ?? 24,
+      whatsappNotifications: map['whatsapp_notifications'] ?? true,
+      autoFeeReminders: map['auto_fee_reminders'] ?? true,
+      autoWelcomeMessage: map['auto_welcome_message'] ?? true,
+      autoPaymentReceipt: map['auto_payment_receipt'] ?? true,
+      remind3DaysBefore: map['remind_3_days_before'] ?? true,
+      remindOnExpiry: map['remind_on_expiry'] ?? true,
+      remindAfterExpiry: map['remind_after_expiry'] ?? true,
+      welcomeTemplate: map['welcome_template'] ?? 'Hello {student_name}, welcome to {library_name}! Your reserved seat is Seat S-{seat_number} ({shift}). Happy studying!',
+      reminderTemplate: map['reminder_template'] ?? 'Dear {student_name}, this is a gentle reminder that your seat fee of ₹{due_amount} at {library_name} is due on {due_date}. Thank you!',
+      receiptTemplate: map['receipt_template'] ?? 'Payment Received! Dear {student_name}, we have received ₹{amount} via {mode} for your seat renewal at {library_name}. Valid until {valid_until}.',
     );
   }
 }

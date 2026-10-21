@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
@@ -27,7 +29,144 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
     });
   }
 
-  void _exportCategory(String categoryName, int rowCount) {
+  Future<void> _shareViaWhatsApp(String text) async {
+    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (_) {}
+  }
+
+  String _cleanCsvField(String field) {
+    if (field.contains(',') || field.contains('"') || field.contains('\n')) {
+      return '"${field.replaceAll('"', '""')}"';
+    }
+    return field;
+  }
+
+  String _generatePaymentsCsv(List<PaymentTransaction> list) {
+    final headers = ['Receipt ID', 'Date', 'Student Name', 'Phone', 'Seat #', 'Shift', 'Amount (INR)', 'Payment Mode', 'Valid Until', 'Collected By'];
+    final rows = list.map((p) => [
+      p.id,
+      DateFormat('dd-MM-yyyy').format(p.date),
+      p.studentName,
+      p.studentPhone,
+      'S-${p.seatNumber}',
+      p.shift,
+      '${p.amount}',
+      p.paymentMode,
+      DateFormat('dd-MM-yyyy').format(p.validUntil),
+      p.collectedBy,
+    ].map(_cleanCsvField).join(',')).join('\n');
+    return '${headers.join(',')}\n$rows';
+  }
+
+  String _generateExpensesCsv(List<ExpenseItem> list) {
+    final headers = ['Expense ID', 'Date', 'Title', 'Category', 'Amount (INR)', 'Payment Mode', 'Notes'];
+    final rows = list.map((e) => [
+      e.id,
+      DateFormat('dd-MM-yyyy').format(e.date),
+      e.title,
+      e.category,
+      '${e.amount}',
+      e.paymentMode,
+      e.notes,
+    ].map(_cleanCsvField).join(',')).join('\n');
+    return '${headers.join(',')}\n$rows';
+  }
+
+  String _generateAdmissionsCsv(List<StudentInfo> list) {
+    final headers = ['Date Joined', 'Student Name', 'Phone', 'Seat #', 'Shift', 'Monthly Fee (INR)', 'Status'];
+    final rows = list.map((s) => [
+      s.joinedAt != null ? DateFormat('dd-MM-yyyy').format(s.joinedAt!) : 'N/A',
+      s.name,
+      s.phone,
+      s.seatNumber != null ? 'S-${s.seatNumber}' : 'Unallocated',
+      s.shift,
+      '${s.monthlyFee}',
+      s.status,
+    ].map(_cleanCsvField).join(',')).join('\n');
+    return '${headers.join(',')}\n$rows';
+  }
+
+  String _generateAllStudentsCsv(List<StudentInfo> list) {
+    final headers = ['Student ID', 'Full Name', 'Phone', 'Seat Number', 'Shift', 'Status', 'Monthly Fee (INR)', 'Pending Dues (INR)', 'Joining Date', 'Father Name', 'Address', 'Aadhaar'];
+    final rows = list.map((s) => [
+      s.id,
+      s.name,
+      s.phone,
+      s.seatNumber != null ? 'S-${s.seatNumber}' : 'Unallocated',
+      s.shift,
+      s.status,
+      '${s.monthlyFee}',
+      '${s.effectiveDues}',
+      s.joinedAt != null ? DateFormat('dd-MM-yyyy').format(s.joinedAt!) : 'N/A',
+      s.fatherName,
+      s.address,
+      s.aadhaarNumber,
+    ].map(_cleanCsvField).join(',')).join('\n');
+    return '${headers.join(',')}\n$rows';
+  }
+
+  void _showPreviewTable(String title, List<String> headers, List<List<String>> rows) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('$title Preview (${rows.length} rows)', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.textNavy)),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (rows.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 30),
+                child: Center(child: Text('No rows in this period.', style: TextStyle(color: Color(0xFF64748B)))),
+              )
+            else
+              SizedBox(
+                height: 320,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      headingRowColor: WidgetStateProperty.all(const Color(0xFFF1F5F9)),
+                      columns: headers.map((h) => DataColumn(label: Text(h, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)))).toList(),
+                      rows: rows.map((r) => DataRow(
+                        cells: r.map((c) => DataCell(Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                      )).toList(),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _exportCategory({
+    required String categoryName,
+    required int rowCount,
+    required String csvData,
+    required List<String> headers,
+    required List<List<String>> previewRows,
+    required String summaryText,
+  }) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -48,48 +187,62 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               'Period: ${DateFormat('MMMM yyyy').format(_selectedMonth)} • $rowCount rows ready',
               style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 18),
+
+            // Option 1: Copy CSV Data
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12)),
                 child: const Icon(Icons.table_view_rounded, color: Color(0xFF16A34A)),
               ),
-              title: const Text('Export Excel / CSV Sheet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              subtitle: const Text('Download .csv spreadsheet for Excel or Google Sheets', style: TextStyle(fontSize: 12)),
+              title: const Text('Copy CSV / Excel Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('Copies complete comma-separated data to clipboard to paste into Excel or Sheets', style: TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(ctx);
+                Clipboard.setData(ClipboardData(text: csvData));
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('$categoryName report generated & saved! (.csv)'),
+                    content: Text('$categoryName CSV ($rowCount rows) copied to clipboard! Ready to paste into Excel.'),
                     backgroundColor: const Color(0xFF0D6E66),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               },
             ),
+
+            // Option 2: View In-App Table
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFF0F9FF), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.visibility_outlined, color: Color(0xFF0284C7)),
+              ),
+              title: const Text('Preview Data Table', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('Browse formatted rows and columns directly inside the app', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showPreviewTable(categoryName, headers, previewRows);
+              },
+            ),
+
+            // Option 3: Share via WhatsApp
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12)),
                 child: const Icon(Icons.share_outlined, color: Color(0xFF10B981)),
               ),
-              title: const Text('Share to WhatsApp / Drive', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              subtitle: const Text('Directly send export file to your administrator WhatsApp', style: TextStyle(fontSize: 12)),
+              title: const Text('Share Summary to WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('Directly send export summary report to administration', style: TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Sharing $categoryName report...'),
-                    backgroundColor: const Color(0xFF0D6E66),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                _shareViaWhatsApp(summaryText);
               },
             ),
           ],
@@ -126,11 +279,11 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
               return StreamBuilder<List<PaymentTransaction>>(
                 stream: _service.streamPayments(),
                 builder: (context, paymentSnap) {
-                  final payments = paymentSnap.data ?? [];
+                  final payments = paymentSnap.data ?? _service.currentPayments;
                   final expenses = expenseSnap.data ?? [];
-                  final students = studentSnap.data ?? [];
+                  final students = studentSnap.data ?? _service.currentStudents;
 
-                  // Calculate metrics by selected month
+                  // Filter by month
                   final monthPayments = payments.where((p) =>
                       p.date.year == _selectedMonth.year &&
                       p.date.month == _selectedMonth.month).toList();
@@ -142,31 +295,21 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                       s.joinedAt!.year == _selectedMonth.year &&
                       s.joinedAt!.month == _selectedMonth.month).toList();
 
-                  final collectedAmount = monthPayments.isNotEmpty
-                      ? monthPayments.fold<int>(0, (sum, p) => sum + p.amount)
-                      : (_selectedMonth.month == 10 && payments.isNotEmpty ? 900 : 0);
-                  final paymentsCount = monthPayments.isNotEmpty
-                      ? monthPayments.length
-                      : (_selectedMonth.month == 10 ? payments.length : 0);
+                  final collectedAmount = monthPayments.fold<int>(0, (sum, p) => sum + p.amount);
+                  final paymentsCount = monthPayments.length;
 
-                  final expenseAmount = monthExpenses.isNotEmpty
-                      ? monthExpenses.fold<int>(0, (sum, e) => sum + e.amount)
-                      : (_selectedMonth.month == 10 && expenses.isNotEmpty ? 1000 : 0);
-                  final expenseCount = monthExpenses.isNotEmpty
-                      ? monthExpenses.length
-                      : (_selectedMonth.month == 10 ? expenses.length : 0);
+                  final expenseAmount = monthExpenses.fold<int>(0, (sum, e) => sum + e.amount);
+                  final expenseCount = monthExpenses.length;
 
                   final net = collectedAmount - expenseAmount;
-                  final newAdmissionsCount = monthStudents.isNotEmpty
-                      ? monthStudents.length
-                      : (_selectedMonth.month == 10 ? students.length : 0);
+                  final newAdmissionsCount = monthStudents.length;
 
                   return SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Section Header: MONTHLY REPORT (Image 5)
+                        // Section Header: MONTHLY REPORT
                         const Text(
                           'MONTHLY REPORT',
                           style: TextStyle(
@@ -178,7 +321,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // Month Picker Card (Image 5)
+                        // Month Picker Card
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
@@ -210,10 +353,9 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // 2x2 Metrics Grid (Image 5)
+                        // 2x2 Metrics Grid
                         Row(
                           children: [
-                            // Collected
                             Expanded(
                               child: _metricCard(
                                 label: 'COLLECTED',
@@ -223,7 +365,6 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // Expenses
                             Expanded(
                               child: _metricCard(
                                 label: 'EXPENSES',
@@ -237,7 +378,6 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            // Net
                             Expanded(
                               child: _metricCard(
                                 label: 'NET',
@@ -247,7 +387,6 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // New Admissions
                             Expanded(
                               child: _metricCard(
                                 label: 'NEW ADMISSIONS',
@@ -260,7 +399,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Monthly Export Category Rows Card (Image 5)
+                        // Monthly Export Category Rows Card
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -269,38 +408,109 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                           ),
                           child: Column(
                             children: [
+                              // Payments
                               _exportListRow(
                                 icon: Icons.account_balance_wallet_outlined,
                                 iconBg: const Color(0xFFECFDF5),
                                 iconColor: const Color(0xFF10B981),
-                                title: 'Payments',
-                                subtitle: '$paymentsCount row this month',
-                                onDownload: () => _exportCategory('Payments', paymentsCount),
+                                title: 'Payments Report',
+                                subtitle: '$paymentsCount payments in $monthStr (₹$collectedAmount)',
+                                onDownload: () {
+                                  final csv = _generatePaymentsCsv(monthPayments);
+                                  final headers = ['Receipt', 'Date', 'Student', 'Phone', 'Seat', 'Shift', 'Amount', 'Mode', 'Valid Until', 'Collected By'];
+                                  final previewRows = monthPayments.map((p) => [
+                                    p.id,
+                                    DateFormat('dd-MM-yy').format(p.date),
+                                    p.studentName,
+                                    p.studentPhone,
+                                    'S-${p.seatNumber}',
+                                    p.shift,
+                                    '₹${p.amount}',
+                                    p.paymentMode,
+                                    DateFormat('dd-MM-yy').format(p.validUntil),
+                                    p.collectedBy,
+                                  ]).toList();
+                                  final summary = '${_service.profile.libraryName} - Payments Report ($monthStr)\nTotal Collected: ₹$collectedAmount across $paymentsCount transactions.';
+                                  _exportCategory(
+                                    categoryName: 'Payments ($monthStr)',
+                                    rowCount: paymentsCount,
+                                    csvData: csv,
+                                    headers: headers,
+                                    previewRows: previewRows,
+                                    summaryText: summary,
+                                  );
+                                },
                               ),
                               const Divider(height: 1),
+
+                              // Expenses
                               _exportListRow(
                                 icon: Icons.receipt_long_outlined,
                                 iconBg: const Color(0xFFFFFBEB),
                                 iconColor: const Color(0xFFF59E0B),
-                                title: 'Expenses',
-                                subtitle: '$expenseCount row this month',
-                                onDownload: () => _exportCategory('Expenses', expenseCount),
+                                title: 'Expenses Report',
+                                subtitle: '$expenseCount entries in $monthStr (₹$expenseAmount)',
+                                onDownload: () {
+                                  final csv = _generateExpensesCsv(monthExpenses);
+                                  final headers = ['ID', 'Date', 'Title', 'Category', 'Amount', 'Mode', 'Notes'];
+                                  final previewRows = monthExpenses.map((e) => [
+                                    e.id,
+                                    DateFormat('dd-MM-yy').format(e.date),
+                                    e.title,
+                                    e.category,
+                                    '₹${e.amount}',
+                                    e.paymentMode,
+                                    e.notes,
+                                  ]).toList();
+                                  final summary = '${_service.profile.libraryName} - Expenses Report ($monthStr)\nTotal Expenses: ₹$expenseAmount across $expenseCount entries.';
+                                  _exportCategory(
+                                    categoryName: 'Expenses ($monthStr)',
+                                    rowCount: expenseCount,
+                                    csvData: csv,
+                                    headers: headers,
+                                    previewRows: previewRows,
+                                    summaryText: summary,
+                                  );
+                                },
                               ),
                               const Divider(height: 1),
+
+                              // New Admissions
                               _exportListRow(
                                 icon: Icons.person_add_outlined,
                                 iconBg: const Color(0xFFF0F9FF),
                                 iconColor: const Color(0xFF0284C7),
                                 title: 'New Admissions',
-                                subtitle: '$newAdmissionsCount rows this month',
-                                onDownload: () => _exportCategory('New Admissions', newAdmissionsCount),
+                                subtitle: '$newAdmissionsCount students joined in $monthStr',
+                                onDownload: () {
+                                  final csv = _generateAdmissionsCsv(monthStudents);
+                                  final headers = ['Joined', 'Name', 'Phone', 'Seat', 'Shift', 'Monthly', 'Status'];
+                                  final previewRows = monthStudents.map((s) => [
+                                    s.joinedAt != null ? DateFormat('dd-MM-yy').format(s.joinedAt!) : 'N/A',
+                                    s.name,
+                                    s.phone,
+                                    s.seatNumber != null ? 'S-${s.seatNumber}' : 'None',
+                                    s.shift,
+                                    '₹${s.monthlyFee}',
+                                    s.status,
+                                  ]).toList();
+                                  final summary = '${_service.profile.libraryName} - New Admissions ($monthStr)\nTotal Admissions: $newAdmissionsCount students.';
+                                  _exportCategory(
+                                    categoryName: 'New Admissions ($monthStr)',
+                                    rowCount: newAdmissionsCount,
+                                    csvData: csv,
+                                    headers: headers,
+                                    previewRows: previewRows,
+                                    summaryText: summary,
+                                  );
+                                },
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 24),
 
-                        // FULL DATA Section (Image 5)
+                        // FULL DATA Section
                         const Text(
                           'FULL DATA',
                           style: TextStyle(
@@ -321,14 +531,37 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                             icon: Icons.people_outline_rounded,
                             iconBg: const Color(0xFFF0F9FF),
                             iconColor: const Color(0xFF0284C7),
-                            title: 'All Students',
-                            subtitle: 'Complete roster — choose audience & columns',
-                            onDownload: () => _exportCategory('All Students Roster', students.length),
+                            title: 'All Students Roster',
+                            subtitle: 'Complete library roster (${students.length} students enrolled)',
+                            onDownload: () {
+                              final csv = _generateAllStudentsCsv(students);
+                              final headers = ['ID', 'Name', 'Phone', 'Seat', 'Shift', 'Status', 'Monthly', 'Dues', 'Joined'];
+                              final previewRows = students.map((s) => [
+                                s.id,
+                                s.name,
+                                s.phone,
+                                s.seatNumber != null ? 'S-${s.seatNumber}' : 'None',
+                                s.shift,
+                                s.status,
+                                '₹${s.monthlyFee}',
+                                '₹${s.effectiveDues}',
+                                s.joinedAt != null ? DateFormat('dd-MM-yy').format(s.joinedAt!) : 'N/A',
+                              ]).toList();
+                              final summary = '${_service.profile.libraryName} - Full Student Roster\nTotal Students: ${students.length}';
+                              _exportCategory(
+                                categoryName: 'Complete Student Roster',
+                                rowCount: students.length,
+                                csvData: csv,
+                                headers: headers,
+                                previewRows: previewRows,
+                                summaryText: summary,
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 20),
 
-                        // Footer Note (Image 5)
+                        // Footer Note
                         const Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -336,7 +569,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Files open in Excel or Google Sheets. Share them to Drive, WhatsApp or email.',
+                                'Files open in Excel or Google Sheets. Copy to clipboard or share directly to WhatsApp or Drive.',
                                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
                               ),
                             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
+import '../../models/library_models.dart';
 import '../../services/library_service.dart';
 
 class LibraryBrandingScreen extends StatefulWidget {
@@ -11,8 +12,57 @@ class LibraryBrandingScreen extends StatefulWidget {
 
 class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
   final LibraryService _service = LibraryService();
-  String? _selectedLogoName;
-  bool _hasLogo = false;
+
+  late String _selectedLogoName;
+  late TextEditingController _nameCtrl;
+  late TextEditingController _cityCtrl;
+  late TextEditingController _taglineCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _service.ensureInitialized();
+    _selectedLogoName = _service.profile.logoEmblem;
+    _nameCtrl = TextEditingController(text: _service.profile.libraryName);
+    _cityCtrl = TextEditingController(text: _service.profile.city);
+    _taglineCtrl = TextEditingController(text: _service.profile.tagline);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _cityCtrl.dispose();
+    _taglineCtrl.dispose();
+    super.dispose();
+  }
+
+  IconData _getEmblemIcon(String emblem) {
+    switch (emblem) {
+      case 'Academic Pillar':
+        return Icons.account_balance_rounded;
+      case 'Modern Campus':
+        return Icons.location_city_rounded;
+      case 'Scholar Cap':
+        return Icons.school_rounded;
+      case 'Book & Torch':
+      default:
+        return Icons.menu_book_rounded;
+    }
+  }
+
+  Color _getEmblemColor(String emblem) {
+    switch (emblem) {
+      case 'Academic Pillar':
+        return const Color(0xFF0284C7);
+      case 'Modern Campus':
+        return const Color(0xFF8B5CF6);
+      case 'Scholar Cap':
+        return const Color(0xFFF59E0B);
+      case 'Book & Torch':
+      default:
+        return const Color(0xFF0D9488);
+    }
+  }
 
   void _chooseLogo() {
     showModalBottomSheet(
@@ -53,21 +103,11 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
                   backgroundColor: AppColors.primaryTeal,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                icon: const Icon(Icons.file_upload_outlined, color: Colors.white),
-                label: const Text('Pick from Device Gallery', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.check_circle_outline, color: Colors.white),
+                label: const Text('Confirm Emblem', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  setState(() {
-                    _hasLogo = true;
-                    _selectedLogoName = 'Custom Library Logo';
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Logo uploaded and applied to all invoices and receipts!'),
-                      backgroundColor: Color(0xFF0D6E66),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  _saveBranding();
                 },
               ),
             ),
@@ -78,13 +118,14 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
   }
 
   Widget _emblemOption(String name, IconData icon, Color color) {
+    final isSelected = _selectedLogoName == name;
     return InkWell(
       onTap: () {
         Navigator.pop(context);
         setState(() {
-          _hasLogo = true;
           _selectedLogoName = name;
         });
+        _saveBranding();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$name emblem set as your official library logo!'),
@@ -100,23 +141,47 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withOpacity(isSelected ? 0.22 : 0.10),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: color.withOpacity(0.3)),
+              border: Border.all(color: color, width: isSelected ? 2.5 : 1),
             ),
             child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 6),
-          Text(name, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+          Text(name, style: TextStyle(fontSize: 10, fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600, color: AppColors.textNavy)),
         ],
+      ),
+    );
+  }
+
+  void _saveBranding() {
+    final name = _nameCtrl.text.trim();
+    final city = _cityCtrl.text.trim();
+    final tagline = _taglineCtrl.text.trim();
+
+    _service.saveBranding(
+      logoEmblem: _selectedLogoName,
+      tagline: tagline.isNotEmpty ? tagline : 'Silence • Focus • Success',
+      libraryName: name.isNotEmpty ? name : null,
+      city: city.isNotEmpty ? city : null,
+    );
+
+    setState(() {});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Library branding saved & applied to receipts!'),
+        backgroundColor: Color(0xFF0D6E66),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final libraryName = _service.profile.libraryName.isNotEmpty ? _service.profile.libraryName : 'Patyiyali';
-    final city = _service.profile.city.isNotEmpty ? _service.profile.city : 'Etah';
+    final libraryName = _nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : _service.profile.libraryName;
+    final city = _cityCtrl.text.trim().isNotEmpty ? _cityCtrl.text.trim() : _service.profile.city;
+    final tagline = _taglineCtrl.text.trim().isNotEmpty ? _taglineCtrl.text.trim() : _service.profile.tagline;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -138,7 +203,7 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Page Header (Image 7)
+            // Page Header
             const Text(
               'Library Branding',
               style: TextStyle(
@@ -149,7 +214,7 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Build your institutional identity',
+              'Build your institutional identity across WhatsApp and invoices.',
               style: TextStyle(
                 fontSize: 14,
                 color: Color(0xFF64748B),
@@ -157,7 +222,7 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Card 1: CURRENT LOGO (Image 7)
+            // Card 1: CURRENT EMBLEM / LOGO
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -174,7 +239,7 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'CURRENT LOGO',
+                      'OFFICIAL EMBLEM / LOGO',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
@@ -185,52 +250,47 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Dashed Logo Container (Image 7)
+                  // Emblem Container
                   Container(
-                    width: 140,
-                    height: 140,
+                    width: 130,
+                    height: 130,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: _getEmblemColor(_selectedLogoName).withOpacity(0.12),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: const Color(0xFFCBD5E1),
-                        width: 1.5,
-                        style: BorderStyle.solid,
+                        color: _getEmblemColor(_selectedLogoName),
+                        width: 2,
                       ),
                     ),
                     child: Center(
-                      child: _hasLogo
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.verified_rounded, color: Color(0xFF0D9488), size: 40),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _selectedLogoName ?? 'Active Logo',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textNavy),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            )
-                          : const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.domain_rounded, color: Color(0xFFCBD5E1), size: 46),
-                                SizedBox(height: 8),
-                                Text(
-                                  'No Logo Uploaded',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
-                                ),
-                              ],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _getEmblemIcon(_selectedLogoName),
+                            color: _getEmblemColor(_selectedLogoName),
+                            size: 48,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _selectedLogoName,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: _getEmblemColor(_selectedLogoName),
                             ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
-                  // Upload Button (Image 7)
+                  // Change Emblem Button
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 48,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0D6E66),
@@ -238,25 +298,20 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      icon: const Icon(Icons.cloud_upload_outlined, size: 20),
-                      label: Text(
-                        _hasLogo ? 'Change Library Logo' : 'Upload Library Logo',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                      icon: const Icon(Icons.style_rounded, size: 20),
+                      label: const Text(
+                        'Choose Library Emblem',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                       ),
                       onPressed: _chooseLogo,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Supports JPG & PNG. Best fit: Square (1:1 aspect ratio).',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Card 2: Why add a logo? (Image 7 & 8)
+            // Card 2: EDIT INSTITUTIONAL DETAILS
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -267,41 +322,57 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF0D9488),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.info_outline_rounded, size: 16, color: Colors.white),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Why add a logo?',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Adding your logo will automatically brand all your:',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+                  const Text('LIBRARY DETAILS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B))),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Library Name',
+                      prefixIcon: const Icon(Icons.business_rounded),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 14),
-                  _brandFeature(Icons.receipt_long_rounded, 'Automated WhatsApp Invoices'),
-                  const SizedBox(height: 10),
-                  _brandFeature(Icons.description_outlined, 'PDF Receipt Reports'),
-                  const SizedBox(height: 10),
-                  _brandFeature(Icons.qr_code_2_rounded, 'Digital Access QR Code'),
+                  TextField(
+                    controller: _cityCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'City / Address',
+                      prefixIcon: const Icon(Icons.location_on_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _taglineCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Tagline / Slogan',
+                      prefixIcon: const Icon(Icons.format_quote_rounded),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryTeal,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.save_rounded, color: Colors.white),
+                      label: const Text('Save Details', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      onPressed: _saveBranding,
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Card 3: INVOICE HEADER PREVIEW (Image 8)
+            // Card 3: INVOICE HEADER PREVIEW
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -314,7 +385,7 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'INVOICE HEADER PREVIEW',
+                    'RECEIPT & INVOICE HEADER PREVIEW',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
@@ -339,51 +410,46 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE2E8F0),
+                                color: _getEmblemColor(_selectedLogoName).withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
-                                _hasLogo ? Icons.verified_rounded : Icons.domain_rounded,
-                                color: _hasLogo ? const Color(0xFF0D9488) : const Color(0xFF94A3B8),
+                                _getEmblemIcon(_selectedLogoName),
+                                color: _getEmblemColor(_selectedLogoName),
                                 size: 24,
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  libraryName,
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  city,
-                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                                ),
-                              ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    libraryName,
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                                  ),
+                                  Text(
+                                    '$city • $tagline',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
-                        const Divider(height: 1, color: Color(0xFFE2E8F0)),
                         const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE2E8F0),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          width: 160,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                        const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Receipt #: REC-2026-1042', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                              child: const Text('PAID', style: TextStyle(color: Color(0xFF16A34A), fontSize: 10, fontWeight: FontWeight.w900)),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -395,23 +461,6 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _brandFeature(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: const Color(0xFF0D9488)),
-        const SizedBox(width: 10),
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textNavy,
-          ),
-        ),
-      ],
     );
   }
 }

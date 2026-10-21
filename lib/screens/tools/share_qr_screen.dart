@@ -1,5 +1,9 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
+import '../../models/library_models.dart';
 import '../../services/library_service.dart';
 
 class ShareQrScreen extends StatefulWidget {
@@ -12,6 +16,11 @@ class ShareQrScreen extends StatefulWidget {
 class _ShareQrScreenState extends State<ShareQrScreen> {
   final LibraryService _service = LibraryService();
   int _qrSeed = 42;
+
+  String get _publicUrl {
+    final slug = _service.profile.libraryName.toLowerCase().replaceAll(RegExp(r'\s+'), '-');
+    return 'https://trackmylibrary.in/live/$slug';
+  }
 
   void _regenerateQR() {
     setState(() {
@@ -26,7 +35,26 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
     );
   }
 
+  Future<void> _shareOnWhatsApp() async {
+    final text = 'Check live seat availability at ${_service.profile.libraryName} before visiting:\n$_publicUrl';
+    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (_) {}
+  }
+
   void _openPublicPreview() {
+    final total = _service.totalSeatsCount;
+    int occupied = 0;
+    for (int i = 1; i <= total; i++) {
+      if (_service.isSeatOccupied(i)) occupied++;
+    }
+    final vacant = total - occupied;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -49,7 +77,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
                     ),
                     const SizedBox(height: 2),
-                    const Text('Student Public Live Seat Board', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    Text('${_service.profile.city} • Student Live Board', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   ],
                 ),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
@@ -63,14 +91,14 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFBBF7D0)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A)),
-                  SizedBox(width: 10),
+                  const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Live Status: Open • 24/35 Seats Currently Available',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF15803D), fontSize: 13),
+                      'Live Status: Open • $vacant/$total Seats Available',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF15803D), fontSize: 13),
                     ),
                   ),
                 ],
@@ -78,8 +106,55 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Students who scan this QR Code from outside or at the reception see real-time seat occupancy instantly on their smartphones without any password or login.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+              'Live Seat Matrix (Student View):',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
+            ),
+            const SizedBox(height: 8),
+
+            // Mini visual seat grid for student view
+            SizedBox(
+              height: 180,
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1.1,
+                ),
+                itemCount: total,
+                itemBuilder: (ctx, idx) {
+                  final seatNum = idx + 1;
+                  final isOcc = _service.isSeatOccupied(seatNum);
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: isOcc ? const Color(0xFFF1F5F9) : const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isOcc ? const Color(0xFFE2E8F0) : const Color(0xFF86EFAC)),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('S-$seatNum', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: isOcc ? const Color(0xFF94A3B8) : const Color(0xFF16A34A))),
+                          Text(isOcc ? 'Occ' : 'Free', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: isOcc ? const Color(0xFF94A3B8) : const Color(0xFF16A34A))),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Container(width: 10, height: 10, decoration: const BoxDecoration(color: Color(0xFF16A34A), shape: BoxShape.circle)),
+                const SizedBox(width: 4),
+                const Text('Available', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                const SizedBox(width: 14),
+                Container(width: 10, height: 10, decoration: const BoxDecoration(color: Color(0xFF94A3B8), shape: BoxShape.circle)),
+                const SizedBox(width: 4),
+                const Text('Occupied', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              ],
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -101,11 +176,93 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
   }
 
   void _shareOrDownload() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('QR Code high-resolution poster ready for printing & sharing!'),
-        backgroundColor: Color(0xFF0D6E66),
-        behavior: SnackBarBehavior.floating,
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Share Live Seat QR Code', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Option 1: Copy Link
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.link_rounded, color: Color(0xFF16A34A)),
+              ),
+              title: const Text('Copy Live Web Link', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: Text(_publicUrl, style: const TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+              onTap: () {
+                Navigator.pop(ctx);
+                Clipboard.setData(ClipboardData(text: _publicUrl));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Live student seat link copied to clipboard!'),
+                    backgroundColor: Color(0xFF0D6E66),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+
+            // Option 2: Share via WhatsApp
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF10B981)),
+              ),
+              title: const Text('Share to WhatsApp Status / Group', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('Post live seat link for all aspirants to view', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _shareOnWhatsApp();
+              },
+            ),
+
+            // Option 3: Print Poster View
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFF0F9FF), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.print_outlined, color: Color(0xFF0284C7)),
+              ),
+              title: const Text('Reception Print Poster Info', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('View and copy formatted notice for printing at reception gate', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                final posterText = '===================================\n'
+                    '        ${_service.profile.libraryName.toUpperCase()}\n'
+                    '     ${_service.profile.city}\n'
+                    '===================================\n'
+                    'SCAN TO CHECK LIVE SEAT AVAILABILITY\n'
+                    'URL: $_publicUrl\n'
+                    'Helpline: ${_service.profile.adminPhone}\n'
+                    '===================================';
+                Clipboard.setData(ClipboardData(text: posterText));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Print poster notice copied to clipboard!'),
+                    backgroundColor: Color(0xFF0D6E66),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -132,7 +289,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // DIGITAL ACCESS Pill (Image 6)
+            // DIGITAL ACCESS Pill
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
@@ -159,7 +316,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Title & Subtitle (Image 6)
+            // Title & Subtitle
             const Text(
               'Seat Availability QR Code',
               style: TextStyle(
@@ -179,7 +336,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Big QR Code Card (Image 6)
+            // Big QR Code Card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(28),
@@ -207,9 +364,41 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                       painter: _QrPatternPainter(seed: _qrSeed),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
-                  // PREVIEW PAGE [↗] (Image 6)
+                  // Public URL bar with Copy icon
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _publicUrl,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF0D9488), fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: _publicUrl));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Link copied to clipboard!'), behavior: SnackBarBehavior.floating),
+                            );
+                          },
+                          child: const Icon(Icons.copy_rounded, size: 16, color: Color(0xFF0D9488)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // PREVIEW PAGE [↗]
                   InkWell(
                     onTap: _openPublicPreview,
                     child: const Row(
@@ -234,7 +423,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Feature Checkmarks (Image 6)
+            // Feature Checkmarks
             _featureRow('Public access for students (no login required)'),
             const SizedBox(height: 12),
             _featureRow('High-resolution for high-quality printing'),
@@ -242,7 +431,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
             _featureRow('Real-time data synchronization every 30s'),
             const SizedBox(height: 28),
 
-            // Buttons (Image 6)
+            // Buttons
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -300,10 +489,10 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
           width: 20,
           height: 20,
           decoration: const BoxDecoration(
-            color: Color(0xFF16A34A),
+            color: Color(0xFFDCFCE7),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.check, size: 13, color: Colors.white),
+          child: const Icon(Icons.check, size: 13, color: Color(0xFF16A34A)),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -321,42 +510,42 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
   }
 }
 
-// Authentic QR pattern painter with 3 corner finder patterns and dynamic data modules
 class _QrPatternPainter extends CustomPainter {
   final int seed;
-  const _QrPatternPainter({required this.seed});
+  _QrPatternPainter({required this.seed});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF0F172A);
-    const int grid = 25;
-    final double step = size.width / grid;
+    final paint = Paint()..color = const Color(0xFF0F172A)..style = PaintingStyle.fill;
+    final r = Random(seed);
+    const int cols = 21;
+    final cellW = size.width / cols;
+    final cellH = size.height / cols;
 
-    void drawFinder(int startX, int startY) {
-      // Outer 7x7 square
-      canvas.drawRect(Rect.fromLTWH(startX * step, startY * step, 7 * step, 7 * step), paint);
-      // Inner 5x5 white space
-      final whitePaint = Paint()..color = Colors.white;
-      canvas.drawRect(Rect.fromLTWH((startX + 1) * step, (startY + 1) * step, 5 * step, 5 * step), whitePaint);
-      // Center 3x3 square
-      canvas.drawRect(Rect.fromLTWH((startX + 2) * step, (startY + 2) * step, 3 * step, 3 * step), paint);
+    void drawFinderPattern(double x, double y) {
+      canvas.drawRect(Rect.fromLTWH(x, y, cellW * 7, cellH * 7), paint);
+      final whitePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+      canvas.drawRect(Rect.fromLTWH(x + cellW, y + cellH, cellW * 5, cellH * 5), whitePaint);
+      canvas.drawRect(Rect.fromLTWH(x + cellW * 2, y + cellH * 2, cellW * 3, cellH * 3), paint);
     }
 
-    drawFinder(0, 0); // Top-left
-    drawFinder(grid - 7, 0); // Top-right
-    drawFinder(0, grid - 7); // Bottom-left
+    drawFinderPattern(0, 0);
+    drawFinderPattern(size.width - cellW * 7, 0);
+    drawFinderPattern(0, size.height - cellH * 7);
 
-    // Draw alignment module and data modules
-    for (int y = 0; y < grid; y++) {
-      for (int x = 0; x < grid; x++) {
-        // Skip finders
-        if ((x < 7 && y < 7) || (x >= grid - 7 && y < 7) || (x < 7 && y >= grid - 7)) {
+    for (int col = 0; col < cols; col++) {
+      for (int row = 0; row < cols; row++) {
+        if ((col < 8 && row < 8) || (col >= cols - 8 && row < 8) || (col < 8 && row >= cols - 8)) {
           continue;
         }
-        // Pseudo-random deterministic module placement
-        final val = (x * 17 + y * 29 + seed * 13) % 100;
-        if (val > 46) {
-          canvas.drawRect(Rect.fromLTWH(x * step, y * step, step * 0.92, step * 0.92), paint);
+        if (r.nextBool()) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(col * cellW + 0.5, row * cellH + 0.5, cellW - 1, cellH - 1),
+              const Radius.circular(1.5),
+            ),
+            paint,
+          );
         }
       }
     }
