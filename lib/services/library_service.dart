@@ -164,6 +164,12 @@ class LibraryService {
     }
   }
 
+  bool isSeatOccupied(int seatNum) {
+    ensureInitialized();
+    if (seatNum <= 0 || seatNum > _mockSeats.length) return false;
+    return _mockSeats[seatNum - 1].isOccupied;
+  }
+
   List<StudentInfo> get currentStudents => List.unmodifiable(_mockStudents);
   List<PaymentTransaction> get currentPayments => List.unmodifiable(_mockPayments);
 
