@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'constants/app_colors.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
+import 'screens/tools/student_live_portal_screen.dart';
 import 'services/library_service.dart';
 
 void main() async {
@@ -54,7 +55,11 @@ class TrackMyLibraryApp extends StatelessWidget {
           foregroundColor: AppColors.textNavy,
         ),
       ),
-      home: const LoginScreen(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const LoginScreen(),
+        '/portal': (context) => const StudentLivePortalScreen(),
+      },
     );
   }
 }

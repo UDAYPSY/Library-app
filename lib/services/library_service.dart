@@ -1118,9 +1118,19 @@ class LibraryService {
     required String tagline,
     String? libraryName,
     String? city,
+    String? logoBase64,
+    String? logoUrl,
+    bool clearCustomLogo = false,
   }) {
     profile.logoEmblem = logoEmblem;
     profile.tagline = tagline;
+    if (clearCustomLogo) {
+      profile.logoBase64 = null;
+      profile.logoUrl = null;
+    } else {
+      if (logoBase64 != null) profile.logoBase64 = logoBase64;
+      if (logoUrl != null) profile.logoUrl = logoUrl;
+    }
     if (libraryName != null && libraryName.trim().isNotEmpty) {
       profile.libraryName = libraryName.trim();
     }

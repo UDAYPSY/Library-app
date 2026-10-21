@@ -1,10 +1,12 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import 'student_live_portal_screen.dart';
 
 class ShareQrScreen extends StatefulWidget {
   const ShareQrScreen({super.key});
@@ -28,7 +30,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('New QR Code generated & synchronized!'),
+        content: Text('New QR Code synchronized with live student portal!'),
         backgroundColor: Color(0xFF0D6E66),
         behavior: SnackBarBehavior.floating,
       ),
@@ -48,130 +50,9 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
   }
 
   void _openPublicPreview() {
-    final total = _service.totalSeatsCount;
-    int occupied = 0;
-    for (int i = 1; i <= total; i++) {
-      if (_service.isSeatOccupied(i)) occupied++;
-    }
-    final vacant = total - occupied;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _service.profile.libraryName,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
-                    ),
-                    const SizedBox(height: 2),
-                    Text('${_service.profile.city} • Student Live Board', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  ],
-                ),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFBBF7D0)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Live Status: Open • $vacant/$total Seats Available',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF15803D), fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Live Seat Matrix (Student View):',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
-            ),
-            const SizedBox(height: 8),
-
-            // Mini visual seat grid for student view
-            SizedBox(
-              height: 180,
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 6,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: 1.1,
-                ),
-                itemCount: total,
-                itemBuilder: (ctx, idx) {
-                  final seatNum = idx + 1;
-                  final isOcc = _service.isSeatOccupied(seatNum);
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: isOcc ? const Color(0xFFF1F5F9) : const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: isOcc ? const Color(0xFFE2E8F0) : const Color(0xFF86EFAC)),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('S-$seatNum', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: isOcc ? const Color(0xFF94A3B8) : const Color(0xFF16A34A))),
-                          Text(isOcc ? 'Occ' : 'Free', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: isOcc ? const Color(0xFF94A3B8) : const Color(0xFF16A34A))),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Container(width: 10, height: 10, decoration: const BoxDecoration(color: Color(0xFF16A34A), shape: BoxShape.circle)),
-                const SizedBox(width: 4),
-                const Text('Available', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                const SizedBox(width: 14),
-                Container(width: 10, height: 10, decoration: const BoxDecoration(color: Color(0xFF94A3B8), shape: BoxShape.circle)),
-                const SizedBox(width: 4),
-                const Text('Occupied', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryTeal,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const StudentLivePortalScreen()),
     );
   }
 
@@ -350,7 +231,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
               ),
               child: Column(
                 children: [
-                  // High-Res Rendered QR Code Pattern
+                  // Real Scannable ISO QR Code Image
                   Container(
                     width: 220,
                     height: 220,
@@ -360,8 +241,22 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     padding: const EdgeInsets.all(12),
-                    child: CustomPaint(
-                      painter: _QrPatternPainter(seed: _qrSeed),
+                    child: Center(
+                      child: QrImageView(
+                        data: _publicUrl,
+                        version: QrVersions.auto,
+                        size: 196.0,
+                        backgroundColor: Colors.white,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                        errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -510,47 +405,3 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
   }
 }
 
-class _QrPatternPainter extends CustomPainter {
-  final int seed;
-  _QrPatternPainter({required this.seed});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF0F172A)..style = PaintingStyle.fill;
-    final r = Random(seed);
-    const int cols = 21;
-    final cellW = size.width / cols;
-    final cellH = size.height / cols;
-
-    void drawFinderPattern(double x, double y) {
-      canvas.drawRect(Rect.fromLTWH(x, y, cellW * 7, cellH * 7), paint);
-      final whitePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
-      canvas.drawRect(Rect.fromLTWH(x + cellW, y + cellH, cellW * 5, cellH * 5), whitePaint);
-      canvas.drawRect(Rect.fromLTWH(x + cellW * 2, y + cellH * 2, cellW * 3, cellH * 3), paint);
-    }
-
-    drawFinderPattern(0, 0);
-    drawFinderPattern(size.width - cellW * 7, 0);
-    drawFinderPattern(0, size.height - cellH * 7);
-
-    for (int col = 0; col < cols; col++) {
-      for (int row = 0; row < cols; row++) {
-        if ((col < 8 && row < 8) || (col >= cols - 8 && row < 8) || (col < 8 && row >= cols - 8)) {
-          continue;
-        }
-        if (r.nextBool()) {
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(col * cellW + 0.5, row * cellH + 0.5, cellW - 1, cellH - 1),
-              const Radius.circular(1.5),
-            ),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _QrPatternPainter oldDelegate) => oldDelegate.seed != seed;
-}

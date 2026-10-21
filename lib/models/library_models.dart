@@ -7,7 +7,11 @@ class LibraryProfile {
   String adminEmail;
   String adminPhone;
   String logoEmblem;
+  String? logoBase64;
+  String? logoUrl;
   String tagline;
+
+  bool get hasCustomLogo => (logoBase64 != null && logoBase64!.isNotEmpty) || (logoUrl != null && logoUrl!.isNotEmpty);
   int whatsappCredits;
   int messagesSentCount;
   bool whatsappNotifications;
@@ -28,6 +32,8 @@ class LibraryProfile {
     this.adminEmail = 'udaypratapsi2022@gmail.com',
     this.adminPhone = '94574 64850',
     this.logoEmblem = 'Book & Torch',
+    this.logoBase64,
+    this.logoUrl,
     this.tagline = 'Silence • Focus • Success',
     this.whatsappCredits = 150,
     this.messagesSentCount = 24,
@@ -51,6 +57,8 @@ class LibraryProfile {
       'admin_email': adminEmail,
       'admin_phone': adminPhone,
       'logo_emblem': logoEmblem,
+      'logo_base64': logoBase64,
+      'logo_url': logoUrl,
       'tagline': tagline,
       'whatsapp_credits': whatsappCredits,
       'messages_sent_count': messagesSentCount,
@@ -75,6 +83,8 @@ class LibraryProfile {
       adminEmail: map['admin_email'] ?? '',
       adminPhone: map['admin_phone'] ?? '',
       logoEmblem: map['logo_emblem'] ?? 'Book & Torch',
+      logoBase64: map['logo_base64'] as String?,
+      logoUrl: map['logo_url'] as String?,
       tagline: map['tagline'] ?? 'Silence • Focus • Success',
       whatsappCredits: (map['whatsapp_credits'] as num?)?.toInt() ?? 150,
       messagesSentCount: (map['messages_sent_count'] as num?)?.toInt() ?? 24,

@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import '../../services/file_export_service.dart';
+import '../../services/excel_import_service.dart';
 
 class ReportsExportsScreen extends StatefulWidget {
   const ReportsExportsScreen({super.key});
@@ -158,6 +160,181 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
     );
   }
 
+  String _generateMasterBackupCsv({
+    required List<StudentInfo> students,
+    required List<PaymentTransaction> payments,
+    required List<ExpenseItem> expenses,
+  }) {
+    final buffer = StringBuffer();
+    buffer.writeln('# ==========================================');
+    buffer.writeln('# ${_service.profile.libraryName.toUpperCase()} - MASTER DATABASE BACKUP');
+    buffer.writeln('# Exported: ${DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now())}');
+    buffer.writeln('# City: ${_service.profile.city} | Helpline: ${_service.profile.adminPhone}');
+    buffer.writeln('# Capacity: ${_service.totalSeatsCount} Seats Total');
+    buffer.writeln('# ==========================================\n');
+
+    buffer.writeln('### SECTION 1: ALL ENROLLED STUDENTS ###');
+    buffer.writeln(_generateAllStudentsCsv(students));
+    buffer.writeln('\n### SECTION 2: PAYMENT & FEE COLLECTION LEDGER ###');
+    buffer.writeln(_generatePaymentsCsv(payments));
+    buffer.writeln('\n### SECTION 3: OPERATING EXPENSES ###');
+    buffer.writeln(_generateExpensesCsv(expenses));
+
+    return buffer.toString();
+  }
+
+  void _openBulkImportSheet() {
+    final inputCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(modalCtx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.table_chart_rounded, color: Color(0xFF0D6E66)),
+                      SizedBox(width: 8),
+                      Text(
+                        'Bulk Import Students',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                      ),
+                    ],
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Paste rows directly from Microsoft Excel or Google Sheets (Name, Phone, Shift, SeatNumber, MonthlyFee):',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0D6E66),
+                  side: const BorderSide(color: Color(0xFF0D6E66)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.file_download_outlined, size: 16),
+                label: const Text('Download Excel Template (.csv)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                onPressed: () async {
+                  final template = ExcelImportService.generateTemplateCsv();
+                  await FileExportService.download(fileName: 'student_import_template.csv', content: template);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Excel Template downloaded! Open in Microsoft Excel.'),
+                        backgroundColor: Color(0xFF0D6E66),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: inputCtrl,
+                maxLines: 6,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                decoration: InputDecoration(
+                  hintText: 'Aarav Sharma, 9876543210, Full Day, 1, 800\nPriya Singh, 9812345678, Morning, 2, 500\nRohan Verma, 9988776655, Evening, , 500',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D6E66),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.cloud_upload_rounded),
+                  label: const Text('Parse & Import Students', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  onPressed: () {
+                    final text = inputCtrl.text.trim();
+                    if (text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please paste some rows from your Excel sheet.')),
+                      );
+                      return;
+                    }
+                    final result = ExcelImportService.parseAndImport(text, _service);
+                    Navigator.pop(ctx);
+                    setState(() {});
+                    _showImportSummaryDialog(result);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showImportSummaryDialog(ExcelImportResult result) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(
+              result.successfullyImported > 0 ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+              color: result.successfullyImported > 0 ? const Color(0xFF10B981) : Colors.red,
+            ),
+            const SizedBox(width: 8),
+            const Text('Import Summary', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('✅ Successfully Imported: ${result.successfullyImported} students', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
+            if (result.skippedRows > 0)
+              Text('⚠️ Skipped Rows: ${result.skippedRows}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+            const SizedBox(height: 10),
+            if (result.warnings.isNotEmpty) ...[
+              const Text('Warnings:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              ...result.warnings.take(4).map((w) => Text('• $w', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
+            ],
+            if (result.errorMessages.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              const Text('Errors:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red)),
+              ...result.errorMessages.take(4).map((e) => Text('• $e', style: const TextStyle(fontSize: 11, color: Colors.red))),
+            ],
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D6E66),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _exportCategory({
     required String categoryName,
     required int rowCount,
@@ -166,6 +343,9 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
     required List<List<String>> previewRows,
     required String summaryText,
   }) {
+    final cleanCategorySlug = categoryName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+    final fileName = '${cleanCategorySlug}_${DateFormat('yyyyMMdd').format(_selectedMonth)}.csv';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -193,21 +373,46 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
             ),
             const SizedBox(height: 18),
 
-            // Option 1: Copy CSV Data
+            // Option 1: Native File Download
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.download_rounded, color: Color(0xFF0D9488)),
+              ),
+              title: const Text('Download Excel / CSV File (.csv)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0D6E66))),
+              subtitle: Text('Directly downloads $fileName to your device for Microsoft Excel', style: const TextStyle(fontSize: 11)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final success = await FileExportService.download(fileName: fileName, content: csvData);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(success ? '$categoryName (.csv) downloaded successfully!' : 'File exported and saved!'),
+                      backgroundColor: const Color(0xFF0D6E66),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+            ),
+
+            // Option 2: Copy Tab-Separated Data for Direct Excel Paste
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.table_view_rounded, color: Color(0xFF16A34A)),
+                child: const Icon(Icons.content_paste_go_rounded, color: Color(0xFF16A34A)),
               ),
-              title: const Text('Copy CSV / Excel Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              subtitle: const Text('Copies complete comma-separated data to clipboard to paste into Excel or Sheets', style: TextStyle(fontSize: 11)),
+              title: const Text('Copy Formatted Data for Excel', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('Copies tab-separated data to paste directly into Excel columns without import wizard', style: TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(ctx);
-                Clipboard.setData(ClipboardData(text: csvData));
+                final tsvData = '${headers.join('\t')}\n${previewRows.map((r) => r.join('\t')).join('\n')}';
+                Clipboard.setData(ClipboardData(text: tsvData));
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('$categoryName CSV ($rowCount rows) copied to clipboard! Ready to paste into Excel.'),
+                    content: Text('$categoryName TSV ($rowCount rows) copied! Paste directly into Excel.'),
                     backgroundColor: const Color(0xFF0D6E66),
                     behavior: SnackBarBehavior.floating,
                   ),
@@ -215,7 +420,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
               },
             ),
 
-            // Option 2: View In-App Table
+            // Option 3: View In-App Table
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(10),
@@ -230,7 +435,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
               },
             ),
 
-            // Option 3: Share via WhatsApp
+            // Option 4: Share via WhatsApp
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(10),
@@ -308,6 +513,129 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // EXCEL-FIRST HYBRID DATA HUB CARD
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 24),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.35)),
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x18000000), blurRadius: 14, offset: Offset(0, 6)),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0D9488).withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(Icons.hub_rounded, color: Color(0xFF2DD4BF), size: 18),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Text(
+                                        'EXCEL-FIRST DATA HUB',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.8,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'HYBRID ARCHITECTURE',
+                                      style: TextStyle(color: Color(0xFF34D399), fontSize: 9, fontWeight: FontWeight.w900),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                'Manage with database speed and reliability, with 100% offline Excel portability.',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), height: 1.4),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0D9488),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      icon: const Icon(Icons.download_for_offline_rounded, size: 18),
+                                      label: const Text(
+                                        'Master Excel Backup',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                      onPressed: () async {
+                                        final masterCsv = _generateMasterBackupCsv(
+                                          students: students,
+                                          payments: payments,
+                                          expenses: expenses,
+                                        );
+                                        final fileName = 'library_master_backup_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
+                                        final ok = await FileExportService.download(fileName: fileName, content: masterCsv);
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(ok ? 'Master Excel Backup downloaded! Contains students, ledger & seats.' : 'Backup generated!'),
+                                              backgroundColor: const Color(0xFF0D6E66),
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                        side: const BorderSide(color: Color(0xFF334155)),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      icon: const Icon(Icons.file_upload_outlined, size: 18, color: Color(0xFF38BDF8)),
+                                      label: const Text(
+                                        'Bulk Excel Import',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                      onPressed: _openBulkImportSheet,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
                         // Section Header: MONTHLY REPORT
                         const Text(
                           'MONTHLY REPORT',

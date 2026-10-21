@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
@@ -12,6 +14,8 @@ class LibraryBrandingScreen extends StatefulWidget {
 
 class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
   final LibraryService _service = LibraryService();
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _isUploading = false;
 
   late String _selectedLogoName;
   late TextEditingController _nameCtrl;
@@ -62,6 +66,73 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
       default:
         return const Color(0xFF0D9488);
     }
+  }
+
+  Future<void> _pickAndUploadLogo() async {
+    try {
+      setState(() => _isUploading = true);
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 600,
+        maxHeight: 600,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        final base64String = base64Encode(bytes);
+
+        _service.saveBranding(
+          logoEmblem: _selectedLogoName,
+          tagline: _taglineCtrl.text.trim().isNotEmpty ? _taglineCtrl.text.trim() : _service.profile.tagline,
+          libraryName: _nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : null,
+          city: _cityCtrl.text.trim().isNotEmpty ? _cityCtrl.text.trim() : null,
+          logoBase64: base64String,
+        );
+
+        if (mounted) {
+          setState(() => _isUploading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Custom Library Logo uploaded and saved successfully!'),
+              backgroundColor: Color(0xFF0D6E66),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        if (mounted) setState(() => _isUploading = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not upload logo: $e'),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeCustomLogo() {
+    _service.saveBranding(
+      logoEmblem: _selectedLogoName,
+      tagline: _taglineCtrl.text.trim().isNotEmpty ? _taglineCtrl.text.trim() : _service.profile.tagline,
+      libraryName: _nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : null,
+      city: _cityCtrl.text.trim().isNotEmpty ? _cityCtrl.text.trim() : null,
+      clearCustomLogo: true,
+    );
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Custom logo removed. Reverted to official emblem.'),
+        backgroundColor: Color(0xFF0D6E66),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _chooseLogo() {
@@ -164,6 +235,7 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
       tagline: tagline.isNotEmpty ? tagline : 'Silence • Focus • Success',
       libraryName: name.isNotEmpty ? name : null,
       city: city.isNotEmpty ? city : null,
+      logoBase64: _service.profile.logoBase64,
     );
 
     setState(() {});
@@ -236,58 +308,119 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
               ),
               child: Column(
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'OFFICIAL EMBLEM / LOGO',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8,
-                        color: const Color(0xFF64748B).withOpacity(0.9),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'OFFICIAL EMBLEM / LOGO',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          color: const Color(0xFF64748B).withOpacity(0.9),
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _service.profile.hasCustomLogo ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _service.profile.hasCustomLogo ? 'CUSTOM LOGO ACTIVE' : 'PRESET EMBLEM',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                            color: _service.profile.hasCustomLogo ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
-                  // Emblem Container
-                  Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      color: _getEmblemColor(_selectedLogoName).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: _getEmblemColor(_selectedLogoName),
-                        width: 2,
-                      ),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _getEmblemIcon(_selectedLogoName),
-                            color: _getEmblemColor(_selectedLogoName),
-                            size: 48,
+                  // Emblem / Custom Logo Container
+                  if (_service.profile.hasCustomLogo)
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: const Color(0xFF0D9488), width: 2.5),
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x120D9488), blurRadius: 16, offset: Offset(0, 6)),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _selectedLogoName,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: _getEmblemColor(_selectedLogoName),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(21),
+                            child: Image.memory(
+                              base64Decode(_service.profile.logoBase64!),
+                              width: 140,
+                              height: 140,
+                              fit: BoxFit.cover,
+                              errorBuilder: (ctx, err, stack) => Center(
+                                child: Icon(_getEmblemIcon(_selectedLogoName), size: 48, color: _getEmblemColor(_selectedLogoName)),
+                              ),
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                        ],
+                        ),
+                        Positioned(
+                          bottom: 4,
+                          right: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF0D6E66),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.check, color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Container(
+                      width: 130,
+                      height: 130,
+                      decoration: BoxDecoration(
+                        color: _getEmblemColor(_selectedLogoName).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: _getEmblemColor(_selectedLogoName),
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _getEmblemIcon(_selectedLogoName),
+                              color: _getEmblemColor(_selectedLogoName),
+                              size: 48,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _selectedLogoName,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: _getEmblemColor(_selectedLogoName),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
                   const SizedBox(height: 20),
 
-                  // Change Emblem Button
+                  // Upload Custom Logo Button
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -298,13 +431,49 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      icon: const Icon(Icons.style_rounded, size: 20),
-                      label: const Text(
-                        'Choose Library Emblem',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                      icon: _isUploading
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.cloud_upload_rounded, size: 20),
+                      label: Text(
+                        _isUploading ? 'Uploading Logo...' : (_service.profile.hasCustomLogo ? 'Change Custom Logo' : 'Upload Custom Logo'),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                       ),
-                      onPressed: _chooseLogo,
+                      onPressed: _isUploading ? null : _pickAndUploadLogo,
                     ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Secondary Button: Preset Emblem or Remove Logo
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.textNavy,
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: const Icon(Icons.style_rounded, size: 18),
+                          label: const Text('Preset Emblems', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                          onPressed: _chooseLogo,
+                        ),
+                      ),
+                      if (_service.profile.hasCustomLogo) ...[
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFDC2626),
+                            side: const BorderSide(color: Color(0xFFFECACA)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                          ),
+                          icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                          label: const Text('Remove', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                          onPressed: _removeCustomLogo,
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -406,19 +575,39 @@ class _LibraryBrandingScreenState extends State<LibraryBrandingScreen> {
                       children: [
                         Row(
                           children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: _getEmblemColor(_selectedLogoName).withOpacity(0.15),
+                            if (_service.profile.hasCustomLogo)
+                              ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
+                                child: Image.memory(
+                                  base64Decode(_service.profile.logoBase64!),
+                                  width: 44,
+                                  height: 44,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (ctx, err, stack) => Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: _getEmblemColor(_selectedLogoName).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(_getEmblemIcon(_selectedLogoName), color: _getEmblemColor(_selectedLogoName), size: 24),
+                                  ),
+                                ),
+                              )
+                            else
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: _getEmblemColor(_selectedLogoName).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  _getEmblemIcon(_selectedLogoName),
+                                  color: _getEmblemColor(_selectedLogoName),
+                                  size: 24,
+                                ),
                               ),
-                              child: Icon(
-                                _getEmblemIcon(_selectedLogoName),
-                                color: _getEmblemColor(_selectedLogoName),
-                                size: 24,
-                              ),
-                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
