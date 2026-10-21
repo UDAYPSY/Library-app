@@ -6,7 +6,9 @@ import '../../services/library_service.dart';
 import '../shifts/shift_system_screen.dart';
 
 class AddStudentWizardScreen extends StatefulWidget {
-  const AddStudentWizardScreen({super.key});
+  final StudentInfo? studentToEdit;
+
+  const AddStudentWizardScreen({super.key, this.studentToEdit});
 
   @override
   State<AddStudentWizardScreen> createState() => _AddStudentWizardScreenState();
@@ -15,6 +17,8 @@ class AddStudentWizardScreen extends StatefulWidget {
 class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   final LibraryService _service = LibraryService();
   int _currentStep = 0; // 0 = Basic Info, 1 = Schedule & Fees, 2 = Review
+
+  bool get isEditing => widget.studentToEdit != null;
 
   // Step 1: Basic Info Controllers
   final TextEditingController _fullNameCtrl = TextEditingController();
@@ -62,6 +66,30 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     _amountPaidCtrl.text = '${_selectedShift.monthlyFee}';
     if (_service.sections.isNotEmpty) {
       _selectedSection = _service.sections.first.name;
+    }
+
+    if (widget.studentToEdit != null) {
+      final s = widget.studentToEdit!;
+      _fullNameCtrl.text = s.name;
+      _phoneCtrl.text = s.phone;
+      if (s.joinedAt != null) _joiningDate = s.joinedAt!;
+      _fatherNameCtrl.text = s.fatherName;
+      _addressCtrl.text = s.address;
+      _aadhaarCtrl.text = s.aadhaarNumber;
+      _preparationCtrl.text = s.preparationFor;
+      _notesCtrl.text = s.note;
+      if (s.gender.isNotEmpty) _gender = s.gender;
+      _selectedSection = s.sectionName;
+      _selectedSeat = s.seatNumber;
+      _feeCtrl.text = '${s.monthlyFee}';
+      final paidAmt = s.hasDues ? (s.monthlyFee - s.effectiveDues).clamp(0, s.monthlyFee) : s.monthlyFee;
+      _amountPaidCtrl.text = '$paidAmt';
+      _isTrial = s.status == 'TRIAL';
+
+      final shiftMatch = _service.shifts.where((sh) => sh.name.toLowerCase() == s.shift.toLowerCase());
+      if (shiftMatch.isNotEmpty) {
+        _selectedShift = shiftMatch.first;
+      }
     }
   }
 
@@ -117,7 +145,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       );
       return;
     }
-    if (_service.isDuplicateStudentPhone(phone)) {
+    if (_service.isDuplicateStudentPhone(phone, excludeStudentId: widget.studentToEdit?.id)) {
       final existing = _service.findStudentByPhone(phone);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -150,7 +178,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final phone = _phoneCtrl.text.trim();
     final seatNum = _selectedSeat;
 
-    if (_service.isDuplicateStudentPhone(phone)) {
+    if (_service.isDuplicateStudentPhone(phone, excludeStudentId: widget.studentToEdit?.id)) {
       final existing = _service.findStudentByPhone(phone);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -195,6 +223,37 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       finalStatus = 'ACTIVE';
     }
 
+    if (widget.studentToEdit != null) {
+      await _service.updateStudent(
+        studentId: widget.studentToEdit!.id,
+        name: name,
+        phone: phone,
+        shift: _selectedShift.name,
+        seatNumber: seatNum,
+        note: _notesCtrl.text.trim(),
+        monthlyFee: finalMonthlyFee,
+        duesAmount: finalDuesAmount,
+        status: finalStatus,
+        fatherName: _fatherNameCtrl.text.trim(),
+        address: _addressCtrl.text.trim(),
+        aadhaarNumber: _aadhaarCtrl.text.trim(),
+        preparationFor: _preparationCtrl.text.trim(),
+        gender: _gender,
+        sectionName: _selectedSection,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Student $name profile updated successfully!'),
+            backgroundColor: AppColors.primaryTeal,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+      return;
+    }
+
     await _service.assignSeatAndRegisterStudent(
       seatNumber: seatNum,
       studentName: name,
@@ -208,6 +267,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       status: finalStatus,
       joiningDate: _joiningDate,
       note: _notesCtrl.text.trim(),
+      fatherName: _fatherNameCtrl.text.trim(),
+      address: _addressCtrl.text.trim(),
+      aadhaarNumber: _aadhaarCtrl.text.trim(),
+      preparationFor: _preparationCtrl.text.trim(),
+      gender: _gender,
     );
 
     if (mounted) {
@@ -223,7 +287,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               : (finalDuesAmount > 0 ? const Color(0xFFE11D48) : AppColors.successGreen),
         ),
       );
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     }
   }
 
@@ -263,9 +327,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                       ),
                     ),
                   ),
-                  const Text(
-                    'Add Student',
-                    style: TextStyle(
+                  Text(
+                    isEditing ? 'Edit Student' : 'Add Student',
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
                       color: AppColors.textNavy,
@@ -428,6 +492,54 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Circular Dashed "Add Photo" Picker (Image 6)
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 20, top: 4),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(60),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Photo selected from gallery/camera'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(
+                    color: const Color(0xFF0D9488),
+                    width: 2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                  ],
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.camera_alt_outlined, size: 36, color: Color(0xFF0D9488)),
+                    SizedBox(height: 6),
+                    Text(
+                      'Add Photo',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0D9488),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
         // Main Form Card (Image 2)
         Container(
           padding: const EdgeInsets.all(20),
@@ -1450,7 +1562,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            _currentStep == 1 ? 'Continue' : 'Finish & Save',
+                            _currentStep == 1
+                                ? 'Continue'
+                                : (isEditing ? 'Save Changes' : 'Finish & Save'),
                             style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(width: 6),

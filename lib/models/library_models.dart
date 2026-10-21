@@ -163,6 +163,12 @@ class StudentInfo {
   final int duesAmount;
   final String sectionName;
 
+  final String fatherName;
+  final String address;
+  final String aadhaarNumber;
+  final String preparationFor;
+  final String gender;
+
   const StudentInfo({
     required this.id,
     required this.name,
@@ -177,6 +183,11 @@ class StudentInfo {
     this.note = '',
     this.duesAmount = 0,
     this.sectionName = 'Main Hall',
+    this.fatherName = '',
+    this.address = '',
+    this.aadhaarNumber = '',
+    this.preparationFor = '',
+    this.gender = 'Male',
   });
 
   bool get hasDues {
@@ -206,6 +217,11 @@ class StudentInfo {
     String? note,
     int? duesAmount,
     String? sectionName,
+    String? fatherName,
+    String? address,
+    String? aadhaarNumber,
+    String? preparationFor,
+    String? gender,
   }) {
     return StudentInfo(
       id: id ?? this.id,
@@ -221,6 +237,11 @@ class StudentInfo {
       note: note ?? this.note,
       duesAmount: duesAmount ?? this.duesAmount,
       sectionName: sectionName ?? this.sectionName,
+      fatherName: fatherName ?? this.fatherName,
+      address: address ?? this.address,
+      aadhaarNumber: aadhaarNumber ?? this.aadhaarNumber,
+      preparationFor: preparationFor ?? this.preparationFor,
+      gender: gender ?? this.gender,
     );
   }
 
@@ -245,6 +266,11 @@ class StudentInfo {
       note: (data['note'] as String?) ?? '',
       duesAmount: (data['dues_amount'] as num?)?.toInt() ?? 0,
       sectionName: (data['section_name'] as String?) ?? 'Main Hall',
+      fatherName: (data['father_name'] as String?) ?? '',
+      address: (data['address'] as String?) ?? '',
+      aadhaarNumber: (data['aadhaar_number'] as String?) ?? '',
+      preparationFor: (data['preparation_for'] as String?) ?? '',
+      gender: (data['gender'] as String?) ?? 'Male',
     );
   }
 }

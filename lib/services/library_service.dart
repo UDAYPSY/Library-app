@@ -537,6 +537,11 @@ class LibraryService {
     DateTime? joiningDate,
     String note = '',
     int duesAmount = 0,
+    String fatherName = '',
+    String address = '',
+    String aadhaarNumber = '',
+    String preparationFor = '',
+    String gender = 'Male',
   }) async {
     ensureInitialized();
 
@@ -610,6 +615,11 @@ class LibraryService {
           'payment_mode': paymentMode,
           'note': note,
           'dues_amount': duesAmount,
+          'father_name': fatherName,
+          'address': address,
+          'aadhaar_number': aadhaarNumber,
+          'preparation_for': preparationFor,
+          'gender': gender,
         });
 
         // 2. Log payment if not trial and fee > 0
@@ -658,6 +668,11 @@ class LibraryService {
           paymentMode: paymentMode,
           note: note,
           duesAmount: duesAmount,
+          fatherName: fatherName,
+          address: address,
+          aadhaarNumber: aadhaarNumber,
+          preparationFor: preparationFor,
+          gender: gender,
         ),
       );
 
@@ -900,6 +915,12 @@ class LibraryService {
     int? duesAmount,
     String? status,
     DateTime? feeDueDate,
+    String? fatherName,
+    String? address,
+    String? aadhaarNumber,
+    String? preparationFor,
+    String? gender,
+    String? sectionName,
   }) async {
     ensureInitialized();
     if (isFirebaseConnected) {
@@ -915,21 +936,52 @@ class LibraryService {
       if (duesAmount != null) updates['dues_amount'] = duesAmount;
       if (status != null) updates['status'] = status;
       if (feeDueDate != null) updates['fee_due_date'] = Timestamp.fromDate(feeDueDate);
+      if (fatherName != null) updates['father_name'] = fatherName;
+      if (address != null) updates['address'] = address;
+      if (aadhaarNumber != null) updates['aadhaar_number'] = aadhaarNumber;
+      if (preparationFor != null) updates['preparation_for'] = preparationFor;
+      if (gender != null) updates['gender'] = gender;
+      if (sectionName != null) updates['section_name'] = sectionName;
       await studentDocRef.update(updates);
     } else {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
         final s = _mockStudents[idx];
+        final oldSeat = s.seatNumber;
+        final newSeat = seatNumber ?? oldSeat;
+
+        // Reallocate seats if seat changed
+        if (oldSeat != null && newSeat != oldSeat && oldSeat > 0 && oldSeat <= _mockSeats.length) {
+          _mockSeats[oldSeat - 1] = SeatInfo(seatNumber: oldSeat);
+        }
+        if (newSeat != null && newSeat > 0 && newSeat <= _mockSeats.length) {
+          _mockSeats[newSeat - 1] = SeatInfo(
+            seatNumber: newSeat,
+            isOccupied: true,
+            studentId: studentId,
+            studentName: name,
+            shift: shift,
+            sectionName: sectionName ?? s.sectionName,
+          );
+        }
+        _mockSeatsController.add(List.unmodifiable(_mockSeats));
+
         _mockStudents[idx] = s.copyWith(
           name: name,
           phone: phone,
           shift: shift,
-          seatNumber: seatNumber ?? s.seatNumber,
+          seatNumber: newSeat,
           note: note,
           monthlyFee: monthlyFee ?? s.monthlyFee,
           duesAmount: duesAmount ?? s.duesAmount,
           status: status ?? s.status,
           feeDueDate: feeDueDate ?? s.feeDueDate,
+          fatherName: fatherName ?? s.fatherName,
+          address: address ?? s.address,
+          aadhaarNumber: aadhaarNumber ?? s.aadhaarNumber,
+          preparationFor: preparationFor ?? s.preparationFor,
+          gender: gender ?? s.gender,
+          sectionName: sectionName ?? s.sectionName,
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
       }

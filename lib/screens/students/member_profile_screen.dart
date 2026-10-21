@@ -1,0 +1,1616 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../constants/app_colors.dart';
+import '../../models/library_models.dart';
+import '../../services/library_service.dart';
+import 'add_student_wizard_screen.dart';
+
+class MemberProfileScreen extends StatefulWidget {
+  final StudentInfo student;
+  final int memberId;
+
+  const MemberProfileScreen({
+    super.key,
+    required this.student,
+    required this.memberId,
+  });
+
+  @override
+  State<MemberProfileScreen> createState() => _MemberProfileScreenState();
+}
+
+class _MemberProfileScreenState extends State<MemberProfileScreen> {
+  final LibraryService _service = LibraryService();
+  late StudentInfo _student;
+
+  @override
+  void initState() {
+    super.initState();
+    _student = widget.student;
+  }
+
+  void _refreshStudent() {
+    final updated = _service.currentStudents.firstWhere(
+      (s) => s.id == _student.id,
+      orElse: () => _student,
+    );
+    setState(() {
+      _student = updated;
+    });
+  }
+
+  Future<void> _launchUrlStr(String urlStr) async {
+    final uri = Uri.parse(urlStr);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open: $urlStr')),
+        );
+      }
+    }
+  }
+
+  void _openWhatsApp() {
+    final cleanPhone = LibraryService.normalizePhone(_student.phone);
+    final url = 'https://wa.me/91$cleanPhone?text=${Uri.encodeComponent('Hello ${_student.name}, this is from ${_service.profile.libraryName}.')}';
+    _launchUrlStr(url);
+  }
+
+  void _openSms() {
+    final cleanPhone = LibraryService.normalizePhone(_student.phone);
+    _launchUrlStr('sms:$cleanPhone');
+  }
+
+  void _openDialer() {
+    final cleanPhone = LibraryService.normalizePhone(_student.phone);
+    _launchUrlStr('tel:$cleanPhone');
+  }
+
+  void _copyPhone() {
+    Clipboard.setData(ClipboardData(text: _student.phone));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Copied ${_student.phone} to clipboard'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color(0xFF0D9488),
+      ),
+    );
+  }
+
+  void _showSaveContactDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF0D9488)),
+            SizedBox(width: 8),
+            Text('Save Contact', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
+          ],
+        ),
+        content: Text(
+          'Save ${_student.name} (${_student.phone}) to your phone contacts?\n\nSeat: #${_student.seatNumber ?? 'Unallocated'}\nShift: ${_student.shift}',
+          style: const TextStyle(fontSize: 14, color: Color(0xFF475569)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _copyPhone();
+            },
+            child: const Text('Copy to Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openEditStudent() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => AddStudentWizardScreen(studentToEdit: _student),
+      ),
+    );
+    if (result == true || mounted) {
+      _refreshStudent();
+    }
+  }
+
+  void _showChangeSeatDialog() {
+    int? tempSeat = _student.seatNumber;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.swap_horiz_rounded, color: Color(0xFF0D9488)),
+              SizedBox(width: 8),
+              Text('Change / Swap Seat', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Current Seat: #${_student.seatNumber ?? 'Unallocated'}', style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+              const SizedBox(height: 14),
+              const Text('Select New Seat Number:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                value: tempSeat,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                items: List.generate(_service.totalSeatsCount, (i) => i + 1).map((num) {
+                  final isCurrent = num == _student.seatNumber;
+                  final isOcc = _service.isSeatOccupied(num) && !isCurrent;
+                  return DropdownMenuItem<int>(
+                    value: num,
+                    enabled: !isOcc,
+                    child: Text(
+                      'Seat #$num ${isCurrent ? '(Current)' : (isOcc ? '(Occupied)' : '(Available)')}',
+                      style: TextStyle(
+                        color: isOcc ? Colors.grey : AppColors.textNavy,
+                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  setDialogState(() => tempSeat = val);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                if (tempSeat != null) {
+                  await _service.updateStudent(
+                    studentId: _student.id,
+                    name: _student.name,
+                    phone: _student.phone,
+                    shift: _student.shift,
+                    seatNumber: tempSeat,
+                  );
+                  Navigator.pop(ctx);
+                  _refreshStudent();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Seat updated to #$tempSeat successfully!'), backgroundColor: AppColors.primaryTeal),
+                    );
+                  }
+                }
+              },
+              child: const Text('Assign Seat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteStudent() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Deactivate Member', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEF4444))),
+        content: Text('Are you sure you want to move ${_student.name} to inactive members? Their seat #${_student.seatNumber ?? ''} will be freed.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              await _service.markStudentInactive(_student.id, _student.seatNumber);
+              Navigator.pop(ctx); // close dialog
+              if (mounted) {
+                Navigator.pop(context, true); // exit profile
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${_student.name} moved to Inactive'), backgroundColor: const Color(0xFFEF4444)),
+                );
+              }
+            },
+            child: const Text('Deactivate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRecordPaymentSheet() {
+    final payAmountCtrl = TextEditingController(
+      text: _student.hasDues ? '${_student.effectiveDues}' : '${_student.monthlyFee}',
+    );
+    String selectedMode = 'Cash';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Collect Member Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(sheetCtx)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDFA),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF99F6E4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, color: Color(0xFF0D9488), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Member: ${_student.name} • Seat: #${_student.seatNumber ?? 'Unallocated'}\nPending Dues: ₹${_student.effectiveDues}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F766E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Amount to Collect (₹)*', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: payAmountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.currency_rupee, color: Color(0xFF0D9488)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 8),
+              Row(
+                children: ['Cash', 'UPI', 'Card', 'Net Banking'].map((mode) {
+                  final isSelected = selectedMode == mode;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(mode),
+                      selected: isSelected,
+                      selectedColor: const Color(0xFF0D9488),
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : AppColors.textNavy,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (val) {
+                        if (val) setSheetState(() => selectedMode = mode);
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D9488),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.check_circle_outline, size: 20),
+                  label: const Text('Confirm & Record Payment', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                  onPressed: () async {
+                    final amt = int.tryParse(payAmountCtrl.text.trim()) ?? 0;
+                    if (amt <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter a valid amount')),
+                      );
+                      return;
+                    }
+                    await _service.collectStudentFee(
+                      studentId: _student.id,
+                      amount: amt,
+                      paymentMode: selectedMode,
+                      notes: 'Collected via Member Profile',
+                    );
+                    Navigator.pop(sheetCtx);
+                    _refreshStudent();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('₹$amt collected successfully! Member is now Active.'), backgroundColor: const Color(0xFF0D9488)),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showIdCardSheet() {
+    final initials = _student.name.trim().isNotEmpty
+        ? (_student.name.trim().split(' ').length > 1
+            ? '${_student.name.trim().split(' ')[0][0]}${_student.name.trim().split(' ')[1][0]}'.toUpperCase()
+            : (_student.name.trim().length >= 2 ? _student.name.trim().substring(0, 2).toUpperCase() : _student.name.trim().toUpperCase()))
+        : 'ST';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: const [
+              BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 4)),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _service.profile.libraryName.toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0D9488), letterSpacing: 1),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const Divider(),
+              const SizedBox(height: 10),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _student.name,
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: AppColors.textNavy),
+              ),
+              Text(
+                'Member ID: #${widget.memberId}',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Column(
+                      children: [
+                        const Text('SEAT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        Text('#${_student.seatNumber ?? 'Unallocated'}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.textNavy)),
+                      ],
+                    ),
+                    Container(height: 24, width: 1, color: const Color(0xFFE2E8F0)),
+                    Column(
+                      children: [
+                        const Text('SHIFT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        Text(_student.shift, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.textNavy)),
+                      ],
+                    ),
+                    Container(height: 24, width: 1, color: const Color(0xFFE2E8F0)),
+                    Column(
+                      children: [
+                        const Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        Text(_student.status, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: _student.status == 'ACTIVE' ? const Color(0xFF10B981) : const Color(0xFFE11D48))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D9488),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: const Text('Share Digital ID Card', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Digital ID Card ready to share!'), backgroundColor: Color(0xFF0D9488)),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = _student.name.trim().isNotEmpty
+        ? (_student.name.trim().split(' ').length > 1
+            ? '${_student.name.trim().split(' ')[0][0]}${_student.name.trim().split(' ')[1][0]}'.toUpperCase()
+            : (_student.name.trim().length >= 2 ? _student.name.trim().substring(0, 2).toUpperCase() : _student.name.trim().toUpperCase()))
+        : 'ST';
+
+    final enrolledDateStr = _student.joinedAt != null
+        ? DateFormat('dd-MMM-yyyy').format(_student.joinedAt!)
+        : '21-Oct-2026';
+
+    final daysIn = _student.joinedAt != null
+        ? DateTime.now().difference(_student.joinedAt!).inDays + 1
+        : 1;
+
+    final validityStr = _student.feeDueDate != null
+        ? 'Valid until ${DateFormat('dd-MMM-yyyy').format(_student.feeDueDate!)}'
+        : 'No active payment';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header: Back Button + Title + Search Button (Image 2)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                        ],
+                      ),
+                      child: const Icon(Icons.chevron_left_rounded, color: AppColors.textNavy, size: 26),
+                    ),
+                  ),
+                  const Text(
+                    'Member Profile',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textNavy,
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Member profile search active'), duration: Duration(seconds: 1)),
+                      );
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                        ],
+                      ),
+                      child: const Icon(Icons.search, color: AppColors.textNavy, size: 22),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Scrollable Profile Sections (Images 2, 3, 4, 5)
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Top Profile Card (Image 2)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Avatar + Name + Badges
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Avatar Squircle with Camera Badge
+                              Stack(
+                                children: [
+                                  Container(
+                                    width: 68,
+                                    height: 68,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0284C7),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        initials,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0D9488),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 2),
+                                      ),
+                                      child: const Icon(
+                                        Icons.camera_alt_outlined,
+                                        color: Colors.white,
+                                        size: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _student.name,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppColors.textNavy,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        // Status Chip
+                                        _buildStatusBadge(_student),
+                                        // Gender Chip (Image 2)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFDF2F8),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFFCE7F3)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.female, size: 12, color: Color(0xFFDB2777)),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                (_student.gender.isNotEmpty ? _student.gender : 'MALE').toUpperCase(),
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFFDB2777),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Member ID Chip (Image 2)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF0FDFA),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFCCFBF1)),
+                                          ),
+                                          child: Text(
+                                            'ID: ${widget.memberId}',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0F766E),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    // Trial / Days In Chip (Image 2)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE0F2FE),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                                      ),
+                                      child: Text(
+                                        _student.status == 'TRIAL'
+                                            ? 'TRIAL • $daysIn DAYS IN'
+                                            : 'ACTIVE • $daysIn DAYS IN',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF0284C7),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+
+                          // 3 Stat Cards Row (Image 2)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _statCard(
+                                  topText: '#${_student.seatNumber ?? '—'}',
+                                  bottomText: 'SEAT',
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _statCard(
+                                  topText: _student.shift,
+                                  bottomText: 'SHIFT',
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _statCard(
+                                  topText: _student.hasDues ? '₹${_student.effectiveDues}' : 'PAID',
+                                  bottomText: _student.hasDues ? 'DUES' : 'FEES',
+                                  textColor: _student.hasDues ? const Color(0xFFE11D48) : const Color(0xFF059669),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Collect Payment Button (Image 2)
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D9488),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: const Icon(Icons.account_balance_wallet_outlined, size: 20),
+                              label: const Text(
+                                'Collect Payment',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                              ),
+                              onPressed: _showRecordPaymentSheet,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Quick Actions Row 1: WhatsApp | SMS (Image 2)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: _openWhatsApp,
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFECFDF5),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Color(0xFF10B981)),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'WhatsApp',
+                                          style: TextStyle(
+                                            color: Color(0xFF10B981),
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: _openSms,
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF0F9FF),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: const Color(0xFFBAE6FD)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.chat_outlined, size: 18, color: Color(0xFF0284C7)),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'SMS',
+                                          style: TextStyle(
+                                            color: Color(0xFF0284C7),
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Quick Actions Row 2: ID Card | Edit | Swap | Delete (Image 2)
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: InkWell(
+                                  onTap: _showIdCardSheet,
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 11),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.badge_outlined, size: 18, color: AppColors.textNavy),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'ID Card',
+                                          style: TextStyle(
+                                            color: AppColors.textNavy,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Edit Button (Navigates to Edit flow, Images 6, 7, 8)
+                              InkWell(
+                                onTap: _openEditStudent,
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.all(11),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: const Icon(Icons.edit_note_rounded, size: 22, color: AppColors.textNavy),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Change Seat Button
+                              InkWell(
+                                onTap: _showChangeSeatDialog,
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.all(11),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: const Icon(Icons.swap_horiz_rounded, size: 22, color: AppColors.textNavy),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Delete/Deactivate Button
+                              InkWell(
+                                onTap: _confirmDeleteStudent,
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.all(11),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFFFECACA)),
+                                  ),
+                                  child: const Icon(Icons.delete_outline_rounded, size: 22, color: Color(0xFFEF4444)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 2. Library Membership Section (Images 2 & 3)
+                    const Text(
+                      'Library Membership',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Workspace
+                          _membershipItem(
+                            icon: Icons.apartment_rounded,
+                            label: 'Workspace',
+                            valueWidget: Text(
+                              '${_student.sectionName} • Pos ${_student.seatNumber ?? 'Unallocated'}',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.textNavy),
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0FDFA),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFCCFBF1)),
+                              ),
+                              child: const Icon(Icons.map_outlined, size: 18, color: Color(0xFF0D9488)),
+                            ),
+                          ),
+                          const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+
+                          // Schedule
+                          _membershipItem(
+                            icon: Icons.access_time_filled_rounded,
+                            label: 'Schedule',
+                            valueWidget: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFCCFBF1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    _student.shift.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0F766E),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '06:00 AM - 10:00 PM',
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textNavy),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+
+                          // Monthly Fee
+                          _membershipItem(
+                            icon: Icons.account_balance_wallet_rounded,
+                            label: 'Monthly Fee',
+                            valueWidget: Text(
+                              '₹${_student.monthlyFee}',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.textNavy),
+                            ),
+                          ),
+                          const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+
+                          // Membership Validity
+                          _membershipItem(
+                            icon: Icons.verified_user_rounded,
+                            label: 'Membership Validity',
+                            valueWidget: Text(
+                              validityStr,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: _student.feeDueDate != null ? AppColors.textNavy : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 3. Personal Information Section (Images 3, 4, 5)
+                    const Text(
+                      'Personal Information',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Phone with Quick Actions Bar (Image 3)
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF0FDFA),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: const Icon(Icons.call_rounded, color: Color(0xFF0D9488), size: 20),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Phone', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _student.phone.isNotEmpty ? _student.phone : 'Not provided',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFF0F766E),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // 4 Action Buttons: Copy | Chat | Call | Save (Image 3)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _phoneActionBtn(
+                                        icon: Icons.copy_rounded,
+                                        label: 'Copy',
+                                        onTap: _copyPhone,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _phoneActionBtn(
+                                        icon: Icons.chat_bubble_outline_rounded,
+                                        label: 'Chat',
+                                        iconColor: const Color(0xFF10B981),
+                                        textColor: const Color(0xFF10B981),
+                                        bgColor: const Color(0xFFECFDF5),
+                                        borderColor: const Color(0xFFA7F3D0),
+                                        onTap: _openWhatsApp,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _phoneActionBtn(
+                                        icon: Icons.phone_outlined,
+                                        label: 'Call',
+                                        iconColor: const Color(0xFF0D9488),
+                                        textColor: const Color(0xFF0D9488),
+                                        bgColor: const Color(0xFFF0FDFA),
+                                        borderColor: const Color(0xFF99F6E4),
+                                        onTap: _openDialer,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _phoneActionBtn(
+                                        icon: Icons.person_add_alt_1_rounded,
+                                        label: 'Save',
+                                        iconColor: const Color(0xFF0284C7),
+                                        textColor: const Color(0xFF0284C7),
+                                        bgColor: const Color(0xFFF0F9FF),
+                                        borderColor: const Color(0xFFBAE6FD),
+                                        onTap: _showSaveContactDialog,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+                          // Father Name (Image 3 & 4)
+                          _personalInfoRow(
+                            icon: Icons.people_alt_outlined,
+                            label: 'Father Name',
+                            value: _student.fatherName.isNotEmpty ? _student.fatherName : 'Not provided',
+                          ),
+                          const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+
+                          // Address (Image 3 & 4)
+                          _personalInfoRow(
+                            icon: Icons.home_outlined,
+                            label: 'Address',
+                            value: _student.address.isNotEmpty ? _student.address : 'Not provided',
+                          ),
+                          const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+
+                          // Aadhaar Number (Image 3 & 4)
+                          _personalInfoRow(
+                            icon: Icons.credit_card_outlined,
+                            label: 'Aadhaar Number',
+                            value: _student.aadhaarNumber.isNotEmpty ? _student.aadhaarNumber : 'Not provided',
+                          ),
+                          const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+
+                          // Preparation For (Image 4 & 5)
+                          _personalInfoRow(
+                            icon: Icons.school_outlined,
+                            label: 'Preparation For',
+                            value: _student.preparationFor.isNotEmpty ? _student.preparationFor : 'General Studies',
+                          ),
+                          const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+
+                          // Enrolled On (Image 4 & 5)
+                          _personalInfoRow(
+                            icon: Icons.calendar_today_outlined,
+                            label: 'Enrolled On',
+                            value: enrolledDateStr,
+                          ),
+                          const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+
+                          // Member Remarks (Image 4 & 5)
+                          _personalInfoRow(
+                            icon: Icons.description_outlined,
+                            label: 'Member Remarks',
+                            value: _student.note.isNotEmpty ? _student.note : 'No remarks recorded',
+                            iconBgColor: const Color(0xFFFFFBEB),
+                            iconColor: const Color(0xFFD97706),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 4. Status Timeline Section (Images 4, 5, 5-)
+                    const Text(
+                      'Status Timeline',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(top: 4),
+                                width: 12,
+                                height: 12,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0D9488),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'ADMISSION',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 13,
+                                            color: Color(0xFF0D9488),
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        Text(
+                                          enrolledDateStr,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Initial Admission',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_student.hasDues) ...[
+                            const SizedBox(height: 16),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(top: 4),
+                                  width: 12,
+                                  height: 12,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFE11D48),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'DUES PENDING',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 13,
+                                              color: Color(0xFFE11D48),
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                          Text(
+                                            '₹${_student.effectiveDues}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFFE11D48),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Payment pending for this month',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 5. Payment History Section (Images 5, 5-)
+                    Row(
+                      children: [
+                        const Text(
+                          'Payment History',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textNavy,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE0F2FE),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${_service.currentPayments.where((p) => p.studentId == _student.id || LibraryService.normalizePhone(p.studentPhone) == LibraryService.normalizePhone(_student.phone)).length}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0284C7),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF8FAFC),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.receipt_long_outlined,
+                              size: 38,
+                              color: Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No transaction history',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(StudentInfo st) {
+    if (st.status == 'INACTIVE') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFECACA)),
+        ),
+        child: const Text('● INACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFFEF4444))),
+      );
+    }
+    if (st.status == 'TRIAL') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: const Text('● TRIAL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFFD97706))),
+      );
+    }
+    if (st.hasDues) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF1F2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFECDD3)),
+        ),
+        child: const Text('● DUES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFFE11D48))),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFA7F3D0)),
+      ),
+      child: const Text('● ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+    );
+  }
+
+  Widget _statCard({
+    required String topText,
+    required String bottomText,
+    Color? textColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            topText,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: textColor ?? AppColors.textNavy,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            bottomText,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF64748B),
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _membershipItem({
+    required IconData icon,
+    required String label,
+    required Widget valueWidget,
+    Widget? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDFA),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: const Color(0xFF0D9488), size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 3),
+                valueWidget,
+              ],
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _personalInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? iconBgColor,
+    Color? iconColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: iconBgColor ?? const Color(0xFFF0FDFA),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: iconColor ?? const Color(0xFF0D9488), size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textNavy,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _phoneActionBtn({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? iconColor,
+    Color? textColor,
+    Color? bgColor,
+    Color? borderColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: bgColor ?? const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor ?? const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: iconColor ?? AppColors.textNavy),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: textColor ?? AppColors.textNavy,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

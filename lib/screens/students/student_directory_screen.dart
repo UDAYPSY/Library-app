@@ -5,6 +5,7 @@ import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
 import 'add_student_wizard_screen.dart';
+import 'member_profile_screen.dart';
 
 class StudentDirectoryScreen extends StatefulWidget {
   final String? initialStatusFilter;
@@ -754,310 +755,30 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   }
 
   void _openViewStudentSheet(StudentInfo st, int memberId) {
-    final initials = st.name.trim().isNotEmpty
-        ? (st.name.trim().split(' ').length > 1
-            ? '${st.name.trim().split(' ')[0][0]}${st.name.trim().split(' ')[1][0]}'.toUpperCase()
-            : (st.name.trim().length >= 2 ? st.name.trim().substring(0, 2).toUpperCase() : st.name.trim().toUpperCase()))
-        : 'ST';
-    final joinDateStr = st.joinedAt != null ? DateFormat('dd-MMM-yyyy').format(st.joinedAt!) : '20-Oct-2026';
-    final seatLabel = st.seatNumber != null ? '${st.sectionName} • #${st.seatNumber}' : 'Main Hall • #$memberId';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF0284C7),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        initials,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          st.name,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textNavy),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'MEMBER ID: #$memberId',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      st.status,
-                      style: const TextStyle(color: Color(0xFF16A34A), fontSize: 12, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF1F5F9)),
-                ),
-                child: Column(
-                  children: [
-                    _viewRow(Icons.phone_outlined, 'Phone', st.phone),
-                    const Divider(height: 20),
-                    _viewRow(Icons.chair_outlined, 'Seat', seatLabel),
-                    const Divider(height: 20),
-                    _viewRow(Icons.wb_sunny_outlined, 'Shift', '${st.shift} (06:00 AM - 10:00 PM)'),
-                    const Divider(height: 20),
-                    _viewRow(Icons.calendar_today_outlined, 'Joined', joinDateStr),
-                    const Divider(height: 20),
-                    _viewRow(Icons.payments_outlined, 'Monthly Fee', '₹${st.monthlyFee} (${st.paymentMode})'),
-                    if (st.duesAmount > 0) ...[
-                      const Divider(height: 20),
-                      _viewRow(Icons.warning_amber_rounded, 'Pending Dues', '₹${st.duesAmount}', valueColor: const Color(0xFFEF4444)),
-                    ],
-                    if (st.note.isNotEmpty) ...[
-                      const Divider(height: 20),
-                      _viewRow(Icons.note_outlined, 'Note', st.note),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                      icon: const Icon(Icons.edit_outlined, color: AppColors.textNavy),
-                      label: const Text('Edit Details', style: TextStyle(color: AppColors.textNavy, fontWeight: FontWeight.bold)),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _openEditStudentSheet(st);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D6E66),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      icon: const Icon(Icons.account_balance_wallet_outlined, color: Colors.white),
-                      label: const Text('Collect Fee', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _openPaySheet(st);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => MemberProfileScreen(
+          student: st,
+          memberId: memberId,
         ),
       ),
-    );
-  }
-
-  Widget _viewRow(IconData icon, String label, String value, {Color? valueColor}) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: const Color(0xFF64748B)),
-        const SizedBox(width: 10),
-        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-        const Spacer(),
-        Text(value, style: TextStyle(fontSize: 13, color: valueColor ?? AppColors.textNavy, fontWeight: FontWeight.w800)),
-      ],
-    );
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _openEditStudentSheet(StudentInfo st) {
-    final nameCtrl = TextEditingController(text: st.name);
-    final phoneCtrl = TextEditingController(text: st.phone);
-    final feeCtrl = TextEditingController(text: st.monthlyFee.toString());
-    final duesCtrl = TextEditingController(text: st.duesAmount.toString());
-    final noteCtrl = TextEditingController(text: st.note);
-    final activeShifts = _service.shifts.where((s) => s.isActive).toList();
-    String shift = activeShifts.any((s) => s.name == st.shift)
-        ? st.shift
-        : (activeShifts.isNotEmpty ? activeShifts.first.name : st.shift);
-    int? seatNumber = st.seatNumber;
-    String status = ['ACTIVE', 'TRIAL', 'INACTIVE'].contains(st.status) ? st.status : 'ACTIVE';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (sheetContext, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Edit Student Profile', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person_outline)),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone_outlined)),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: (activeShifts.any((s) => s.name == shift))
-                            ? shift
-                            : (activeShifts.isNotEmpty ? activeShifts.first.name : null),
-                        items: (activeShifts.isNotEmpty ? activeShifts : _service.shifts)
-                            .map((s) => DropdownMenuItem(value: s.name, child: Text(s.name)))
-                            .toList(),
-                        onChanged: (v) => setModalState(() => shift = v ?? shift),
-                        decoration: const InputDecoration(labelText: 'Shift', border: OutlineInputBorder()),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: status,
-                        items: ['ACTIVE', 'TRIAL', 'INACTIVE']
-                            .map((st) => DropdownMenuItem(value: st, child: Text(st)))
-                            .toList(),
-                        onChanged: (v) => setModalState(() => status = v ?? status),
-                        decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: feeCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Monthly Fee (₹)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.currency_rupee)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: duesCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Pending Dues (₹)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.warning_amber_rounded)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: noteCtrl,
-                  decoration: const InputDecoration(labelText: 'Note / Remarks', border: OutlineInputBorder(), prefixIcon: Icon(Icons.sticky_note_2_outlined)),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryTeal,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    onPressed: () async {
-                      if (nameCtrl.text.isEmpty || phoneCtrl.text.isEmpty) return;
-                      Navigator.pop(ctx);
-                      final dues = int.tryParse(duesCtrl.text.trim()) ?? 0;
-                      await _service.updateStudent(
-                        studentId: st.id,
-                        name: nameCtrl.text.trim(),
-                        phone: phoneCtrl.text.trim(),
-                        shift: shift,
-                        seatNumber: status == 'INACTIVE' ? null : seatNumber,
-                        monthlyFee: int.tryParse(feeCtrl.text.trim()) ?? st.monthlyFee,
-                        duesAmount: dues,
-                        status: status,
-                        note: noteCtrl.text.trim(),
-                      );
-                      if (status == 'INACTIVE' && st.status != 'INACTIVE') {
-                        await _service.markStudentInactive(st.id, st.seatNumber);
-                      }
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Updated profile for ${nameCtrl.text.trim()}!'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => AddStudentWizardScreen(
+          studentToEdit: st,
         ),
       ),
-    );
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _openPaySheet(StudentInfo st) {
