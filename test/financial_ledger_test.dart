@@ -1,0 +1,100 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:library_manager/models/library_models.dart';
+import 'package:library_manager/services/library_service.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late LibraryService service;
+
+  setUp(() {
+    service = LibraryService();
+    service.ensureInitialized();
+  });
+
+  group('Financial Ledger & Payment Reconciliation Tests', () {
+    test('Student fee collection decreases dues and records payment transaction', () async {
+      // 1. Add student with dues
+      final testStudent = StudentInfo(
+        id: 'test_std_001',
+        name: 'Rahul Sharma',
+        phone: '9876543210',
+        shift: 'Full Day',
+        seatNumber: 1,
+        monthlyFee: 800,
+        duesAmount: 800,
+        status: 'Active',
+        joinedAt: DateTime(2026, 1, 1),
+      );
+      service.addStudent(testStudent);
+
+      expect(service.isSeatOccupied(1), isTrue);
+
+      // 2. Collect fee of 800
+      final initialPaymentCount = service.currentPayments.length;
+      await service.collectStudentFee(
+        studentId: testStudent.id,
+        amount: 800,
+        paymentMode: 'UPI',
+        notes: 'Monthly renewal fee paid via UPI',
+      );
+
+      // 3. Verify payment ledger recorded
+      expect(service.currentPayments.length, equals(initialPaymentCount + 1));
+      final lastPayment = service.currentPayments.first;
+      expect(lastPayment.studentId, equals('test_std_001'));
+      expect(lastPayment.studentName, equals('Rahul Sharma'));
+      expect(lastPayment.amount, equals(800));
+      expect(lastPayment.paymentMode, equals('UPI'));
+
+      // 4. Verify student dues cleared
+      final updatedStudent = service.findStudentByPhone('9876543210');
+      expect(updatedStudent, isNotNull);
+      expect(updatedStudent!.duesAmount, equals(0));
+    });
+
+    test('Adding and deleting expense item', () async {
+      final initialExpenses = service.currentExpenses.length;
+      final expense = ExpenseItem(
+        id: 'exp_test_001',
+        title: 'High-Speed Wi-Fi Bill',
+        category: 'Utilities',
+        amount: 1499,
+        date: DateTime.now(),
+        paymentMode: 'UPI',
+        note: 'Monthly internet broadband',
+      );
+
+      service.addExpense(expense);
+      expect(service.currentExpenses.length, equals(initialExpenses + 1));
+      expect(service.currentExpenses.any((e) => e.id == 'exp_test_001'), isTrue);
+
+      // Delete expense
+      service.deleteExpense('exp_test_001');
+      expect(service.currentExpenses.any((e) => e.id == 'exp_test_001'), isFalse);
+    });
+
+    test('Payment transaction query by student ID and phone', () async {
+      final payment = PaymentTransaction(
+        id: 'pmt_lookup_test',
+        studentId: 'std_lookup_99',
+        studentName: 'Pooja Verma',
+        studentPhone: '9988776655',
+        seatNumber: 5,
+        shift: 'Evening',
+        amount: 600,
+        date: DateTime.now(),
+        paymentMode: 'Cash',
+      );
+      service.recordPayment(payment);
+
+      final foundById = service.getLastPaymentForStudent(studentId: 'std_lookup_99');
+      expect(foundById, isNotNull);
+      expect(foundById!.amount, equals(600));
+
+      final foundByPhone = service.getLastPaymentForStudent(phone: '9988776655');
+      expect(foundByPhone, isNotNull);
+      expect(foundByPhone!.studentName, equals('Pooja Verma'));
+    });
+  });
+}

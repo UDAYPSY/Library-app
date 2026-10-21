@@ -540,6 +540,7 @@ class LibraryService {
 
   List<StudentInfo> get currentStudents => List.unmodifiable(_mockStudents);
   List<PaymentTransaction> get currentPayments => List.unmodifiable(_mockPayments);
+  List<ExpenseItem> get currentExpenses => List.unmodifiable(_mockExpenses);
 
   PaymentTransaction? getLastPaymentForStudent({String? studentId, String? phone, String? name}) {
     final normPhone = phone != null ? normalizePhone(phone) : null;

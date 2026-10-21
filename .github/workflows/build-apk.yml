@@ -43,6 +43,9 @@ jobs:
           find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion [0-9]*/minSdkVersion 23/g' {} + || true
           flutter pub get
 
+      - name: Run Automated Test Suite
+        run: flutter test
+
       - name: Compile Release APK
         run: flutter build apk --release --no-tree-shake-icons
 
@@ -71,6 +74,9 @@ jobs:
           flutter create --org com.example.library_manager --project-name library_manager --platforms web .
           cp pubspec.yaml.bak pubspec.yaml
           flutter pub get
+
+      - name: Run Automated Test Suite
+        run: flutter test
 
       - name: Compile Flutter Web
         run: flutter build web --release --base-href "/Library-app/"

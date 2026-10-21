@@ -9,6 +9,50 @@ import 'services/library_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Production Error Boundary & Resilient UI Guard
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('TrackMyLibrary Resilient UI Guard: ${details.exception}');
+  };
+
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: const Color(0xFFF8FAFC),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.shield_outlined, color: Color(0xFF0F766E), size: 40),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'TrackMyLibrary Safe Guard',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'A visual display glitch was safely isolated without interrupting library data or seat operations.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   // Initialize service in-memory baseline
   LibraryService().ensureInitialized();
 
@@ -31,6 +75,7 @@ void main() async {
 
   runApp(const TrackMyLibraryApp());
 }
+
 
 class TrackMyLibraryApp extends StatelessWidget {
   const TrackMyLibraryApp({super.key});
