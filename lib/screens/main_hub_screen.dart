@@ -17,6 +17,7 @@ import 'tools/share_qr_screen.dart';
 import 'tools/library_branding_screen.dart';
 import 'tools/refer_earn_screen.dart';
 import 'tools/library_community_screen.dart';
+import 'settings/settings_screen.dart';
 import 'login_screen.dart';
 
 class MainHubScreen extends StatefulWidget {
@@ -2730,50 +2731,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
   // TAB 6: SETTINGS
   // -------------------------------------------------------------
   Widget _buildSettingsTab() {
-    final p = _service.profile;
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: ListView(
-        children: [
-          const Text('Settings & Workspace', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(p.libraryName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 4),
-                Text(p.city, style: const TextStyle(color: AppColors.textMuted)),
-                const Divider(height: 24),
-                Text('Admin: ${p.adminName}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text('Email: ${p.adminEmail}', style: const TextStyle(color: AppColors.textMuted)),
-                Text('Phone: ${p.adminPhone}', style: const TextStyle(color: AppColors.textMuted)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.errorRed,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(Icons.logout),
-            label: const Text('Sign Out'),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
-    );
+    return const SettingsScreen();
   }
 
   // -------------------------------------------------------------
