@@ -767,14 +767,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Account deletion request registered. Data will be purged in 30 days.'),
-                  backgroundColor: Color(0xFFEF4444),
-                ),
-              );
+              await _service.clearAllData();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('All library data has been wiped.'),
+                    backgroundColor: Color(0xFFEF4444),
+                  ),
+                );
+              }
             },
             child: const Text('Delete Permanently', style: TextStyle(fontWeight: FontWeight.bold)),
           ),

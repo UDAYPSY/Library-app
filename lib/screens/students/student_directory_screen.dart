@@ -340,7 +340,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   }
 
   void _openNoteSheet(StudentInfo st) {
-    final noteCtrl = TextEditingController(text: st.note.isNotEmpty ? st.note : (st.name == 'Gshsgsg' ? 'Gdgsgsggsgs' : (st.name == 'Uday' ? 'Civil Services Aspirant' : '')));
+    final noteCtrl = TextEditingController(text: st.note);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -578,7 +578,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     final nameCtrl = TextEditingController(text: st.name);
     final phoneCtrl = TextEditingController(text: st.phone);
     final feeCtrl = TextEditingController(text: st.monthlyFee.toString());
-    final noteCtrl = TextEditingController(text: st.note.isNotEmpty ? st.note : (st.name == 'Gshsgsg' ? 'Gdgsgsggsgs' : (st.name == 'Uday' ? 'Civil Services Aspirant' : '')));
+    final noteCtrl = TextEditingController(text: st.note);
     String shift = st.shift;
     int? seatNumber = st.seatNumber;
 
@@ -809,7 +809,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
           } else if (_selectedStatusFilter == 'DUES') {
             return s.hasDues;
           } else if (_selectedStatusFilter == 'ACTIVE') {
-            return s.status == 'ACTIVE';
+            return s.status != 'INACTIVE';
           } else if (_selectedStatusFilter == 'INACTIVE') {
             return s.status == 'INACTIVE';
           } else if (_selectedStatusFilter == 'UNALLOCATED') {
@@ -1060,11 +1060,11 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                               itemCount: filteredStudents.length,
                               itemBuilder: (ctx, i) {
                                 final st = filteredStudents[i];
-                                final memberId = st.id == 'demo_1' ? 2 : (st.id == 'demo_2' ? 1 : i + 1);
-                                final seatLabel = st.seatNumber != null ? '${st.sectionName} • #${st.seatNumber}' : 'Main Hall • #$memberId';
+                                final memberId = i + 1;
+                                final seatLabel = st.seatNumber != null ? '${st.sectionName} • #${st.seatNumber}' : 'Unallocated';
                                 final joinDateStr = st.joinedAt != null
                                     ? DateFormat('dd-MMM-yyyy').format(st.joinedAt!)
-                                    : '20-Oct-2026';
+                                    : DateFormat('dd-MMM-yyyy').format(DateTime.now());
                                 
                                 final initials = st.name.trim().isNotEmpty
                                     ? (st.name.trim().split(' ').length > 1
@@ -1221,9 +1221,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                     Text(
                                                       st.note.isNotEmpty
                                                           ? st.note
-                                                          : (st.name == 'Gshsgsg'
-                                                              ? 'Gdgsgsggsgs'
-                                                              : (st.name == 'Uday' ? 'Civil Services Aspirant' : 'Enrolled for ${st.shift}')),
+                                                          : 'Enrolled for ${st.shift}',
                                                       style: const TextStyle(
                                                         fontSize: 12,
                                                         fontWeight: FontWeight.w700,

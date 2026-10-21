@@ -111,197 +111,21 @@ class LibraryService {
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
     );
-    if (_mockStudents.isEmpty) {
-      _mockStudents.addAll([
-        StudentInfo(
-          id: 'demo_1',
-          name: 'Gshsgsg',
-          phone: '6464649199',
-          seatNumber: 1,
-          shift: 'Full Day',
-          status: 'ACTIVE',
-          feeDueDate: DateTime(2026, 11, 20),
-          joinedAt: DateTime(2026, 10, 20),
-          monthlyFee: 500,
-          paymentMode: 'UPI',
-          note: 'Gdgsgsggsgs',
-          duesAmount: 0,
-          sectionName: 'Main Hall',
-        ),
-        StudentInfo(
-          id: 'demo_2',
-          name: 'Uday',
-          phone: '9876543210',
-          seatNumber: 2,
-          shift: 'Full Day',
-          status: 'DUES',
-          feeDueDate: DateTime(2026, 10, 18),
-          joinedAt: DateTime(2026, 9, 18),
-          monthlyFee: 600,
-          paymentMode: 'Cash',
-          note: 'Civil Services Aspirant',
-          duesAmount: 200,
-          sectionName: 'Main Hall',
-        ),
-      ]);
-      if (_mockSeats.isNotEmpty) {
-        _mockSeats[0] = const SeatInfo(
-          seatNumber: 1,
-          isOccupied: true,
-          studentName: 'Gshsgsg',
-          studentId: 'demo_1',
-          shift: 'Full Day',
-          sectionName: 'Main Hall',
-        );
-      }
-      if (_mockSeats.length > 1) {
-        _mockSeats[1] = const SeatInfo(
-          seatNumber: 2,
-          isOccupied: true,
-          studentName: 'Uday',
-          studentId: 'demo_2',
-          shift: 'Full Day',
-          sectionName: 'Main Hall',
-        );
-      }
-    }
-
-    if (_mockPayments.isEmpty) {
-      _mockPayments.addAll([
-        PaymentTransaction(
-          id: 'pay_demo_1',
-          studentId: 'demo_1',
-          studentName: 'Gshsgsg',
-          studentPhone: '6464649199',
-          seatNumber: 1,
-          shift: 'Full Day',
-          amount: 500,
-          date: DateTime(2026, 10, 20),
-          paymentMode: 'UPI',
-          notes: 'Full admission & seat reservation fee',
-        ),
-        PaymentTransaction(
-          id: 'pay_demo_2',
-          studentId: 'demo_2',
-          studentName: 'Uday',
-          studentPhone: '9876543210',
-          seatNumber: 2,
-          shift: 'Full Day',
-          amount: 400,
-          date: DateTime(2026, 10, 18),
-          paymentMode: 'Cash',
-          notes: 'Partial payment • ₹200 pending dues',
-        ),
-        PaymentTransaction(
-          id: 'pay_demo_sep_1',
-          studentId: 'demo_1',
-          studentName: 'Gshsgsg',
-          studentPhone: '6464649199',
-          seatNumber: 1,
-          shift: 'Full Day',
-          amount: 500,
-          date: DateTime(2026, 9, 20),
-          paymentMode: 'UPI',
-          notes: 'September membership fee',
-        ),
-        PaymentTransaction(
-          id: 'pay_demo_sep_2',
-          studentId: 'demo_2',
-          studentName: 'Uday',
-          studentPhone: '9876543210',
-          seatNumber: 2,
-          shift: 'Full Day',
-          amount: 600,
-          date: DateTime(2026, 9, 18),
-          paymentMode: 'Cash',
-          notes: 'September membership fee',
-        ),
-        PaymentTransaction(
-          id: 'pay_demo_aug_1',
-          studentId: 'demo_1',
-          studentName: 'Gshsgsg',
-          studentPhone: '6464649199',
-          seatNumber: 1,
-          shift: 'Full Day',
-          amount: 500,
-          date: DateTime(2026, 8, 20),
-          paymentMode: 'UPI',
-          notes: 'August membership fee',
-        ),
-        PaymentTransaction(
-          id: 'pay_demo_aug_2',
-          studentId: 'demo_2',
-          studentName: 'Uday',
-          studentPhone: '9876543210',
-          seatNumber: 2,
-          shift: 'Full Day',
-          amount: 600,
-          date: DateTime(2026, 8, 18),
-          paymentMode: 'Cash',
-          notes: 'August membership fee',
-        ),
-      ]);
-    }
-
-    if (_mockExpenses.isEmpty) {
-      _mockExpenses.addAll([
-        ExpenseItem(
-          id: 'exp_oct_1',
-          title: 'Electricity & Inverter Bill',
-          category: 'Utility',
-          amount: 650,
-          date: DateTime(2026, 10, 15),
-          paymentMode: 'UPI',
-          note: 'Peak hour AC bill',
-        ),
-        ExpenseItem(
-          id: 'exp_oct_2',
-          title: 'High-Speed Wi-Fi Fiber',
-          category: 'Internet',
-          amount: 350,
-          date: DateTime(2026, 10, 10),
-          paymentMode: 'UPI',
-          note: '300 Mbps unlimited optical connection',
-        ),
-        ExpenseItem(
-          id: 'exp_sep_1',
-          title: 'Electricity Bill',
-          category: 'Utility',
-          amount: 600,
-          date: DateTime(2026, 9, 15),
-          paymentMode: 'UPI',
-          note: 'September electricity',
-        ),
-        ExpenseItem(
-          id: 'exp_sep_2',
-          title: 'Wi-Fi Fiber Connection',
-          category: 'Internet',
-          amount: 350,
-          date: DateTime(2026, 9, 10),
-          paymentMode: 'UPI',
-          note: 'Monthly internet recharge',
-        ),
-        ExpenseItem(
-          id: 'exp_aug_1',
-          title: 'Electricity Bill',
-          category: 'Utility',
-          amount: 550,
-          date: DateTime(2026, 8, 15),
-          paymentMode: 'UPI',
-          note: 'August electricity',
-        ),
-        ExpenseItem(
-          id: 'exp_aug_2',
-          title: 'Wi-Fi Fiber Connection',
-          category: 'Internet',
-          amount: 350,
-          date: DateTime(2026, 8, 10),
-          paymentMode: 'UPI',
-          note: 'Monthly internet recharge',
-        ),
-      ]);
-    }
     _initialized = true;
+  }
+
+  Future<void> clearAllData() async {
+    _mockStudents.clear();
+    _mockPayments.clear();
+    _mockExpenses.clear();
+    _mockSeats = List.generate(
+      totalSeatsCount,
+      (index) => SeatInfo(seatNumber: index + 1),
+    );
+    _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+    _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+    _mockSeatsController.add(List.unmodifiable(_mockSeats));
   }
 
   void updateSectionsAndRebuildSeats(List<SectionConfig> newSections) {

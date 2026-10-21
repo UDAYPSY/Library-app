@@ -168,7 +168,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                     controller: nameCtrl,
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
                     decoration: const InputDecoration(
-                      hintText: 'e.g. GSHSGSG',
+                      hintText: 'e.g. Rahul Sharma',
                       hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -194,7 +194,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                     keyboardType: TextInputType.phone,
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
                     decoration: const InputDecoration(
-                      hintText: 'e.g. 6464649199',
+                      hintText: 'e.g. 9876543210',
                       hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -283,7 +283,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () async {
-                      final studentName = nameCtrl.text.trim().isEmpty ? 'GSHSGSG' : nameCtrl.text.trim();
+                      final studentName = nameCtrl.text.trim().isEmpty ? 'Student' : nameCtrl.text.trim();
                       final phone = phoneCtrl.text.trim().isEmpty ? '9876543210' : phoneCtrl.text.trim();
                       final fee = int.tryParse(feeCtrl.text.trim()) ?? 500;
 
@@ -878,7 +878,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                     Column(
                                       children: [
                                         Text(
-                                          seat.studentName.isNotEmpty ? seat.studentName.toUpperCase() : 'GSHSGSG',
+                                          seat.studentName.isNotEmpty ? seat.studentName.toUpperCase() : 'OCCUPIED',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(

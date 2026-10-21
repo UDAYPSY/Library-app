@@ -98,7 +98,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
       stream: _service.streamStudents(),
       builder: (context, studentSnapshot) {
         final students = studentSnapshot.data ?? [];
-        final activeStudents = students.where((s) => s.status == 'ACTIVE').length;
+        final activeStudents = students.where((s) => s.status != 'INACTIVE').length;
         final totalEarnings = students.fold<int>(0, (sum, s) => sum + s.monthlyFee);
         final dueStudents = students.where((s) => s.hasDues).toList();
         final dueStudentsCount = dueStudents.length;
@@ -118,9 +118,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
             final monthPayments = payments.where((p) =>
                 p.date.year == today.year &&
                 p.date.month == today.month).toList();
-            final monthEarnings = monthPayments.isNotEmpty
-                ? monthPayments.fold<int>(0, (sum, p) => sum + p.amount)
-                : totalEarnings;
+            final monthEarnings = monthPayments.fold<int>(0, (sum, p) => sum + p.amount);
 
             return StreamBuilder<List<SeatInfo>>(
               stream: _service.streamSeats(),
@@ -340,7 +338,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '$occupiedSeats active • ₹$totalEarnings earned today',
+                                  '$activeStudents active • ₹$todayEarnings earned today',
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.85),
                                     fontSize: 13,
@@ -601,7 +599,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               const SizedBox(height: 3),
                               Text(
                                 dueStudentsCount > 0
-                                    ? '₹ from  student'
+                                    ? '₹$pendingDuesTotal from $dueStudentsCount student${dueStudentsCount == 1 ? '' : 's'}'
                                     : 'All dues cleared • ₹0 pending',
                                 style: const TextStyle(
                                   fontSize: 12,

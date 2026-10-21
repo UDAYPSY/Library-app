@@ -98,27 +98,25 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
                     0, (sum, e) => sum + e.amount);
                 final annualNetProfit = annualRevenue - annualExpenses;
 
-                // Trend bar calculation for 6 months (May to Oct or Jun to Nov)
-                // We show 6 months ending at current selected month or active window
-                final List<int> trendMonthIndices = [4, 5, 6, 7, 8, 9]; // May, Jun, Jul, Aug, Sep, Oct
+                // 6-month dynamic trend window ending at current selected month
                 int maxTrendVal = 1;
                 final List<Map<String, dynamic>> trendData = [];
 
-                for (final mIdx in trendMonthIndices) {
-                  final mNum = mIdx + 1;
+                for (int i = 5; i >= 0; i--) {
+                  final targetDate = DateTime(_selectedYear, _selectedMonthIndex + 1 - i, 1);
                   final mRev = payments.where((p) =>
-                      p.date.year == _selectedYear &&
-                      p.date.month == mNum).fold<int>(0, (sum, p) => sum + p.amount);
+                      p.date.year == targetDate.year &&
+                      p.date.month == targetDate.month).fold<int>(0, (sum, p) => sum + p.amount);
                   final mExp = expenses.where((e) =>
-                      e.date.year == _selectedYear &&
-                      e.date.month == mNum).fold<int>(0, (sum, e) => sum + e.amount);
+                      e.date.year == targetDate.year &&
+                      e.date.month == targetDate.month).fold<int>(0, (sum, e) => sum + e.amount);
 
                   if (mRev > maxTrendVal) maxTrendVal = mRev;
                   if (mExp > maxTrendVal) maxTrendVal = mExp;
 
                   trendData.add({
-                    'monthIndex': mIdx,
-                    'name': _months[mIdx],
+                    'monthIndex': targetDate.month - 1,
+                    'name': _months[targetDate.month - 1],
                     'revenue': mRev,
                     'expenses': mExp,
                   });
