@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../models/library_models.dart';
+import 'local_storage_service.dart';
 
 class LibraryService {
   // Singleton pattern for centralized app state
@@ -66,6 +68,7 @@ class LibraryService {
     final idx = shifts.indexWhere((s) => s.id == shiftId);
     if (idx != -1) {
       shifts[idx].isActive = !shifts[idx].isActive;
+      _saveLocalState();
     }
   }
 
@@ -73,11 +76,13 @@ class LibraryService {
     final idx = shifts.indexWhere((s) => s.id == updated.id);
     if (idx != -1) {
       shifts[idx] = updated;
+      _saveLocalState();
     }
   }
 
   void addShift(ShiftConfig newShift) {
     shifts.add(newShift);
+    _saveLocalState();
   }
 
   int get totalSeatsCount {
@@ -104,6 +109,7 @@ class LibraryService {
       StreamController<List<PaymentTransaction>>.broadcast();
 
   bool _initialized = false;
+  bool _loadedFromLocalStorage = false;
 
   void ensureInitialized() {
     if (_initialized) return;
@@ -112,6 +118,119 @@ class LibraryService {
       (index) => SeatInfo(seatNumber: index + 1),
     );
     _initialized = true;
+    _loadFromLocalStorage();
+  }
+
+  void _syncSeatsWithStudents() {
+    _mockSeats = List.generate(
+      totalSeatsCount,
+      (index) => SeatInfo(seatNumber: index + 1),
+    );
+    for (var s in _mockStudents) {
+      if (s.seatNumber != null &&
+          s.seatNumber! > 0 &&
+          s.seatNumber! <= _mockSeats.length &&
+          s.status != 'INACTIVE') {
+        _mockSeats[s.seatNumber! - 1] = SeatInfo(
+          seatNumber: s.seatNumber!,
+          isOccupied: true,
+          studentName: s.name,
+          studentId: s.id,
+          shift: s.shift,
+          sectionName: s.sectionName,
+        );
+      }
+    }
+    if (!_mockSeatsController.isClosed) {
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    }
+  }
+
+  Future<void> _loadFromLocalStorage() async {
+    if (_loadedFromLocalStorage) return;
+    _loadedFromLocalStorage = true;
+    try {
+      final profileStr = await LocalStorageService.getString('app_library_profile');
+      if (profileStr != null && profileStr.isNotEmpty) {
+        final decoded = json.decode(profileStr);
+        if (decoded is Map<String, dynamic>) {
+          profile = LibraryProfile.fromMap(decoded);
+        }
+      }
+
+      final sectionsStr = await LocalStorageService.getString('app_library_sections');
+      if (sectionsStr != null && sectionsStr.isNotEmpty) {
+        final decoded = json.decode(sectionsStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          sections = decoded.map((s) => SectionConfig.fromMap(Map<String, dynamic>.from(s))).toList();
+        }
+      }
+
+      final shiftsStr = await LocalStorageService.getString('app_library_shifts');
+      if (shiftsStr != null && shiftsStr.isNotEmpty) {
+        final decoded = json.decode(shiftsStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          shifts = decoded.map((s) => ShiftConfig.fromMap(Map<String, dynamic>.from(s))).toList();
+        }
+      }
+
+      final studentsStr = await LocalStorageService.getString('app_library_students');
+      if (studentsStr != null && studentsStr.isNotEmpty) {
+        final decoded = json.decode(studentsStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          _mockStudents.clear();
+          for (var item in decoded) {
+            final map = Map<String, dynamic>.from(item);
+            _mockStudents.add(StudentInfo.fromFirestore(map['id']?.toString() ?? '', map));
+          }
+          _syncSeatsWithStudents();
+          if (!_mockStudentsController.isClosed) {
+            _mockStudentsController.add(List.unmodifiable(_mockStudents));
+          }
+        }
+      }
+
+      final paymentsStr = await LocalStorageService.getString('app_library_payments');
+      if (paymentsStr != null && paymentsStr.isNotEmpty) {
+        final decoded = json.decode(paymentsStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          _mockPayments.clear();
+          for (var item in decoded) {
+            final map = Map<String, dynamic>.from(item);
+            _mockPayments.add(PaymentTransaction.fromFirestore(map['payment_id']?.toString() ?? '', map));
+          }
+          if (!_mockPaymentsController.isClosed) {
+            _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+          }
+        }
+      }
+
+      final expensesStr = await LocalStorageService.getString('app_library_expenses');
+      if (expensesStr != null && expensesStr.isNotEmpty) {
+        final decoded = json.decode(expensesStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          _mockExpenses.clear();
+          for (var item in decoded) {
+            final map = Map<String, dynamic>.from(item);
+            _mockExpenses.add(ExpenseItem.fromFirestore(map['id']?.toString() ?? '', map));
+          }
+          if (!_mockExpensesController.isClosed) {
+            _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveLocalState() async {
+    try {
+      await LocalStorageService.saveString('app_library_profile', json.encode(profile.toMap()));
+      await LocalStorageService.saveString('app_library_sections', json.encode(sections.map((s) => s.toMap()).toList()));
+      await LocalStorageService.saveString('app_library_shifts', json.encode(shifts.map((s) => s.toMap()).toList()));
+      await LocalStorageService.saveString('app_library_students', json.encode(_mockStudents.map((s) => s.toMap()).toList()));
+      await LocalStorageService.saveString('app_library_payments', json.encode(_mockPayments.map((p) => p.toJsonMap()).toList()));
+      await LocalStorageService.saveString('app_library_expenses', json.encode(_mockExpenses.map((e) => e.toJsonMap()).toList()));
+    } catch (_) {}
   }
 
   Future<void> clearAllData() async {
@@ -126,15 +245,15 @@ class LibraryService {
     _mockPaymentsController.add(List.unmodifiable(_mockPayments));
     _mockExpensesController.add(List.unmodifiable(_mockExpenses));
     _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    await LocalStorageService.remove('app_library_students');
+    await LocalStorageService.remove('app_library_payments');
+    await LocalStorageService.remove('app_library_expenses');
   }
 
   void updateSectionsAndRebuildSeats(List<SectionConfig> newSections) {
     sections = newSections;
-    _mockSeats = List.generate(
-      totalSeatsCount,
-      (index) => SeatInfo(seatNumber: index + 1),
-    );
-    _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    _syncSeatsWithStudents();
+    _saveLocalState();
   }
 
   static String normalizePhone(String phone) {
@@ -292,10 +411,10 @@ class LibraryService {
     String note = '',
   }) async {
     ensureInitialized();
+    final expId = 'exp_${DateTime.now().millisecondsSinceEpoch}';
     if (isFirebaseConnected) {
-      final docRef = _db.collection('expenses').doc();
-      await docRef.set({
-        'id': docRef.id,
+      await _db.collection('expenses').doc(expId).set({
+        'id': expId,
         'title': title,
         'category': category,
         'amount': amount,
@@ -307,7 +426,7 @@ class LibraryService {
       _mockExpenses.insert(
         0,
         ExpenseItem(
-          id: 'exp_${DateTime.now().millisecondsSinceEpoch}',
+          id: expId,
           title: title,
           category: category,
           amount: amount,
@@ -317,6 +436,19 @@ class LibraryService {
         ),
       );
       _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+      await _saveLocalState();
+    }
+  }
+
+  // Delete Expense
+  Future<void> deleteExpense(String expenseId) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      await _db.collection('expenses').doc(expenseId).delete();
+    } else {
+      _mockExpenses.removeWhere((e) => e.id == expenseId);
+      _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+      await _saveLocalState();
     }
   }
 
@@ -365,6 +497,23 @@ class LibraryService {
         'payment_mode': paymentMode,
         'notes': notes,
       });
+
+      if (studentId != null && studentId.isNotEmpty) {
+        try {
+          final studentDoc = await _db.collection('students').doc(studentId).get();
+          if (studentDoc.exists) {
+            final data = studentDoc.data() ?? {};
+            final curDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
+            if (curDues > 0) {
+              final newDues = (curDues - amount).clamp(0, 999999);
+              await _db.collection('students').doc(studentId).update({
+                'dues_amount': newDues,
+                'status': newDues == 0 ? 'ACTIVE' : 'DUES',
+              });
+            }
+          }
+        } catch (_) {}
+      }
     } else {
       _mockPayments.insert(
         0,
@@ -382,6 +531,27 @@ class LibraryService {
         ),
       );
       _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+
+      // Reconcile dues in student if registered
+      final matchIdx = _mockStudents.indexWhere((s) =>
+          (studentId != null && studentId.isNotEmpty && s.id == studentId) ||
+          (phone != null && phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(phone)) ||
+          (s.name.toLowerCase() == studentName.toLowerCase()));
+
+      if (matchIdx != -1) {
+        final s = _mockStudents[matchIdx];
+        final currentDues = s.effectiveDues;
+        if (currentDues > 0) {
+          final newDues = (currentDues - amount).clamp(0, 999999);
+          _mockStudents[matchIdx] = s.copyWith(
+            duesAmount: newDues,
+            status: newDues == 0 ? 'ACTIVE' : 'DUES',
+          );
+          _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        }
+      }
+
+      await _saveLocalState();
     }
   }
 
@@ -534,6 +704,7 @@ class LibraryService {
 
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      _saveLocalState();
     }
   }
 
@@ -757,6 +928,7 @@ class LibraryService {
       }
 
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      _saveLocalState();
     }
   }
 
@@ -798,6 +970,7 @@ class LibraryService {
         }
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        _saveLocalState();
       }
     }
   }
@@ -835,6 +1008,7 @@ class LibraryService {
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
       }
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      _saveLocalState();
     }
   }
 
@@ -867,6 +1041,7 @@ class LibraryService {
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
       }
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      _saveLocalState();
     }
   }
 
@@ -886,6 +1061,7 @@ class LibraryService {
           duesAmount: 0,
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        _saveLocalState();
       }
     }
   }
@@ -913,6 +1089,7 @@ class LibraryService {
           feeDueDate: dDate,
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        _saveLocalState();
       }
     }
   }
@@ -960,6 +1137,7 @@ class LibraryService {
           duesAmount: 0,
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        _saveLocalState();
       }
     }
   }
@@ -1053,6 +1231,7 @@ class LibraryService {
           sectionName: sectionName ?? s.sectionName,
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        _saveLocalState();
       }
     }
   }
@@ -1073,16 +1252,44 @@ class LibraryService {
       final paymentDocRef = _db.collection('payments').doc();
       final batch = _db.batch();
 
-      batch.update(studentDocRef, {
-        'status': 'ACTIVE',
-        'dues_amount': 0,
-        'fee_due_date': Timestamp.fromDate(validUntil),
+      String studentName = '';
+      String studentPhone = '';
+      int? seatNumber;
+      String shift = 'Full Day';
+      int currentDues = 0;
+
+      try {
+        final snap = await studentDocRef.get();
+        if (snap.exists) {
+          final data = snap.data() ?? {};
+          studentName = (data['name'] as String?) ?? '';
+          studentPhone = (data['phone'] as String?) ?? '';
+          seatNumber = (data['seat_number'] as num?)?.toInt();
+          shift = (data['shift'] as String?) ?? 'Full Day';
+          currentDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
+        }
+      } catch (_) {}
+
+      final newDues = (currentDues - amount).clamp(0, 999999);
+      final newStatus = newDues == 0 ? 'ACTIVE' : 'DUES';
+
+      final updateData = <String, dynamic>{
+        'status': newStatus,
+        'dues_amount': newDues,
         'payment_mode': paymentMode,
-      });
+      };
+      if (newDues == 0) {
+        updateData['fee_due_date'] = Timestamp.fromDate(validUntil);
+      }
+      batch.update(studentDocRef, updateData);
 
       batch.set(paymentDocRef, {
         'payment_id': paymentDocRef.id,
         'student_id': studentId,
+        'student_name': studentName,
+        'student_phone': studentPhone,
+        'seat_number': seatNumber,
+        'shift': shift,
         'amount': amount,
         'date': Timestamp.fromDate(now),
         'valid_until': Timestamp.fromDate(validUntil),
@@ -1095,10 +1302,15 @@ class LibraryService {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
         final s = _mockStudents[idx];
+        final currentDues = s.effectiveDues;
+        final newDues = (currentDues - amount).clamp(0, 999999);
+        final newStatus = newDues == 0 ? 'ACTIVE' : 'DUES';
+        final newDueDate = newDues == 0 ? validUntil : s.feeDueDate;
+
         _mockStudents[idx] = s.copyWith(
-          status: 'ACTIVE',
-          duesAmount: 0,
-          feeDueDate: validUntil,
+          status: newStatus,
+          duesAmount: newDues,
+          feeDueDate: newDueDate,
           paymentMode: paymentMode,
         );
         _mockPayments.insert(
@@ -1118,6 +1330,7 @@ class LibraryService {
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+        await _saveLocalState();
       }
     }
   }
@@ -1156,6 +1369,7 @@ class LibraryService {
     if (city != null && city.trim().isNotEmpty) {
       profile.city = city.trim();
     }
+    _saveLocalState();
     if (isFirebaseConnected) {
       _db.collection('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
     }
@@ -1183,6 +1397,7 @@ class LibraryService {
     if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
     if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
     if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+    _saveLocalState();
 
     if (isFirebaseConnected) {
       _db.collection('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
@@ -1191,6 +1406,7 @@ class LibraryService {
 
   void addWhatsAppCredits(int amount) {
     profile.whatsappCredits += amount;
+    _saveLocalState();
     if (isFirebaseConnected) {
       _db.collection('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
     }
@@ -1200,6 +1416,7 @@ class LibraryService {
     if (profile.whatsappCredits >= count) {
       profile.whatsappCredits -= count;
       profile.messagesSentCount += count;
+      _saveLocalState();
       return true;
     }
     return false;

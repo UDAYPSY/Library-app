@@ -17,9 +17,17 @@ class FinancialAnalyticsScreen extends StatefulWidget {
 class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
   final LibraryService _service = LibraryService();
 
-  int _selectedYear = 2026;
-  int _selectedMonthIndex = 9; // October (0-indexed: 9)
+  late int _selectedYear;
+  late int _selectedMonthIndex;
   bool _isIncomeSelected = true; // Income vs Expenses toggle
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _selectedYear = now.year;
+    _selectedMonthIndex = now.month - 1;
+  }
 
   final List<String> _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -878,9 +886,53 @@ class _FinancialAnalyticsScreenState extends State<FinancialAnalyticsScreen> {
                                                 ),
                                               ],
                                             ),
-                                            Text(
-                                              '-₹${e.amount}',
-                                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFFEF4444)),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  '-₹${e.amount}',
+                                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFFEF4444)),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                IconButton(
+                                                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textMuted),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(),
+                                                  tooltip: 'Delete Expense',
+                                                  onPressed: () async {
+                                                    final confirm = await showDialog<bool>(
+                                                      context: context,
+                                                      builder: (ctx) => AlertDialog(
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                        title: const Text('Delete Expense?'),
+                                                        content: Text('Are you sure you want to delete "${e.title}" (-₹${e.amount})?'),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () => Navigator.pop(ctx, false),
+                                                            child: const Text('Cancel'),
+                                                          ),
+                                                          ElevatedButton(
+                                                            style: ElevatedButton.styleFrom(
+                                                              backgroundColor: Colors.red,
+                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                            ),
+                                                            onPressed: () => Navigator.pop(ctx, true),
+                                                            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                    if (confirm == true) {
+                                                      await _service.deleteExpense(e.id);
+                                                      if (mounted) {
+                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                          SnackBar(content: Text('Expense "${e.title}" deleted')),
+                                                        );
+                                                      }
+                                                    }
+                                                  },
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),

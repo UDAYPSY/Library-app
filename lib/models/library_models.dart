@@ -311,6 +311,32 @@ class StudentInfo {
     );
   }
 
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'phone': phone,
+      'seat_number': seatNumber,
+      'shift': shift,
+      'status': status,
+      'fee_due_date': feeDueDate?.toIso8601String(),
+      'joined_at': joinedAt?.toIso8601String(),
+      'monthly_fee': monthlyFee,
+      'payment_mode': paymentMode,
+      'note': note,
+      'dues_amount': duesAmount,
+      'section_name': sectionName,
+      'father_name': fatherName,
+      'address': address,
+      'aadhaar_number': aadhaarNumber,
+      'preparation_for': preparationFor,
+      'gender': gender,
+    };
+  }
+
+  factory StudentInfo.fromMap(Map<String, dynamic> map) =>
+      StudentInfo.fromFirestore((map['id'] as String?) ?? '', map);
+
   factory StudentInfo.fromFirestore(String id, Map<String, dynamic> data) {
     DateTime? parseDate(dynamic val) {
       if (val is Timestamp) return val.toDate();
@@ -372,6 +398,18 @@ class ExpenseItem {
     };
   }
 
+  Map<String, dynamic> toJsonMap() {
+    return {
+      'id': id,
+      'title': title,
+      'category': category,
+      'amount': amount,
+      'date': date.toIso8601String(),
+      'payment_mode': paymentMode,
+      'note': note,
+    };
+  }
+
   factory ExpenseItem.fromFirestore(String id, Map<String, dynamic> data) {
     DateTime parseDate(dynamic val) {
       if (val is Timestamp) return val.toDate();
@@ -426,6 +464,21 @@ class PaymentTransaction {
       'shift': shift,
       'amount': amount,
       'date': Timestamp.fromDate(date),
+      'payment_mode': paymentMode,
+      'notes': notes,
+    };
+  }
+
+  Map<String, dynamic> toJsonMap() {
+    return {
+      'payment_id': id,
+      'student_id': studentId,
+      'student_name': studentName,
+      'student_phone': studentPhone,
+      'seat_number': seatNumber,
+      'shift': shift,
+      'amount': amount,
+      'date': date.toIso8601String(),
       'payment_mode': paymentMode,
       'notes': notes,
     };

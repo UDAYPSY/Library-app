@@ -1,0 +1,64 @@
+import 'dart:convert';
+import 'dart:io';
+
+class LocalStoreImpl {
+  static final Map<String, String> _memory = {};
+  static bool _initialized = false;
+  static File? _storageFile;
+
+  static Future<void> _ensureInit() async {
+    if (_initialized) return;
+    _initialized = true;
+    try {
+      Directory dir = Directory.systemTemp;
+      if (Platform.isAndroid) {
+        final appFilesDir = Directory('/data/data/com.example.library_manager/files');
+        if (await appFilesDir.exists()) {
+          dir = appFilesDir;
+        } else {
+          final altAppDir = Directory('/data/user/0/com.example.library_manager/files');
+          if (await altAppDir.exists()) {
+            dir = altAppDir;
+          }
+        }
+      }
+      _storageFile = File('${dir.path}/app_local_store.json');
+      if (await _storageFile!.exists()) {
+        final content = await _storageFile!.readAsString();
+        if (content.isNotEmpty) {
+          final decoded = json.decode(content);
+          if (decoded is Map) {
+            decoded.forEach((k, v) {
+              _memory[k.toString()] = v.toString();
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> saveString(String key, String value) async {
+    await _ensureInit();
+    _memory[key] = value;
+    try {
+      if (_storageFile != null) {
+        await _storageFile!.writeAsString(json.encode(_memory));
+      }
+    } catch (_) {}
+  }
+
+  static Future<String?> getString(String key) async {
+    await _ensureInit();
+    return _memory[key];
+  }
+
+  static Future<void> remove(String key) async {
+    await _ensureInit();
+    _memory.remove(key);
+    try {
+      if (_storageFile != null) {
+        await _storageFile!.writeAsString(json.encode(_memory));
+      }
+    } catch (_) {}
+  }
+}

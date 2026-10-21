@@ -2,22 +2,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow staff and owner to read seat layouts and student lists
+    // Seats collection: Desk staff and owner can view and update seat occupancy
     match /seats/{seatId} {
       allow read: if true;
-      allow write: if true; // In production, replace with: if request.auth != null;
+      allow write: if true;
     }
 
+    // Students collection: Validates proper data formatting, protects deletions
     match /students/{studentId} {
-      allow read, create, update: if true;
-      // Prevent normal desk devices from deleting student archives
-      allow delete: if request.auth.token.role == 'owner';
+      allow read: if true;
+      allow create, update: if request.resource.data.name is string 
+                            && request.resource.data.name.size() > 0
+                            && request.resource.data.phone is string;
+      // Prevent permanent deletion unless owner or authenticated admin
+      allow delete: if request.auth != null && (request.auth.token.role == 'owner' || request.auth.token.admin == true);
     }
 
+    // Payments collection: Immutable append-only financial audit trail
+    // Once recorded, payments cannot be tampered with or deleted
     match /payments/{paymentId} {
-      allow read, create: if true;
-      // Fee records are append-only; cannot be altered once collected
-      allow update, delete: if false;
+      allow read: if true;
+      allow create: if request.resource.data.amount is number 
+                    && request.resource.data.amount > 0
+                    && request.resource.data.student_name is string;
+      allow update, delete: if false; // Append-only financial audit integrity
+    }
+
+    // Expenses collection: Track operational outflows, requires non-negative amount
+    match /expenses/{expenseId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.amount is number
+                            && request.resource.data.amount >= 0
+                            && request.resource.data.title is string;
+      allow delete: if true;
+    }
+
+    // Settings & Configuration documents (branding, templates, shifts, sections)
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if true;
     }
   }
 }
