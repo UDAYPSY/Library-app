@@ -287,6 +287,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                       ),
                       onPressed: () async {
                         final name = nameCtrl.text.trim();
+                        final phone = phoneCtrl.text.trim();
                         if (name.isEmpty || phone.isEmpty) return;
                         if (_service.isDuplicateStudentPhone(phone)) {
                           final existing = _service.findStudentByPhone(phone);
