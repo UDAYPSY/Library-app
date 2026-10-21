@@ -30,7 +30,7 @@ class LibraryService {
       startsAt: '12:00 AM',
       endsAt: '11:59 PM',
       monthlyFee: 1500,
-      isActive: false,
+      isActive: true,
       isSystemSlot: false,
     ),
     ShiftConfig(
@@ -39,7 +39,7 @@ class LibraryService {
       startsAt: '02:00 PM',
       endsAt: '10:00 PM',
       monthlyFee: 600,
-      isActive: false,
+      isActive: true,
       isSystemSlot: false,
     ),
     ShiftConfig(
@@ -48,7 +48,7 @@ class LibraryService {
       startsAt: '06:00 AM',
       endsAt: '02:00 PM',
       monthlyFee: 600,
-      isActive: false,
+      isActive: true,
       isSystemSlot: false,
     ),
     ShiftConfig(
@@ -57,7 +57,7 @@ class LibraryService {
       startsAt: '10:00 PM',
       endsAt: '06:00 AM',
       monthlyFee: 500,
-      isActive: false,
+      isActive: true,
       isSystemSlot: false,
     ),
   ];
@@ -325,6 +325,7 @@ class LibraryService {
     required String shift,
     required String deviceUserId,
     int feeAmount = 500,
+    int? monthlyFee,
     String paymentMode = 'UPI',
     String status = 'ACTIVE',
     DateTime? joiningDate,
@@ -333,7 +334,14 @@ class LibraryService {
   }) async {
     ensureInitialized();
     final now = joiningDate ?? DateTime.now();
-    final validUntil = now.add(const Duration(days: 30));
+    final effectiveMonthly = (monthlyFee != null && monthlyFee > 0)
+        ? monthlyFee
+        : (duesAmount > 0 && feeAmount == 0
+            ? duesAmount
+            : (feeAmount + duesAmount > 0 ? feeAmount + duesAmount : 500));
+    final validUntil = (duesAmount > 0 && feeAmount == 0)
+        ? now // Due immediately if no initial fee was paid
+        : now.add(const Duration(days: 30));
 
     if (isFirebaseConnected) {
       final studentDocRef = _db.collection('students').doc();
@@ -375,7 +383,7 @@ class LibraryService {
           'fee_due_date': Timestamp.fromDate(validUntil),
           'status': status,
           'joined_at': Timestamp.fromDate(now),
-          'monthly_fee': feeAmount,
+          'monthly_fee': effectiveMonthly,
           'payment_mode': paymentMode,
           'note': note,
           'dues_amount': duesAmount,
@@ -426,7 +434,7 @@ class LibraryService {
           status: status,
           feeDueDate: validUntil,
           joinedAt: now,
-          monthlyFee: feeAmount,
+          monthlyFee: effectiveMonthly,
           paymentMode: paymentMode,
           note: note,
           duesAmount: duesAmount,

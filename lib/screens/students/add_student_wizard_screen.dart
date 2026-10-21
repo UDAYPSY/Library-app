@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import '../shifts/shift_system_screen.dart';
 
 class AddStudentWizardScreen extends StatefulWidget {
   const AddStudentWizardScreen({super.key});
@@ -33,6 +34,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int? _selectedSeat; // null = unallocated
   late ShiftConfig _selectedShift;
   final TextEditingController _feeCtrl = TextEditingController();
+  final TextEditingController _amountPaidCtrl = TextEditingController();
   bool _isTrial = false;
 
   // Step 3: Review Options
@@ -44,10 +46,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final activeShifts = _service.shifts.where((s) => s.isActive).toList();
     if (activeShifts.isNotEmpty) {
       _selectedShift = activeShifts.first;
-      _feeCtrl.text = '${_selectedShift.monthlyFee}';
     } else if (_service.shifts.isNotEmpty) {
       _selectedShift = _service.shifts.first;
-      _feeCtrl.text = '${_selectedShift.monthlyFee}';
     } else {
       _selectedShift = ShiftConfig(
         id: 'shift_1',
@@ -55,9 +55,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         startsAt: '06:00 AM',
         endsAt: '10:00 PM',
         monthlyFee: 500,
+        isActive: true,
       );
-      _feeCtrl.text = '500';
     }
+    _feeCtrl.text = '${_selectedShift.monthlyFee}';
+    _amountPaidCtrl.text = '${_selectedShift.monthlyFee}';
     if (_service.sections.isNotEmpty) {
       _selectedSection = _service.sections.first.name;
     }
@@ -73,6 +75,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     _aadhaarCtrl.dispose();
     _notesCtrl.dispose();
     _feeCtrl.dispose();
+    _amountPaidCtrl.dispose();
     super.dispose();
   }
 
@@ -124,14 +127,49 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       );
       return;
     }
+    if (_amountPaidCtrl.text.trim().isEmpty) {
+      _amountPaidCtrl.text = _feeCtrl.text.trim();
+    }
     setState(() => _currentStep = 2);
   }
 
   Future<void> _finishAndSave() async {
     final name = _fullNameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
-    final fee = int.tryParse(_feeCtrl.text.trim()) ?? _selectedShift.monthlyFee;
     final seatNum = _selectedSeat;
+
+    final shiftFee = _selectedShift.monthlyFee > 0 ? _selectedShift.monthlyFee : 500;
+    final parsedMonthly = int.tryParse(_feeCtrl.text.trim()) ?? shiftFee;
+    final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? parsedMonthly;
+
+    int finalMonthlyFee;
+    int finalPaidAmount;
+    int finalDuesAmount;
+
+    if (parsedMonthly == 0) {
+      // User entered 000 or 0 in monthly fee: shift fee is standard, paid is 0, full shift fee is due!
+      finalMonthlyFee = shiftFee;
+      finalPaidAmount = 0;
+      finalDuesAmount = shiftFee;
+    } else if (parsedMonthly < shiftFee && parsedPaid == parsedMonthly) {
+      // User entered a number less than standard shift fee 500 (e.g. 200 or 300)
+      finalMonthlyFee = shiftFee;
+      finalPaidAmount = parsedMonthly;
+      finalDuesAmount = shiftFee - parsedMonthly;
+    } else {
+      finalMonthlyFee = parsedMonthly;
+      finalPaidAmount = parsedPaid.clamp(0, parsedMonthly);
+      finalDuesAmount = (parsedMonthly - finalPaidAmount).clamp(0, 999999);
+    }
+
+    final String finalStatus;
+    if (_isTrial) {
+      finalStatus = 'TRIAL';
+    } else if (finalDuesAmount > 0 || finalPaidAmount == 0) {
+      finalStatus = 'DUES';
+    } else {
+      finalStatus = 'ACTIVE';
+    }
 
     await _service.assignSeatAndRegisterStudent(
       seatNumber: seatNum,
@@ -139,9 +177,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       phone: phone,
       shift: _selectedShift.name,
       deviceUserId: _service.profile.adminName,
-      feeAmount: fee,
+      feeAmount: finalPaidAmount,
+      monthlyFee: finalMonthlyFee,
+      duesAmount: finalDuesAmount,
       paymentMode: 'UPI',
-      status: _isTrial ? 'TRIAL' : 'ACTIVE',
+      status: finalStatus,
       joiningDate: _joiningDate,
       note: _notesCtrl.text.trim(),
     );
@@ -151,8 +191,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         SnackBar(
           content: Text(_isTrial
               ? 'Trial Student $name registered successfully!'
-              : 'Student $name added successfully!'),
-          backgroundColor: _isTrial ? const Color(0xFFD97706) : AppColors.successGreen,
+              : (finalDuesAmount > 0
+                  ? 'Student $name registered with ₹$finalDuesAmount pending due (categorized in DUES & REMAINING)!'
+                  : 'Student $name added successfully (Fully Paid)!')),
+          backgroundColor: _isTrial
+              ? const Color(0xFFD97706)
+              : (finalDuesAmount > 0 ? const Color(0xFFE11D48) : AppColors.successGreen),
         ),
       );
       Navigator.pop(context);
@@ -621,10 +665,20 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
             children: [
               _fieldLabel('Shift Selection', isRequired: false),
               InkWell(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Shift management available in Workspace Settings.')),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ShiftSystemScreen()),
                   );
+                  setState(() {
+                    final found = _service.shifts.firstWhere(
+                      (s) => s.id == _selectedShift.id || s.name == _selectedShift.name,
+                      orElse: () => _service.shifts.isNotEmpty ? _service.shifts.first : _selectedShift,
+                    );
+                    _selectedShift = found;
+                    _feeCtrl.text = '${found.monthlyFee}';
+                    _amountPaidCtrl.text = '${found.monthlyFee}';
+                  });
                 },
                 child: const Row(
                   children: [
@@ -645,16 +699,16 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Active Shifts Horizontal List (Only active shifts shown)
+          // All Shifts Horizontal List
           Builder(
             builder: (context) {
-              final activeShifts = _service.shifts.where((s) => s.isActive).toList();
-              final shiftsToDisplay = activeShifts.isNotEmpty ? activeShifts : _service.shifts;
+              final shiftsToDisplay = _service.shifts;
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: shiftsToDisplay.map((sh) {
-                    final isSelected = _selectedShift.id == sh.id || _selectedShift.name == sh.name;
+                    final isSelected = _selectedShift.id == sh.id ||
+                        _selectedShift.name.toLowerCase() == sh.name.toLowerCase();
                     return Padding(
                       padding: const EdgeInsets.only(right: 12.0),
                       child: InkWell(
@@ -662,7 +716,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                         onTap: () {
                           setState(() {
                             _selectedShift = sh;
+                            sh.isActive = true;
                             _feeCtrl.text = '${sh.monthlyFee}';
+                            _amountPaidCtrl.text = '${sh.monthlyFee}';
                           });
                         },
                         child: AnimatedContainer(
@@ -751,12 +807,210 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           ),
           const SizedBox(height: 20),
 
-          _fieldLabel('Monthly Fees (₹)', isRequired: true),
-          const SizedBox(height: 8),
-          _formTextField(
-            controller: _feeCtrl,
-            hintText: '500',
-            keyboardType: TextInputType.number,
+          // Monthly Fees & Amount Paid Row with live dues computation
+          Builder(
+            builder: (context) {
+              final shiftFee = _selectedShift.monthlyFee > 0 ? _selectedShift.monthlyFee : 500;
+              final parsedFee = int.tryParse(_feeCtrl.text.trim()) ?? shiftFee;
+              final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? parsedFee;
+
+              int calcMonthly;
+              int calcPaid;
+              int calcDues;
+
+              if (parsedFee == 0) {
+                calcMonthly = shiftFee;
+                calcPaid = 0;
+                calcDues = shiftFee;
+              } else if (parsedFee < shiftFee && parsedPaid == parsedFee) {
+                calcMonthly = shiftFee;
+                calcPaid = parsedFee;
+                calcDues = shiftFee - parsedFee;
+              } else {
+                calcMonthly = parsedFee;
+                calcPaid = parsedPaid.clamp(0, parsedFee);
+                calcDues = (parsedFee - calcPaid).clamp(0, 999999);
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _fieldLabel('Monthly Fees (₹)', isRequired: true),
+                            const SizedBox(height: 8),
+                            _formTextField(
+                              controller: _feeCtrl,
+                              hintText: '500',
+                              keyboardType: TextInputType.number,
+                              onChanged: (val) {
+                                final newFee = int.tryParse(val.trim());
+                                setState(() {
+                                  if (newFee != null && newFee > 0) {
+                                    _amountPaidCtrl.text = '$newFee';
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _fieldLabel('Amount Paid Now (₹)', isRequired: true),
+                            const SizedBox(height: 8),
+                            _formTextField(
+                              controller: _amountPaidCtrl,
+                              hintText: '500',
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Quick chips
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          setState(() {
+                            _amountPaidCtrl.text = _feeCtrl.text.trim().isNotEmpty && _feeCtrl.text.trim() != '0'
+                                ? _feeCtrl.text.trim()
+                                : '$shiftFee';
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: calcDues == 0 ? const Color(0xFFE6F4F1) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: calcDues == 0 ? AppColors.primaryTeal : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Text(
+                            'Full Paid (₹$parsedFee)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: calcDues == 0 ? AppColors.primaryTeal : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          setState(() {
+                            _amountPaidCtrl.text = '0';
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: calcPaid == 0 ? const Color(0xFFFFF1F2) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: calcPaid == 0 ? const Color(0xFFE11D48) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Text(
+                            'Unpaid / ₹0 Due',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: calcPaid == 0 ? const Color(0xFFE11D48) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Dues Status Preview Banner
+                  if (calcDues > 0)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1F2),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFFECDD3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Pending Due: ₹$calcDues',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFE11D48),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'Categorized in DUES and REMAINING tabs (Not in PAID)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFBE123C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Fully Paid (₹$calcMonthly) • Categorized under PAID tab',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF059669),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 18),
 
@@ -838,7 +1092,28 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final father = _fatherNameCtrl.text.trim().isNotEmpty ? _fatherNameCtrl.text.trim() : 'N/A';
     final address = _addressCtrl.text.trim().isNotEmpty ? _addressCtrl.text.trim() : 'N/A';
     final notes = _notesCtrl.text.trim();
-    final fee = _feeCtrl.text.trim().isNotEmpty ? _feeCtrl.text.trim() : '500';
+
+    final shiftFee = _selectedShift.monthlyFee > 0 ? _selectedShift.monthlyFee : 500;
+    final parsedFee = int.tryParse(_feeCtrl.text.trim()) ?? shiftFee;
+    final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? parsedFee;
+
+    int reviewMonthly;
+    int reviewPaid;
+    int reviewDues;
+
+    if (parsedFee == 0) {
+      reviewMonthly = shiftFee;
+      reviewPaid = 0;
+      reviewDues = shiftFee;
+    } else if (parsedFee < shiftFee && parsedPaid == parsedFee) {
+      reviewMonthly = shiftFee;
+      reviewPaid = parsedFee;
+      reviewDues = shiftFee - parsedFee;
+    } else {
+      reviewMonthly = parsedFee;
+      reviewPaid = parsedPaid.clamp(0, parsedFee);
+      reviewDues = (parsedFee - reviewPaid).clamp(0, 999999);
+    }
 
     return Column(
       children: [
@@ -912,7 +1187,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   Expanded(
                     child: _reviewItem(
                       'STATUS',
-                      _isTrial ? 'TRIAL STUDENT' : 'ACTIVE MEMBER',
+                      _isTrial
+                          ? 'TRIAL STUDENT'
+                          : (reviewDues > 0 ? 'FEE DUE (₹$reviewDues)' : 'ACTIVE (PAID)'),
+                      valueColor: _isTrial
+                          ? const Color(0xFFD97706)
+                          : (reviewDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF059669)),
                     ),
                   ),
                   Expanded(child: _reviewItem('SHIFTS', _selectedShift.name)),
@@ -922,11 +1202,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _reviewItem('FEES', '₹$fee')),
+                  Expanded(child: _reviewItem('MONTHLY FEE', '₹$reviewMonthly')),
                   Expanded(
                     child: _reviewItem(
-                      'SEAT',
-                      _selectedSeat != null ? 'Seat S-$_selectedSeat' : 'Unallocated',
+                      reviewDues > 0 ? 'DUE AMOUNT' : 'AMOUNT PAID',
+                      reviewDues > 0 ? '₹$reviewDues DUE' : '₹$reviewPaid PAID',
+                      valueColor: reviewDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF059669),
                     ),
                   ),
                 ],
@@ -935,14 +1216,22 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Expanded(
+                    child: _reviewItem(
+                      'SEAT',
+                      _selectedSeat != null ? 'Seat S-$_selectedSeat' : 'Unallocated',
+                    ),
+                  ),
                   Expanded(child: _reviewItem('PREPARING FOR', prep)),
-                  Expanded(child: _reviewItem('FATHER', father)),
                 ],
               ),
               const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _reviewItem('ADDRESS', address),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _reviewItem('FATHER', father)),
+                  Expanded(child: _reviewItem('ADDRESS', address)),
+                ],
               ),
 
               // Notes Box (Image 5)
@@ -1035,7 +1324,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     );
   }
 
-  Widget _reviewItem(String label, String value) {
+  Widget _reviewItem(String label, String value, {Color? valueColor}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1051,10 +1340,10 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w900,
-            color: AppColors.textNavy,
+            color: valueColor ?? AppColors.textNavy,
           ),
         ),
       ],
@@ -1183,6 +1472,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
     Widget? prefixIcon,
+    ValueChanged<String>? onChanged,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1194,6 +1484,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        onChanged: onChanged,
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
         decoration: InputDecoration(
           hintText: hintText,

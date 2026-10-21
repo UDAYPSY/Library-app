@@ -77,9 +77,10 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   void _openAddMemberSheet() {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
-    final activeShifts = _service.shifts.where((s) => s.isActive).toList();
-    String shift = activeShifts.isNotEmpty ? activeShifts.first.name : (_service.shifts.isNotEmpty ? _service.shifts.first.name : 'Full Day');
-    int fee = activeShifts.isNotEmpty ? activeShifts.first.monthlyFee : (_service.shifts.isNotEmpty ? _service.shifts.first.monthlyFee : 500);
+    String shift = _service.shifts.isNotEmpty ? _service.shifts.first.name : 'Full Day';
+    final initialFee = _service.shifts.isNotEmpty ? _service.shifts.first.monthlyFee : 500;
+    final feeCtrl = TextEditingController(text: '$initialFee');
+    final paidCtrl = TextEditingController(text: '$initialFee');
     int? allocatedSeat;
     String status = 'ACTIVE';
     String paymentMode = 'UPI';
@@ -92,173 +93,246 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (sheetContext, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Register New Member',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textNavy,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: AppColors.textNavy),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Student Full Name',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person_outline_rounded),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'WhatsApp Phone Number',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.phone_outlined),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: shift,
-                        items: (activeShifts.isNotEmpty ? activeShifts : _service.shifts)
-                            .map((s) => DropdownMenuItem(value: s.name, child: Text(s.name)))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            final found = _service.shifts.firstWhere((s) => s.name == v);
-                            setModalState(() {
-                              shift = v;
-                              fee = found.monthlyFee;
-                            });
-                          }
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Select Shift',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: status,
-                        items: ['ACTIVE', 'TRIAL']
-                            .map((st) => DropdownMenuItem(value: st, child: Text(st)))
-                            .toList(),
-                        onChanged: (v) => setModalState(() => status = v ?? status),
-                        decoration: const InputDecoration(
-                          labelText: 'Status',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int?>(
-                        value: allocatedSeat,
-                        hint: const Text('Seat (Optional)'),
-                        items: [
-                          const DropdownMenuItem<int?>(value: null, child: Text('Unallocated')),
-                          ...List.generate(_service.totalSeatsCount, (i) => i + 1)
-                              .map((num) => DropdownMenuItem<int?>(value: num, child: Text('Seat S-$num'))),
-                        ],
-                        onChanged: (v) => setModalState(() => allocatedSeat = v),
-                        decoration: const InputDecoration(
-                          labelText: 'Seat Allocation',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: paymentMode,
-                        items: ['UPI', 'Cash']
-                            .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                            .toList(),
-                        onChanged: (v) => setModalState(() => paymentMode = v ?? paymentMode),
-                        decoration: const InputDecoration(
-                          labelText: 'Payment Mode',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryTeal,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () async {
-                      final name = nameCtrl.text.trim();
-                      final phone = phoneCtrl.text.trim();
-                      if (name.isEmpty || phone.isEmpty) return;
-                      Navigator.pop(ctx);
+        builder: (sheetContext, setModalState) {
+          final mFee = int.tryParse(feeCtrl.text.trim()) ?? initialFee;
+          final pAmt = int.tryParse(paidCtrl.text.trim()) ?? 0;
+          final remDue = (mFee - pAmt).clamp(0, 999999);
 
-                      await _service.assignSeatAndRegisterStudent(
-                        seatNumber: allocatedSeat,
-                        studentName: name,
-                        phone: phone,
-                        shift: shift,
-                        deviceUserId: _service.profile.adminName,
-                        feeAmount: fee,
-                        paymentMode: paymentMode,
-                        status: status,
-                      );
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('$name registered successfully ($status)!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    },
-                    child: Text(
-                      'Confirm Member (₹$fee)',
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Register New Member',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textNavy,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: AppColors.textNavy),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Student Full Name',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person_outline_rounded),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'WhatsApp Phone Number',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: shift,
+                          items: _service.shifts
+                              .map((s) => DropdownMenuItem(
+                                    value: s.name,
+                                    child: Text(s.name, overflow: TextOverflow.ellipsis),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              final found = _service.shifts.firstWhere((s) => s.name == v);
+                              setModalState(() {
+                                shift = v;
+                                found.isActive = true;
+                                feeCtrl.text = '${found.monthlyFee}';
+                                paidCtrl.text = '${found.monthlyFee}';
+                              });
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Select Shift',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: status,
+                          items: ['ACTIVE', 'TRIAL']
+                              .map((st) => DropdownMenuItem(value: st, child: Text(st)))
+                              .toList(),
+                          onChanged: (v) => setModalState(() => status = v ?? status),
+                          decoration: const InputDecoration(
+                            labelText: 'Status',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: feeCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Monthly Fee (₹)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.currency_rupee, size: 16),
+                          ),
+                          onChanged: (_) => setModalState(() {}),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: paidCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Amount Paid (₹)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.payment, size: 16),
+                          ),
+                          onChanged: (_) => setModalState(() {}),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (remDue > 0) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1F2),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFECDD3)),
+                      ),
+                      child: Text(
+                        '⚠️ Remaining Due: ₹$remDue • Will be tagged in DUES & REMAINING tabs',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFE11D48),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<int?>(
+                          value: allocatedSeat,
+                          hint: const Text('Seat (Optional)'),
+                          items: [
+                            const DropdownMenuItem<int?>(value: null, child: Text('Unallocated')),
+                            ...List.generate(_service.totalSeatsCount, (i) => i + 1)
+                                .map((num) => DropdownMenuItem<int?>(value: num, child: Text('Seat S-$num'))),
+                          ],
+                          onChanged: (v) => setModalState(() => allocatedSeat = v),
+                          decoration: const InputDecoration(
+                            labelText: 'Seat Allocation',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: paymentMode,
+                          items: ['UPI', 'Cash']
+                              .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                              .toList(),
+                          onChanged: (v) => setModalState(() => paymentMode = v ?? paymentMode),
+                          decoration: const InputDecoration(
+                            labelText: 'Payment Mode',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryTeal,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        final name = nameCtrl.text.trim();
+                        final phone = phoneCtrl.text.trim();
+                        if (name.isEmpty || phone.isEmpty) return;
+                        Navigator.pop(ctx);
+
+                        final parsedFee = int.tryParse(feeCtrl.text.trim()) ?? initialFee;
+                        final parsedPaid = int.tryParse(paidCtrl.text.trim()) ?? 0;
+                        final dues = (parsedFee - parsedPaid).clamp(0, 999999);
+                        final finalStatus = status == 'TRIAL'
+                            ? 'TRIAL'
+                            : (dues > 0 || parsedPaid == 0 ? 'DUES' : 'ACTIVE');
+
+                        await _service.assignSeatAndRegisterStudent(
+                          seatNumber: allocatedSeat,
+                          studentName: name,
+                          phone: phone,
+                          shift: shift,
+                          deviceUserId: _service.profile.adminName,
+                          feeAmount: parsedPaid,
+                          duesAmount: dues,
+                          paymentMode: paymentMode,
+                          status: finalStatus,
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                dues > 0
+                                    ? '$name registered with ₹$dues pending due!'
+                                    : '$name registered successfully ($finalStatus)!',
+                              ),
+                              backgroundColor: dues > 0 ? const Color(0xFFE11D48) : Colors.green,
+                            ),
+                          );
+                        }
+                      },
+                      child: Text(
+                        remDue > 0 ? 'Register with ₹$remDue Due' : 'Confirm Member (₹$mFee)',
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -977,92 +1051,546 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   }
 
   void _openPaySheet(StudentInfo st) {
-    final defaultAmount = st.duesAmount > 0 ? st.duesAmount : st.monthlyFee;
-    final amountCtrl = TextEditingController(text: defaultAmount.toString());
-    final noteCtrl = TextEditingController(text: 'Monthly fee renewal');
-    String paymentMode = 'UPI';
+    final defaultMonthly = st.monthlyFee > 0 ? st.monthlyFee : 500;
+    final initialPaid = st.duesAmount > 0 ? st.duesAmount : defaultMonthly;
+    final amountPaidCtrl = TextEditingController(text: '$initialPaid');
+    final remainingDuesCtrl = TextEditingController(text: '0');
+    final notesCtrl = TextEditingController();
+
+    DateTime fromDate = st.feeDueDate ?? DateTime.now();
+    DateTime untilDate = fromDate.add(const Duration(days: 30));
+    DateTime paymentDate = DateTime.now();
+    String selectedMethod = 'UPI';
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      backgroundColor: const Color(0xFFF0F5F8),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (sheetContext, setModalState) => Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
             left: 20,
             right: 20,
-            top: 20,
+            top: 12,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Collect Payment - ${st.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-                      const SizedBox(height: 2),
-                      Text('Seat #${st.seatNumber ?? 1} • ${st.shift}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                    ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Centered Drag Handle (Image 2)
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Amount to Collect (₹)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.currency_rupee)),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: paymentMode,
-                items: ['UPI', 'Cash', 'Card', 'Net Banking'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: (v) => setModalState(() => paymentMode = v ?? paymentMode),
-                decoration: const InputDecoration(labelText: 'Payment Mode', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteCtrl,
-                decoration: const InputDecoration(labelText: 'Payment Note', border: OutlineInputBorder(), prefixIcon: Icon(Icons.notes_rounded)),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D6E66),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  onPressed: () async {
-                    final amt = int.tryParse(amountCtrl.text.trim()) ?? defaultAmount;
-                    Navigator.pop(ctx);
-                    await _service.collectStudentFee(
-                      studentId: st.id,
-                      amount: amt,
-                      paymentMode: paymentMode,
-                      notes: noteCtrl.text.trim(),
-                    );
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Payment of ₹$amt collected from ${st.name} via $paymentMode!'),
-                          backgroundColor: const Color(0xFF0D6E66),
-                          behavior: SnackBarBehavior.floating,
+                ),
+                const SizedBox(height: 14),
+
+                // Top Header Row: Record Payment + Admin Badge (Image 2)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Record Payment',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textNavy,
+                          ),
                         ),
-                      );
+                        SizedBox(height: 2),
+                        Text(
+                          'Track and record fee processing',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE6F4F1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.person, size: 14, color: AppColors.primaryTeal),
+                          const SizedBox(width: 4),
+                          Text(
+                            _service.profile.adminName.isNotEmpty ? _service.profile.adminName : 'Admin',
+                            style: const TextStyle(
+                              color: AppColors.primaryTeal,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Amount Paid (₹) (Image 2)
+                const Text(
+                  'Amount Paid (₹)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textNavy,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: TextField(
+                    controller: amountPaidCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textNavy,
+                    ),
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      border: InputBorder.none,
+                    ),
+                    onChanged: (val) {
+                      final paid = int.tryParse(val.trim()) ?? 0;
+                      final totalOwed = st.duesAmount > 0 ? st.duesAmount : (st.monthlyFee > 0 ? st.monthlyFee : 500);
+                      final remaining = (totalOwed - paid).clamp(0, 999999);
+                      setModalState(() {
+                        remainingDuesCtrl.text = '$remaining';
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Remaining Fees / Due (₹) (Image 2)
+                const Text(
+                  'Remaining Fees / Due (₹)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textNavy,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: TextField(
+                    controller: remainingDuesCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFEF4444), // Red as shown in Image 2 & 3
+                    ),
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // From & Until Dates (Image 2 & 3)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'From',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textNavy,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: fromDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2035),
+                              );
+                              if (picked != null) {
+                                setModalState(() {
+                                  fromDate = picked;
+                                  untilDate = fromDate.add(const Duration(days: 30));
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    DateFormat('dd-MMM-yyyy').format(fromDate),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textNavy,
+                                    ),
+                                  ),
+                                  const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF64748B)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Until',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textNavy,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: untilDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2035),
+                              );
+                              if (picked != null) {
+                                setModalState(() => untilDate = picked);
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    DateFormat('dd-MMM-yyyy').format(untilDate),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textNavy,
+                                    ),
+                                  ),
+                                  const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF64748B)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Payment Date (Image 2 & 3)
+                const Text(
+                  'Payment Date',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textNavy,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: paymentDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2035),
+                    );
+                    if (picked != null) {
+                      setModalState(() => paymentDate = picked);
                     }
                   },
-                  child: Text('Confirm & Collect ₹${amountCtrl.text}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('dd-MMM-yyyy').format(paymentDate),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textNavy,
+                          ),
+                        ),
+                        const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF64748B)),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 18),
+
+                // Payment Method (Image 2 & 3: CASH vs UPI)
+                const Text(
+                  'Payment Method',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textNavy,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => setModalState(() => selectedMethod = 'Cash'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: selectedMethod == 'Cash' ? const Color(0xFF0F766E) : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: selectedMethod == 'Cash' ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.payments_outlined,
+                                size: 18,
+                                color: selectedMethod == 'Cash' ? Colors.white : AppColors.textNavy,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'CASH',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: selectedMethod == 'Cash' ? Colors.white : AppColors.textNavy,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => setModalState(() => selectedMethod = 'UPI'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: selectedMethod == 'UPI' ? const Color(0xFF0F766E) : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: selectedMethod == 'UPI' ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.phone_android_rounded,
+                                size: 18,
+                                color: selectedMethod == 'UPI' ? Colors.white : AppColors.textNavy,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'UPI',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: selectedMethod == 'UPI' ? Colors.white : AppColors.textNavy,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Notes (Optional) (Image 2 & 3)
+                const Text(
+                  'Notes (Optional)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textNavy,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: TextField(
+                    controller: notesCtrl,
+                    maxLines: 2,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textNavy,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'Add remark...',
+                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Bottom Buttons: [ Discard ]  [ (✓) Save Payment ] (Image 3)
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.textNavy,
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          'Discard',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F766E),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                        label: const Text(
+                          'Save Payment',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                        ),
+                        onPressed: () async {
+                          final paid = int.tryParse(amountPaidCtrl.text.trim()) ?? 0;
+                          final dues = int.tryParse(remainingDuesCtrl.text.trim()) ?? 0;
+                          Navigator.pop(ctx);
+
+                          if (paid > 0) {
+                            await _service.recordPayment(
+                              studentId: st.id,
+                              studentName: st.name,
+                              phone: st.phone,
+                              seatNumber: st.seatNumber,
+                              shift: st.shift,
+                              amount: paid,
+                              date: paymentDate,
+                              paymentMode: selectedMethod,
+                              notes: notesCtrl.text.trim(),
+                            );
+                          }
+
+                          await _service.updateStudent(
+                            studentId: st.id,
+                            name: st.name,
+                            phone: st.phone,
+                            shift: st.shift,
+                            seatNumber: st.seatNumber,
+                            duesAmount: dues,
+                            status: dues > 0 ? 'DUES' : 'ACTIVE',
+                            feeDueDate: untilDate,
+                          );
+
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  dues > 0
+                                      ? 'Payment of ₹$paid recorded. Remaining ₹$dues due!'
+                                      : 'Payment of ₹$paid recorded! Dues fully cleared.',
+                                ),
+                                backgroundColor: dues > 0 ? const Color(0xFFE11D48) : AppColors.primaryTeal,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1103,11 +1631,11 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
           if (_selectedStatusFilter == 'RECENT' || _selectedStatusFilter == 'ALL') {
             return true;
           } else if (_selectedStatusFilter == 'PAID') {
-            return !s.hasDues && s.status != 'TRIAL';
+            return !s.hasDues && s.duesAmount == 0 && s.status != 'DUES' && s.status != 'TRIAL';
           } else if (_selectedStatusFilter == 'DUES' || _selectedStatusFilter == 'REMAINING') {
-            return s.hasDues;
+            return s.hasDues || s.effectiveDues > 0 || s.duesAmount > 0 || s.status == 'DUES';
           } else if (_selectedStatusFilter == 'ACTIVE') {
-            return s.status == 'ACTIVE' || s.status == 'PAID';
+            return (s.status == 'ACTIVE' || s.status == 'PAID') && !s.hasDues && s.duesAmount == 0;
           } else if (_selectedStatusFilter == 'UNALLOCATED') {
             return s.seatNumber == null;
           } else if (_selectedStatusFilter == 'TRIAL') {
