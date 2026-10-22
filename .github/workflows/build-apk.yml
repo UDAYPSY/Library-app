@@ -47,7 +47,7 @@ jobs:
       - name: Compile Release APK
         run: |
           set -e -o pipefail
-          flutter build apk --release --no-tree-shake-icons 2>&1 | tee apk_build.log
+          flutter build apk --release --no-tree-shake-icons -v 2>&1 | tee apk_build.log
           echo "=== APK files built ==="
           ls -la build/app/outputs/flutter-apk/ || true
 
@@ -59,10 +59,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B ci-error-log
-          cp apk_build.log CI_FAILURE.log || true
-          cp test_run.log CI_TEST_FAILURE.log || true
-          git add CI_FAILURE.log CI_TEST_FAILURE.log || true
-          git commit -m "ci: build failure diagnostics [skip ci]" || true
+          [ -f apk_build.log ] && cp apk_build.log CI_FAILURE.txt || echo "No apk_build.log" > CI_FAILURE.txt
+          [ -f test_run.log ] && cp test_run.log CI_TEST_FAILURE.txt || true
+          git add -f CI_FAILURE.txt CI_TEST_FAILURE.txt
+          git commit -m "ci: build failure diagnostics [skip ci]"
           git push -f origin ci-error-log || true
 
       - name: Upload Build Log Artifact

@@ -11,18 +11,11 @@ def patch_gradle_files():
 
         is_kts = file_path.endswith('.kts')
         
-        # 1. Update minSdk to 23
+        # Update minSdk to 23 for Cloud Firestore compatibility
         if is_kts:
             content = re.sub(r'minSdk\s*=\s*.*', 'minSdk = 23', content)
         else:
             content = re.sub(r'minSdkVersion\s*=?\s*.*', 'minSdkVersion 23', content)
-
-        # 2. Enable multidex
-        if 'multiDexEnabled' not in content:
-            if is_kts:
-                content = re.sub(r'(defaultConfig\s*\{)', r'\1\n        multiDexEnabled = true', content)
-            else:
-                content = re.sub(r'(defaultConfig\s*\{)', r'\1\n        multiDexEnabled true', content)
 
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
