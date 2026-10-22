@@ -1206,7 +1206,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               );
             },
           ),
-          const SizedBox(heig          // Month Selection (Payment Duration / Advance Period)
+          const SizedBox(height: 18),
+
+          // Month Selection (Payment Duration / Advance Period)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

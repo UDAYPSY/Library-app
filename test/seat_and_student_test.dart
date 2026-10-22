@@ -151,6 +151,7 @@ void main() {
         phone: '9876599991',
         shift: 'Morning Shift',
         deviceUserId: 'Admin',
+        monthlyFee: monthlyFee,
         feeAmount: expectedTotal,
         duesAmount: 0,
         durationMonths: durationMonths,
@@ -227,6 +228,7 @@ void main() {
         phone: '9876588881',
         shift: 'Morning Shift',
         deviceUserId: 'Admin',
+        studentId: 'std_test_m',
       );
       final stdM = service.findStudentByPhone('9876588881')!;
 
@@ -237,6 +239,7 @@ void main() {
         phone: '9876588882',
         shift: 'Evening Shift',
         deviceUserId: 'Admin',
+        studentId: 'std_test_e',
       );
       final stdE = service.findStudentByPhone('9876588882')!;
 

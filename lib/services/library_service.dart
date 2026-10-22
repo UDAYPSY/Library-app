@@ -11,6 +11,7 @@ class LibraryService {
   static final LibraryService _instance = LibraryService._internal();
   factory LibraryService() => _instance;
   LibraryService._internal();
+  static int _uniqueIdCounter = 0;
 
   // Active configuration models
   LibraryProfile profile = LibraryProfile();
@@ -1398,12 +1399,13 @@ class LibraryService {
     }
 
     final now = joiningDate ?? DateTime.now();
+    final totalFee = feeAmount + duesAmount;
+    final effectiveMonths = durationMonths > 0 ? durationMonths : 1;
     final effectiveMonthly = (monthlyFee != null && monthlyFee > 0)
         ? monthlyFee
-        : (duesAmount > 0 && feeAmount == 0
-            ? duesAmount
-            : (feeAmount + duesAmount > 0 ? feeAmount + duesAmount : 500));
-    final effectiveMonths = durationMonths > 0 ? durationMonths : 1;
+        : (totalFee > 0
+            ? (totalFee ~/ effectiveMonths > 0 ? totalFee ~/ effectiveMonths : totalFee)
+            : 500);
     final validUntil = (duesAmount > 0 && feeAmount == 0)
         ? now // Due immediately if no initial fee was paid
         : now.add(Duration(days: 30 * effectiveMonths));
@@ -1480,7 +1482,7 @@ class LibraryService {
       // In-memory mock assignment
       final effectiveStudentId = (studentId != null && studentId.isNotEmpty)
           ? studentId
-          : 'std_${DateTime.now().millisecondsSinceEpoch}';
+          : 'std_${DateTime.now().millisecondsSinceEpoch}_${++_uniqueIdCounter}';
       if (seatNumber != null) {
         // Unassign seat only from previous occupants who have conflicting shifts
         for (int i = 0; i < _mockStudents.length; i++) {
