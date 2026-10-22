@@ -1548,7 +1548,6 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                 ],
               );
             },
-          ),         },
           ),
           const SizedBox(height: 18),
 

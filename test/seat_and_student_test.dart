@@ -162,8 +162,8 @@ void main() {
       expect(student!.monthlyFee, equals(monthlyFee));
       expect(student.duesAmount, equals(0));
       expect(student.status, equals('ACTIVE'));
-      expect(student.validUntil, isNotNull);
-      final differenceDays = student.validUntil!.difference(DateTime.now()).inDays;
+      expect(student.feeDueDate, isNotNull);
+      final differenceDays = student.feeDueDate!.difference(DateTime.now()).inDays;
       expect(differenceDays, greaterThanOrEqualTo(145));
     });
 
