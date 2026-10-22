@@ -80,6 +80,24 @@ jobs:
           name: library-manager-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
+      - name: Publish Release with APK Asset
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest
+          name: "Library Manager Latest Release APK"
+          body: |
+            ### 📱 Library Manager Android APK
+            Automated release build with the latest fee management, shift-wise seat allotment, and data synchronization features.
+            
+            - **Direct Download**: Click `app-release.apk` below to download directly to your Android device.
+          files: build/app/outputs/flutter-apk/app-release.apk
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
   build-web:
     name: Build & Deploy Web App
     runs-on: ubuntu-latest
