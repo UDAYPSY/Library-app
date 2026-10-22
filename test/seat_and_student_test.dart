@@ -145,7 +145,7 @@ void main() {
       final durationMonths = 5;
       final expectedTotal = monthlyFee * durationMonths; // 2500
 
-      final student = await service.assignSeatAndRegisterStudent(
+      await service.assignSeatAndRegisterStudent(
         seatNumber: 15,
         studentName: 'Neha Kumari',
         phone: '9876599991',
@@ -157,7 +157,9 @@ void main() {
         status: 'ACTIVE',
       );
 
-      expect(student.monthlyFee, equals(monthlyFee));
+      final student = service.findStudentByPhone('9876599991');
+      expect(student, isNotNull);
+      expect(student!.monthlyFee, equals(monthlyFee));
       expect(student.duesAmount, equals(0));
       expect(student.status, equals('ACTIVE'));
       expect(student.validUntil, isNotNull);
@@ -167,7 +169,7 @@ void main() {
 
     test('Payment status determination for Full Paid, Partial Paid, and Unpaid', () async {
       // 1. Full Paid: Amount Paid == Total Fee -> Status ACTIVE, Dues 0
-      final fullPaid = await service.assignSeatAndRegisterStudent(
+      await service.assignSeatAndRegisterStudent(
         seatNumber: 16,
         studentName: 'Sanjay Kumar',
         phone: '9876599992',
@@ -177,11 +179,13 @@ void main() {
         duesAmount: 0,
         status: 'ACTIVE',
       );
-      expect(fullPaid.duesAmount, equals(0));
+      final fullPaid = service.findStudentByPhone('9876599992');
+      expect(fullPaid, isNotNull);
+      expect(fullPaid!.duesAmount, equals(0));
       expect(fullPaid.status, equals('ACTIVE'));
 
       // 2. Partial Paid: 0 < Amount Paid < Total Fee -> Status DUES, Dues > 0
-      final partialPaid = await service.assignSeatAndRegisterStudent(
+      await service.assignSeatAndRegisterStudent(
         seatNumber: 17,
         studentName: 'Rohan Mehra',
         phone: '9876599993',
@@ -191,11 +195,13 @@ void main() {
         duesAmount: 200,
         status: 'DUES',
       );
-      expect(partialPaid.duesAmount, equals(200));
+      final partialPaid = service.findStudentByPhone('9876599993');
+      expect(partialPaid, isNotNull);
+      expect(partialPaid!.duesAmount, equals(200));
       expect(partialPaid.status, equals('DUES'));
 
       // 3. Unpaid: Amount Paid == 0 -> Status DUES, Dues == Total Fee
-      final unpaid = await service.assignSeatAndRegisterStudent(
+      await service.assignSeatAndRegisterStudent(
         seatNumber: 18,
         studentName: 'Divya Sharma',
         phone: '9876599994',
@@ -205,7 +211,9 @@ void main() {
         duesAmount: 500,
         status: 'DUES',
       );
-      expect(unpaid.duesAmount, equals(500));
+      final unpaid = service.findStudentByPhone('9876599994');
+      expect(unpaid, isNotNull);
+      expect(unpaid!.duesAmount, equals(500));
       expect(unpaid.status, equals('DUES'));
     });
 
@@ -213,28 +221,30 @@ void main() {
       final seatNum = 20;
 
       // Register Student M in Morning Shift
-      final stdM = await service.assignSeatAndRegisterStudent(
+      await service.assignSeatAndRegisterStudent(
         seatNumber: seatNum,
         studentName: 'Manish Pandey',
         phone: '9876588881',
         shift: 'Morning Shift',
         deviceUserId: 'Admin',
       );
+      final stdM = service.findStudentByPhone('9876588881')!;
 
       // Register Student E in Evening Shift on same seat
-      final stdE = await service.assignSeatAndRegisterStudent(
+      await service.assignSeatAndRegisterStudent(
         seatNumber: seatNum,
         studentName: 'Esha Gupta',
         phone: '9876588882',
         shift: 'Evening Shift',
         deviceUserId: 'Admin',
       );
+      final stdE = service.findStudentByPhone('9876588882')!;
 
       expect(service.isSeatOccupied(seatNum, shift: 'Morning Shift'), isTrue);
       expect(service.isSeatOccupied(seatNum, shift: 'Evening Shift'), isTrue);
 
       // Vacate Morning Shift occupant
-      await service.vacateSeat(seatNum, studentId: stdM.id, shift: 'Morning Shift');
+      await service.vacateSeat(seatNum, stdM.id);
 
       // Morning shift should now be vacant
       expect(service.isSeatOccupied(seatNum, shift: 'Morning Shift'), isFalse);
@@ -248,7 +258,7 @@ void main() {
     });
 
     test('Marking dues and fee payment reconciliation', () async {
-      final std = await service.assignSeatAndRegisterStudent(
+      await service.assignSeatAndRegisterStudent(
         seatNumber: 22,
         studentName: 'Kunal Kapoor',
         phone: '9876577771',
@@ -258,6 +268,7 @@ void main() {
         duesAmount: 0,
         status: 'ACTIVE',
       );
+      final std = service.findStudentByPhone('9876577771')!;
 
       // Mark dues of ₹300
       await service.markStudentDues(std.id, 300);
