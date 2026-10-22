@@ -1620,70 +1620,245 @@ _Powered by TrackMyLibrary_
                     ),
                     const SizedBox(height: 24),
 
-                    // 5. Payment History Section (Images 5, 5-)
-                    Row(
-                      children: [
-                        const Text(
-                          'Payment History',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textNavy,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE0F2FE),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${_service.currentPayments.where((p) => p.studentId == _student.id || LibraryService.normalizePhone(p.studentPhone) == LibraryService.normalizePhone(_student.phone)).length}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0284C7),
+                    // 5. Payment History Section
+                    StreamBuilder<List<PaymentTransaction>>(
+                      stream: _service.streamPayments(),
+                      builder: (context, paySnap) {
+                        final allPayments = paySnap.data ?? _service.currentPayments;
+                        final studentPhoneNorm = LibraryService.normalizePhone(_student.phone);
+                        final studentNameLower = _student.name.trim().toLowerCase();
+
+                        final studentPayments = allPayments.where((p) {
+                          if (p.studentId.isNotEmpty && p.studentId == _student.id) return true;
+                          if (studentPhoneNorm.isNotEmpty &&
+                              p.studentPhone.isNotEmpty &&
+                              LibraryService.normalizePhone(p.studentPhone) == studentPhoneNorm) {
+                            return true;
+                          }
+                          if (studentNameLower.isNotEmpty &&
+                              p.studentName.trim().toLowerCase() == studentNameLower) {
+                            return true;
+                          }
+                          return false;
+                        }).toList();
+
+                        studentPayments.sort((a, b) => b.date.compareTo(a.date));
+                        final totalPaid = studentPayments.fold<int>(0, (sum, p) => sum + p.amount);
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Payment History',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppColors.textNavy,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE0F2FE),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '${studentPayments.length}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF0284C7),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFF0D9488),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  ),
+                                  icon: const Icon(Icons.add_card_rounded, size: 16),
+                                  label: const Text(
+                                    'Collect Fee',
+                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                  ),
+                                  onPressed: _showRecordPaymentSheet,
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFF8FAFC),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.receipt_long_outlined,
-                              size: 38,
-                              color: Color(0xFFCBD5E1),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No transaction history',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(height: 12),
+                            if (studentPayments.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFF8FAFC),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.receipt_long_outlined,
+                                        size: 38,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'No transaction history yet',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF475569),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'No payments have been recorded for ${_student.name}.',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0D9488),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      icon: const Icon(Icons.add_rounded, size: 18),
+                                      label: const Text(
+                                        'Collect First Payment',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      onPressed: _showRecordPaymentSheet,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else ...[
+                              // Total summary banner
+                              Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: const [
+                                    BoxShadow(color: Color(0x10000000), blurRadius: 8, offset: Offset(0, 3)),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'TOTAL COLLECTED',
+                                          style: TextStyle(
+                                            color: Color(0xFF94A3B8),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '₹$totalPaid',
+                                          style: const TextStyle(
+                                            color: Color(0xFF34D399),
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      height: 36,
+                                      width: 1,
+                                      color: const Color(0xFF334155),
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        const Text(
+                                          'TRANSACTIONS',
+                                          style: TextStyle(
+                                            color: Color(0xFF94A3B8),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${studentPayments.length}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      height: 36,
+                                      width: 1,
+                                      color: const Color(0xFF334155),
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        const Text(
+                                          'LAST PAID',
+                                          style: TextStyle(
+                                            color: Color(0xFF94A3B8),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          DateFormat('dd MMM yy').format(studentPayments.first.date),
+                                          style: const TextStyle(
+                                            color: Color(0xFF38BDF8),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Payment cards list
+                              ...studentPayments.map((p) => _buildPaymentItemCard(p)),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -1895,6 +2070,239 @@ _Powered by TrackMyLibrary_
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _shareReceipt(PaymentTransaction p) async {
+    final seatText = p.seatNumber != null ? 'S-${p.seatNumber}' : 'Unassigned';
+    final text = '🏛️ *${_service.profile.libraryName}*\n'
+        '📄 *FEE PAYMENT RECEIPT*\n'
+        '--------------------------------\n'
+        '👤 *Member:* ${_student.name}\n'
+        '📱 *Phone:* ${_student.phone}\n'
+        '🪑 *Seat:* $seatText (${p.shift})\n'
+        '💰 *Amount Paid:* ₹${p.amount}\n'
+        '💳 *Mode:* ${p.paymentMode}\n'
+        '📅 *Date:* ${DateFormat('dd MMM yyyy, hh:mm a').format(p.date)}\n'
+        '🔖 *Receipt ID:* ${p.id}\n'
+        '${p.notes.trim().isNotEmpty ? '📝 *Notes:* ${p.notes}\n' : ''}'
+        '--------------------------------\n'
+        'Thank you for your payment! Please keep this receipt for your records.';
+    final encoded = Uri.encodeComponent(text);
+    final phoneClean = LibraryService.normalizePhone(_student.phone);
+    final uri = phoneClean.isNotEmpty && phoneClean.length >= 10
+        ? Uri.parse('https://wa.me/91$phoneClean?text=$encoded')
+        : Uri.parse('https://wa.me/?text=$encoded');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (_) {}
+  }
+
+  Widget _buildPaymentItemCard(PaymentTransaction p) {
+    IconData modeIcon;
+    Color modeColor;
+    Color modeBg;
+
+    final modeUpper = p.paymentMode.toUpperCase();
+    if (modeUpper.contains('CASH')) {
+      modeIcon = Icons.payments_rounded;
+      modeColor = const Color(0xFF16A34A);
+      modeBg = const Color(0xFFECFDF5);
+    } else if (modeUpper.contains('CARD')) {
+      modeIcon = Icons.credit_card_rounded;
+      modeColor = const Color(0xFF8B5CF6);
+      modeBg = const Color(0xFFF5F3FF);
+    } else if (modeUpper.contains('BANK') || modeUpper.contains('CHEQUE')) {
+      modeIcon = Icons.account_balance_rounded;
+      modeColor = const Color(0xFFF59E0B);
+      modeBg = const Color(0xFFFFFBEB);
+    } else {
+      modeIcon = Icons.qr_code_2_rounded;
+      modeColor = const Color(0xFF0284C7);
+      modeBg = const Color(0xFFF0F9FF);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top row: Amount + Mode + Date
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                      ),
+                      child: Text(
+                        '₹${p.amount}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF059669),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: modeBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(modeIcon, size: 13, color: modeColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            p.paymentMode,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: modeColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  DateFormat('dd MMM yyyy, hh:mm a').format(p.date),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          // Second row: Seat & Shift, Receipt ID, WhatsApp share
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 12, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.chair_alt_rounded, size: 14, color: Color(0xFF0D9488)),
+                          const SizedBox(width: 4),
+                          Text(
+                            p.seatNumber != null ? 'Seat S-${p.seatNumber}' : 'Unallocated Seat',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textNavy,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              p.shift,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Receipt ID: ${p.id.replaceAll('pay_', '')}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Share Receipt on WhatsApp',
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366).withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.share_rounded, size: 16, color: Color(0xFF16A34A)),
+                  ),
+                  onPressed: () => _shareReceipt(p),
+                ),
+              ],
+            ),
+          ),
+          // Optional Notes / Remarks
+          if (p.notes.trim().isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.notes_rounded, size: 14, color: Color(0xFF64748B)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      p.notes.trim(),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

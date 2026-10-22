@@ -1548,14 +1548,6 @@ class LibraryService {
     ensureInitialized();
     if (isFirebaseConnected) {
       final batch = _db.batch();
-      final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
-
-      batch.update(seatDocRef, {
-        'is_occupied': false,
-        'student_id': null,
-        'student_name': null,
-        'shift': null,
-      });
 
       if (studentId != null && studentId.trim().isNotEmpty) {
         final studentDocRef = _tenantCol('students').doc(studentId.trim());
@@ -1564,11 +1556,32 @@ class LibraryService {
         });
       }
 
+      final otherStudents = _currentStudents.where(
+        (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+      ).toList();
+
+      final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
+      if (otherStudents.isNotEmpty) {
+        final remaining = otherStudents.first;
+        batch.update(seatDocRef, {
+          'is_occupied': true,
+          'student_id': remaining.id,
+          'student_name': remaining.name,
+          'shift': remaining.shift,
+        });
+      } else {
+        batch.update(seatDocRef, {
+          'is_occupied': false,
+          'student_id': null,
+          'student_name': null,
+          'shift': null,
+        });
+      }
+
       await batch.commit();
     } else {
       final index = seatNumber - 1;
       if (index >= 0 && index < _mockSeats.length) {
-        _mockSeats[index] = SeatInfo(seatNumber: seatNumber);
         if (studentId != null && studentId.isNotEmpty) {
           final studentIndex =
               _mockStudents.indexWhere((s) => s.id == studentId);
@@ -1579,6 +1592,28 @@ class LibraryService {
             );
           }
         }
+
+        final otherStudents = _mockStudents.where(
+          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+        ).toList();
+
+        if (otherStudents.isNotEmpty) {
+          final rem = otherStudents.first;
+          _mockSeats[index] = SeatInfo(
+            seatNumber: seatNumber,
+            isOccupied: true,
+            studentId: rem.id,
+            studentName: rem.name,
+            shift: rem.shift,
+            sectionName: _mockSeats[index].sectionName,
+          );
+        } else {
+          _mockSeats[index] = SeatInfo(
+            seatNumber: seatNumber,
+            sectionName: _mockSeats[index].sectionName,
+          );
+        }
+
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
         _saveLocalState();
@@ -1597,13 +1632,26 @@ class LibraryService {
         'seat_number': null,
       });
       if (seatNumber != null) {
+        final otherStudents = _currentStudents.where(
+          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+        ).toList();
         final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
-        batch.update(seatDocRef, {
-          'is_occupied': false,
-          'student_id': null,
-          'student_name': null,
-          'shift': null,
-        });
+        if (otherStudents.isNotEmpty) {
+          final rem = otherStudents.first;
+          batch.update(seatDocRef, {
+            'is_occupied': true,
+            'student_id': rem.id,
+            'student_name': rem.name,
+            'shift': rem.shift,
+          });
+        } else {
+          batch.update(seatDocRef, {
+            'is_occupied': false,
+            'student_id': null,
+            'student_name': null,
+            'shift': null,
+          });
+        }
       }
       await batch.commit();
     } else {
@@ -1615,7 +1663,25 @@ class LibraryService {
         );
       }
       if (seatNumber != null && seatNumber > 0 && seatNumber <= _mockSeats.length) {
-        _mockSeats[seatNumber - 1] = SeatInfo(seatNumber: seatNumber);
+        final otherStudents = _mockStudents.where(
+          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+        ).toList();
+        if (otherStudents.isNotEmpty) {
+          final rem = otherStudents.first;
+          _mockSeats[seatNumber - 1] = SeatInfo(
+            seatNumber: seatNumber,
+            isOccupied: true,
+            studentId: rem.id,
+            studentName: rem.name,
+            shift: rem.shift,
+            sectionName: _mockSeats[seatNumber - 1].sectionName,
+          );
+        } else {
+          _mockSeats[seatNumber - 1] = SeatInfo(
+            seatNumber: seatNumber,
+            sectionName: _mockSeats[seatNumber - 1].sectionName,
+          );
+        }
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
       }
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
@@ -1636,19 +1702,50 @@ class LibraryService {
       final studentDocRef = _tenantCol('students').doc(studentId);
       batch.delete(studentDocRef);
       if (seatNumber != null) {
+        final otherStudents = _currentStudents.where(
+          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+        ).toList();
         final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
-        batch.update(seatDocRef, {
-          'is_occupied': false,
-          'student_id': null,
-          'student_name': null,
-          'shift': null,
-        });
+        if (otherStudents.isNotEmpty) {
+          final rem = otherStudents.first;
+          batch.update(seatDocRef, {
+            'is_occupied': true,
+            'student_id': rem.id,
+            'student_name': rem.name,
+            'shift': rem.shift,
+          });
+        } else {
+          batch.update(seatDocRef, {
+            'is_occupied': false,
+            'student_id': null,
+            'student_name': null,
+            'shift': null,
+          });
+        }
       }
       await batch.commit();
     } else {
       _mockStudents.removeWhere((s) => s.id == studentId);
       if (seatNumber != null && seatNumber > 0 && seatNumber <= _mockSeats.length) {
-        _mockSeats[seatNumber - 1] = SeatInfo(seatNumber: seatNumber);
+        final otherStudents = _mockStudents.where(
+          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+        ).toList();
+        if (otherStudents.isNotEmpty) {
+          final rem = otherStudents.first;
+          _mockSeats[seatNumber - 1] = SeatInfo(
+            seatNumber: seatNumber,
+            isOccupied: true,
+            studentId: rem.id,
+            studentName: rem.name,
+            shift: rem.shift,
+            sectionName: _mockSeats[seatNumber - 1].sectionName,
+          );
+        } else {
+          _mockSeats[seatNumber - 1] = SeatInfo(
+            seatNumber: seatNumber,
+            sectionName: _mockSeats[seatNumber - 1].sectionName,
+          );
+        }
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
       }
       _mockStudentsController.add(List.unmodifiable(_mockStudents));

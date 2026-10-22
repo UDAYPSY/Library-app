@@ -887,28 +887,36 @@ class _SeatsScreenState extends State<SeatsScreen> {
     );
   }
 
-  void _showChangeSeatDialog(SeatInfo currentSeat, List<SeatInfo> allSeats) {
-    final vacantSeats = allSeats.where((s) => !s.isOccupied).toList();
-    if (vacantSeats.isEmpty) {
+  void _showChangeSeatDialog(SeatInfo currentSeat, List<SeatInfo> allSeats, {StudentInfo? targetStudent}) {
+    final studentName = targetStudent?.name ?? (currentSeat.studentName.isNotEmpty ? currentSeat.studentName : 'Student');
+    final studentId = targetStudent?.id ?? currentSeat.studentId;
+    final studentShift = targetStudent?.shift ?? currentSeat.shift;
+
+    final candidateSeats = allSeats.where((s) {
+      if (s.seatNumber == currentSeat.seatNumber) return false;
+      return _service.isSeatAvailableForShift(s.seatNumber, studentShift);
+    }).toList();
+
+    if (candidateSeats.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No other vacant seats available right now.')),
+        SnackBar(content: Text('No other seats available for $studentShift right now.')),
       );
       return;
     }
-    int selectedNewSeat = vacantSeats.first.seatNumber;
+    int selectedNewSeat = candidateSeats.first.seatNumber;
 
     showDialog(
       context: context,
       builder: (dlgCtx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Move ${currentSeat.studentName}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+          title: Text('Move $studentName', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Move from Seat S-${currentSeat.seatNumber} to an available seat:',
+                'Move from Seat S-${currentSeat.seatNumber} to an available seat for $studentShift:',
                 style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
               ),
               const SizedBox(height: 14),
@@ -922,7 +930,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                   child: DropdownButton<int>(
                     value: selectedNewSeat,
                     isExpanded: true,
-                    items: vacantSeats.map((vs) {
+                    items: candidateSeats.map((vs) {
                       return DropdownMenuItem<int>(
                         value: vs.seatNumber,
                         child: Text('Seat S-${vs.seatNumber} (${vs.sectionName})', style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -948,13 +956,13 @@ class _SeatsScreenState extends State<SeatsScreen> {
                 await _service.changeSeat(
                   fromSeatNumber: currentSeat.seatNumber,
                   toSeatNumber: selectedNewSeat,
-                  studentId: currentSeat.studentId,
-                  shift: currentSeat.shift,
+                  studentId: studentId,
+                  shift: studentShift,
                 );
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('${currentSeat.studentName} moved to Seat S-$selectedNewSeat. Seat S-${currentSeat.seatNumber} is now vacant.'),
+                      content: Text('$studentName moved to Seat S-$selectedNewSeat ($studentShift).'),
                       backgroundColor: const Color(0xFF0D766E),
                     ),
                   );
@@ -968,148 +976,464 @@ class _SeatsScreenState extends State<SeatsScreen> {
     );
   }
 
-  void _showSeatOccupiedModal(SeatInfo seat, List<SeatInfo> allSeats) {
+  void _showSeatOccupiedModal(SeatInfo seat, List<SeatInfo> allSeats, List<StudentInfo> allStudents) {
+    // Find all active students on this seat
+    final seatOccupants = allStudents.where((s) => s.seatNumber == seat.seatNumber && s.status != 'INACTIVE').toList();
+
+    if (seatOccupants.isEmpty) {
+      final fallback = _service.getStudentForSeat(seat.seatNumber) ?? StudentInfo(
+        id: seat.studentId.isNotEmpty ? seat.studentId : 'S-${seat.seatNumber}',
+        name: seat.studentName.isNotEmpty ? seat.studentName : 'Student S-${seat.seatNumber}',
+        phone: '',
+        seatNumber: seat.seatNumber,
+        shift: seat.shift,
+      );
+      seatOccupants.add(fallback);
+    }
+
+    final allLibraryShifts = _service.shifts.isNotEmpty
+        ? _service.shifts.map((s) => s.name).toSet().toList()
+        : ['Morning Shift', 'Evening Shift', 'Night Shift', 'Full Day'];
+
+    final bool hasFullDay = seatOccupants.any((s) {
+      final sh = s.shift.toLowerCase();
+      return sh.contains('full') || sh.contains('24');
+    });
+
+    final vacantShifts = hasFullDay
+        ? <String>[]
+        : allLibraryShifts.where((sh) {
+            final shLow = sh.toLowerCase();
+            if (shLow.contains('full') || shLow.contains('24')) return false;
+            return !seatOccupants.any((occ) => LibraryService.doShiftsConflict(occ.shift, sh));
+          }).toList();
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0284C7),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFFEAB308), width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          seat.studentName.isNotEmpty ? seat.studentName.substring(0, 1).toUpperCase() : 'S',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          seat.studentName.toUpperCase(),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
-                        ),
-                        Text(
-                          'Seat S-${seat.seatNumber} • ${seat.shift}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) => Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(modalCtx).size.height * 0.85,
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.textNavy),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            // View Member Profile (Image 2)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: const Icon(Icons.person_outline_rounded, size: 20),
-                label: const Text('View Member Profile', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  final student = _service.currentStudents.firstWhere(
-                    (s) => (seat.studentId.isNotEmpty && s.id == seat.studentId) || s.seatNumber == seat.seatNumber,
-                    orElse: () => _service.getStudentForSeat(seat.seatNumber) ?? StudentInfo(
-                      id: seat.studentId.isNotEmpty ? seat.studentId : 'S-${seat.seatNumber}',
-                      name: seat.studentName.isNotEmpty ? seat.studentName : 'Student S-${seat.seatNumber}',
-                      phone: '',
-                      seatNumber: seat.seatNumber,
-                      shift: seat.shift,
-                    ),
-                  );
-                  final idx = _service.currentStudents.indexWhere((s) => s.id == student.id);
-                  final memberId = idx != -1 ? idx + 1 : seat.seatNumber;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MemberProfileScreen(student: student, memberId: memberId),
-                    ),
-                  );
-                },
               ),
-            ),
-            const SizedBox(height: 12),
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.chair_alt_rounded, color: Color(0xFF0284C7), size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Seat S-${seat.seatNumber}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textNavy,
+                            ),
+                          ),
+                          Text(
+                            seat.sectionName.isNotEmpty ? seat.sectionName : 'Main Hall',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: seatOccupants.length > 1 ? const Color(0xFFF3E8FF) : const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: seatOccupants.length > 1 ? const Color(0xFFD8B4FE) : const Color(0xFFA7F3D0),
+                          ),
+                        ),
+                        child: Text(
+                          seatOccupants.length > 1
+                              ? '${seatOccupants.length} Members'
+                              : '1 Member',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: seatOccupants.length > 1 ? const Color(0xFF7E22CE) : const Color(0xFF059669),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: AppColors.textNavy),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'ASSIGNED MEMBERS ACROSS SHIFTS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Scrollable list of occupant cards
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      ...seatOccupants.map((occ) {
+                        final idx = allStudents.indexWhere((s) => s.id == occ.id);
+                        final memberId = idx != -1 ? idx + 1 : seat.seatNumber;
+                        final hasDues = occ.hasDues || occ.effectiveDues > 0;
+                        final initials = occ.name.trim().isNotEmpty
+                            ? (occ.name.trim().split(' ').length > 1
+                                ? '${occ.name.trim().split(' ')[0][0]}${occ.name.trim().split(' ')[1][0]}'.toUpperCase()
+                                : (occ.name.trim().length >= 2 ? occ.name.trim().substring(0, 2).toUpperCase() : occ.name.trim().toUpperCase()))
+                            : 'M';
 
-            // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFFFCA5A5)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.cancel_outlined, size: 18),
-                    label: const Text('Vacate Seat', style: TextStyle(fontWeight: FontWeight.w800)),
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      await _service.vacateSeat(seat.seatNumber, seat.studentId);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Seat S-${seat.seatNumber} is now vacant and available.'),
-                            backgroundColor: Colors.black87,
-                            behavior: SnackBarBehavior.floating,
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: hasDues ? const Color(0xFFFECDD3) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  // Avatar
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0284C7),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: const Color(0xFFEAB308), width: 2),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        initials,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          occ.name.toUpperCase(),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppColors.textNavy,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE0F2FE),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                occ.shift,
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFF0369A1),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Member #$memberId',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Due / Paid badge
+                                  if (hasDues)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF1F2),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFFECDD3)),
+                                      ),
+                                      child: Text(
+                                        'Due ₹${occ.effectiveDues}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFFE11D48),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFECFDF5),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                                      ),
+                                      child: const Text(
+                                        'Paid',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF16A34A),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (occ.phone.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.phone_rounded, size: 13, color: Color(0xFF64748B)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      occ.phone,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              // Primary action: View Member Profile
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0D9488),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  icon: const Icon(Icons.person_rounded, size: 18),
+                                  label: Text(
+                                    'View Profile (${occ.name.split(' ').first})',
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => MemberProfileScreen(
+                                          student: occ,
+                                          memberId: memberId,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              // Sub-actions: Change seat & Vacate seat for this member
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFF0D766E),
+                                        side: const BorderSide(color: Color(0xFF99F6E4)),
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.sync_alt_rounded, size: 16),
+                                      label: const Text('Move Seat', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        _showChangeSeatDialog(seat, allSeats, targetStudent: occ);
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFFEF4444),
+                                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.cancel_outlined, size: 16),
+                                      label: const Text('Vacate Shift', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                      onPressed: () async {
+                                        Navigator.pop(ctx);
+                                        await _service.vacateSeat(seat.seatNumber, occ.id);
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('${occ.name} vacated from Seat S-${seat.seatNumber} (${occ.shift}).'),
+                                              backgroundColor: Colors.black87,
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         );
-                      }
-                    },
+                      }),
+                      // Vacant Shifts Section (if any shifts are available on this seat)
+                      if (vacantShifts.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 18),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    'Available Shifts on this Seat:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      color: Color(0xFF166534),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: vacantShifts.map((sh) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFF86EFAC)),
+                                    ),
+                                    child: Text(
+                                      '✓ $sh',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF15803D),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF16A34A),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 17),
+                                  label: const Text(
+                                    'Assign Student to Remaining Shift',
+                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _showAssignSeatModal(seat, allStudents);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D766E),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.sync_alt_rounded, size: 18),
-                    label: const Text('Change Seat', style: TextStyle(fontWeight: FontWeight.w800)),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _showChangeSeatDialog(seat, allSeats);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1517,30 +1841,37 @@ class _SeatsScreenState extends State<SeatsScreen> {
 
                           // OCCUPIED / ASSIGNED SEAT CARD
                           if (isOccupied) {
+                            final isMultiOccupant = seatStudents.length > 1;
+                            final anyDues = seatStudents.any((s) => s.hasDues || s.effectiveDues > 0);
                             final studentIdx = students.indexWhere((s) => s.id == student.id);
                             final memberId = studentIdx != -1 ? studentIdx + 1 : seat.seatNumber;
                             final hasDues = student.hasDues || student.effectiveDues > 0 || student.duesAmount > 0 || student.status == 'DUES';
                             final isTrial = student.status == 'TRIAL';
 
-                            final initials = seat.studentName.trim().isNotEmpty
-                                ? (seat.studentName.trim().split(' ').length > 1
-                                    ? '${seat.studentName.trim().split(' ')[0][0]}${seat.studentName.trim().split(' ')[1][0]}'.toUpperCase()
-                                    : (seat.studentName.trim().length >= 2 ? seat.studentName.trim().substring(0, 2).toUpperCase() : seat.studentName.trim().toUpperCase()))
-                                : 'GS';
+                            final String cardInitials;
+                            if (isMultiOccupant) {
+                              final firstInit = seatStudents[0].name.trim().isNotEmpty ? seatStudents[0].name.trim()[0].toUpperCase() : 'S';
+                              final secondInit = seatStudents[1].name.trim().isNotEmpty ? seatStudents[1].name.trim()[0].toUpperCase() : 'S';
+                              cardInitials = '$firstInit/$secondInit';
+                            } else if (seat.studentName.trim().isNotEmpty) {
+                              cardInitials = seat.studentName.trim().split(' ').length > 1
+                                  ? '${seat.studentName.trim().split(' ')[0][0]}${seat.studentName.trim().split(' ')[1][0]}'.toUpperCase()
+                                  : (seat.studentName.trim().length >= 2 ? seat.studentName.trim().substring(0, 2).toUpperCase() : seat.studentName.trim().toUpperCase());
+                            } else {
+                              cardInitials = 'GS';
+                            }
+
+                            final displayName = isMultiOccupant
+                                ? seatStudents.map((s) => s.name.trim().split(' ').first).join(' & ')
+                                : (seat.studentName.isNotEmpty ? seat.studentName.toUpperCase() : 'OCCUPIED');
+
+                            final displayShift = isMultiOccupant
+                                ? seatStudents.map((s) => s.shift.split(' ').first).join(' • ')
+                                : seat.shift.toUpperCase();
 
                             return InkWell(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => MemberProfileScreen(
-                                      student: student,
-                                      memberId: memberId,
-                                    ),
-                                  ),
-                                );
-                              },
-                              onLongPress: () => _showSeatOccupiedModal(seat, seats),
+                              onTap: () => _showSeatOccupiedModal(seat, seats, students),
+                              onLongPress: () => _showSeatOccupiedModal(seat, seats, students),
                               borderRadius: BorderRadius.circular(18),
                               child: Container(
                                 padding: const EdgeInsets.all(12),
@@ -1548,9 +1879,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                   color: AppColors.card(context),
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: hasDues
+                                    color: (anyDues || hasDues)
                                         ? (AppColors.isDark(context) ? const Color(0xFF7F1D1D) : const Color(0xFFFECDD3))
-                                        : AppColors.cardBorderColor(context),
+                                        : (isMultiOccupant ? const Color(0xFFD8B4FE) : AppColors.cardBorderColor(context)),
+                                    width: isMultiOccupant ? 1.5 : 1,
                                   ),
                                   boxShadow: const [
                                     BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
@@ -1559,7 +1891,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    // Top row: Status dot, Seat number, and dynamic Dues/Paid/Trial badge
+                                    // Top row: Status dot, Seat number, and dynamic Dues/Paid/Trial/Multi-shift badge
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
@@ -1569,9 +1901,11 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                               width: 7,
                                               height: 7,
                                               decoration: BoxDecoration(
-                                                color: isTrial
-                                                    ? const Color(0xFF0284C7)
-                                                    : (hasDues ? const Color(0xFFEF4444) : const Color(0xFF16A34A)),
+                                                color: isMultiOccupant
+                                                    ? const Color(0xFF8B5CF6)
+                                                    : (isTrial
+                                                        ? const Color(0xFF0284C7)
+                                                        : (hasDues ? const Color(0xFFEF4444) : const Color(0xFF16A34A))),
                                                 shape: BoxShape.circle,
                                               ),
                                             ),
@@ -1586,7 +1920,24 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                             ),
                                           ],
                                         ),
-                                        if (hasDues)
+                                        if (isMultiOccupant)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF3E8FF),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFFD8B4FE)),
+                                            ),
+                                            child: Text(
+                                              '${seatStudents.length} SHIFTS',
+                                              style: const TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w900,
+                                                color: Color(0xFF7E22CE),
+                                              ),
+                                            ),
+                                          )
+                                        else if (hasDues)
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
@@ -1637,22 +1988,25 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                       ],
                                     ),
 
-                                    // Circular Avatar with Gold/Yellow Border
+                                    // Circular Avatar with Gold/Purple Border
                                     Container(
                                       width: 48,
                                       height: 48,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF0284C7),
+                                        color: isMultiOccupant ? const Color(0xFF7C3AED) : const Color(0xFF0284C7),
                                         shape: BoxShape.circle,
-                                        border: Border.all(color: const Color(0xFFEAB308), width: 2.5),
+                                        border: Border.all(
+                                          color: isMultiOccupant ? const Color(0xFFC084FC) : const Color(0xFFEAB308),
+                                          width: 2.5,
+                                        ),
                                       ),
                                       child: Center(
                                         child: Text(
-                                          initials,
+                                          cardInitials,
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.w900,
-                                            fontSize: 16,
+                                            fontSize: 15,
                                           ),
                                         ),
                                       ),
@@ -1662,7 +2016,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                     Column(
                                       children: [
                                         Text(
-                                          seat.studentName.isNotEmpty ? seat.studentName.toUpperCase() : 'OCCUPIED',
+                                          displayName,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
@@ -1675,18 +2029,24 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFF0FDFA),
+                                            color: isMultiOccupant
+                                                ? const Color(0xFFF3E8FF)
+                                                : (AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFF0FDFA)),
                                             borderRadius: BorderRadius.circular(6),
                                             border: Border.all(
-                                              color: AppColors.isDark(context) ? const Color(0xFF0D9488) : const Color(0xFF99F6E4),
+                                              color: isMultiOccupant
+                                                  ? const Color(0xFFD8B4FE)
+                                                  : (AppColors.isDark(context) ? const Color(0xFF0D9488) : const Color(0xFF99F6E4)),
                                             ),
                                           ),
                                           child: Text(
-                                            seat.shift.toUpperCase(),
+                                            displayShift,
                                             style: TextStyle(
                                               fontSize: 9,
                                               fontWeight: FontWeight.w800,
-                                              color: AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D9488),
+                                              color: isMultiOccupant
+                                                  ? const Color(0xFF7E22CE)
+                                                  : (AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D9488)),
                                             ),
                                           ),
                                         ),

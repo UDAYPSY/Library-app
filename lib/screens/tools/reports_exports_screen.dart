@@ -18,6 +18,7 @@ class ReportsExportsScreen extends StatefulWidget {
 class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
   final LibraryService _service = LibraryService();
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  int _selectedTab = 0; // 0: Monthly Financials, 1: Student Tenure, 2: Payment Analysis, 3: Shift & Capacity, 4: Fee Dues
 
   void _prevMonth() {
     setState(() {
@@ -31,8 +32,12 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
     });
   }
 
-  Future<void> _shareViaWhatsApp(String text) async {
-    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
+  Future<void> _shareViaWhatsApp(String text, {String? phone}) async {
+    final encoded = Uri.encodeComponent(text);
+    final phoneClean = phone != null ? LibraryService.normalizePhone(phone) : '';
+    final uri = phoneClean.isNotEmpty && phoneClean.length >= 10
+        ? Uri.parse('https://wa.me/91$phoneClean?text=$encoded')
+        : Uri.parse('https://wa.me/?text=$encoded');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -112,6 +117,117 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
     return '${headers.join(',')}\n$rows';
   }
 
+  String _generateTenureCsv(List<StudentInfo> list, List<PaymentTransaction> allPayments) {
+    final headers = [
+      'Student Name',
+      'Phone',
+      'Seat Number',
+      'Shift',
+      'Joined Date',
+      'Study Duration (Months)',
+      'Tenure Category',
+      'Total Fees Paid (INR)',
+      'Monthly Fee (INR)',
+      'Pending Dues (INR)',
+      'Status'
+    ];
+    final now = DateTime.now();
+    final rows = list.map((s) {
+      final joined = s.joinedAt;
+      final months = joined != null
+          ? ((now.year - joined.year) * 12 + now.month - joined.month).clamp(0, 120)
+          : 1;
+      final String category;
+      if (months < 1) {
+        category = 'New (< 1 Month)';
+      } else if (months <= 3) {
+        category = 'Recent (1-3 Months)';
+      } else if (months <= 6) {
+        category = 'Established (3-6 Months)';
+      } else if (months <= 12) {
+        category = 'Long-Term (6-12 Months)';
+      } else {
+        category = 'Veteran (> 1 Year)';
+      }
+      final sPhoneNorm = LibraryService.normalizePhone(s.phone);
+      final sNameLower = s.name.trim().toLowerCase();
+      final totalPaid = allPayments.where((p) {
+        if (p.studentId.isNotEmpty && p.studentId == s.id) return true;
+        if (sPhoneNorm.isNotEmpty && p.studentPhone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == sPhoneNorm) return true;
+        if (sNameLower.isNotEmpty && p.studentName.trim().toLowerCase() == sNameLower) return true;
+        return false;
+      }).fold<int>(0, (sum, p) => sum + p.amount);
+
+      return [
+        s.name,
+        s.phone,
+        s.seatNumber != null ? 'S-${s.seatNumber}' : 'Unallocated',
+        s.shift,
+        joined != null ? DateFormat('dd-MM-yyyy').format(joined) : 'N/A',
+        '$months',
+        category,
+        '$totalPaid',
+        '${s.monthlyFee}',
+        '${s.effectiveDues}',
+        s.status,
+      ].map(_cleanCsvField).join(',');
+    }).join('\n');
+    return '${headers.join(',')}\n$rows';
+  }
+
+  String _generateShiftOccupancyCsv(List<StudentInfo> students, int totalSeats) {
+    final headers = ['Shift Name', 'Enrolled Students', 'Total Seat Capacity', 'Occupancy Rate (%)'];
+    final activeStudents = students.where((s) => s.status != 'INACTIVE').toList();
+    final shifts = ['Full Day', 'Morning Shift', 'Evening Shift', 'Night Shift'];
+
+    final rows = shifts.map((sh) {
+      final count = activeStudents.where((s) => LibraryService.doShiftsConflict(s.shift, sh)).length;
+      final rate = totalSeats > 0 ? ((count / totalSeats) * 100).toStringAsFixed(1) : '0.0';
+      return [
+        sh,
+        '$count',
+        '$totalSeats',
+        '$rate%',
+      ].map(_cleanCsvField).join(',');
+    }).join('\n');
+    return '${headers.join(',')}\n$rows';
+  }
+
+  String _generatePaymentModeCsv(List<PaymentTransaction> payments) {
+    final headers = ['Payment Mode', 'Transactions Count', 'Total Amount (INR)', 'Revenue Share (%)'];
+    final totalAll = payments.fold<int>(0, (sum, p) => sum + p.amount);
+    final modes = ['UPI', 'Cash', 'Card', 'Bank Transfer'];
+
+    final rows = modes.map((m) {
+      final modePayments = payments.where((p) => p.paymentMode.toUpperCase().contains(m.toUpperCase())).toList();
+      final sum = modePayments.fold<int>(0, (s, p) => s + p.amount);
+      final pct = totalAll > 0 ? ((sum / totalAll) * 100).toStringAsFixed(1) : '0.0';
+      return [
+        m,
+        '${modePayments.length}',
+        '$sum',
+        '$pct%',
+      ].map(_cleanCsvField).join(',');
+    }).join('\n');
+    return '${headers.join(',')}\n$rows';
+  }
+
+  String _generateDefaultersCsv(List<StudentInfo> list) {
+    final headers = ['Student Name', 'Phone', 'Seat #', 'Shift', 'Pending Dues (INR)', 'Monthly Fee (INR)', 'Joined Date', 'Status'];
+    final defaulters = list.where((s) => s.status != 'INACTIVE' && (s.hasDues || s.effectiveDues > 0)).toList();
+    final rows = defaulters.map((s) => [
+      s.name,
+      s.phone,
+      s.seatNumber != null ? 'S-${s.seatNumber}' : 'Unallocated',
+      s.shift,
+      '${s.effectiveDues}',
+      '${s.monthlyFee}',
+      s.joinedAt != null ? DateFormat('dd-MM-yyyy').format(s.joinedAt!) : 'N/A',
+      s.status,
+    ].map(_cleanCsvField).join(',')).join('\n');
+    return '${headers.join(',')}\n$rows';
+  }
+
   void _showPreviewTable(String title, List<String> headers, List<List<String>> rows) {
     showModalBottomSheet(
       context: context,
@@ -127,7 +243,12 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('$title Preview (${rows.length} rows)', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.textNavy)),
+                Expanded(
+                  child: Text(
+                    '$title Preview (${rows.length} rows)',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.textNavy),
+                  ),
+                ),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
               ],
             ),
@@ -135,11 +256,11 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
             if (rows.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 30),
-                child: Center(child: Text('No rows in this period.', style: TextStyle(color: Color(0xFF64748B)))),
+                child: Center(child: Text('No data found for this report.', style: TextStyle(color: Color(0xFF64748B)))),
               )
             else
               SizedBox(
-                height: 320,
+                height: 340,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.vertical,
                   child: SingleChildScrollView(
@@ -344,7 +465,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
     required String summaryText,
   }) {
     final cleanCategorySlug = categoryName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-    final fileName = '${cleanCategorySlug}_${DateFormat('yyyyMMdd').format(_selectedMonth)}.csv';
+    final fileName = '${cleanCategorySlug}_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
 
     showModalBottomSheet(
       context: context,
@@ -359,16 +480,18 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Export $categoryName',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                Expanded(
+                  child: Text(
+                    'Export $categoryName',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                  ),
                 ),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              'Period: ${DateFormat('MMMM yyyy').format(_selectedMonth)} • $rowCount rows ready',
+              '$rowCount rows ready for export or preview',
               style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 18),
@@ -455,10 +578,49 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
     );
   }
 
+  Widget _buildNavTab(int index, String label, IconData icon) {
+    final isSelected = _selectedTab == index;
+    return InkWell(
+      onTap: () => setState(() => _selectedTab = index),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0D9488) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: isSelected
+              ? [const BoxShadow(color: Color(0x180D9488), blurRadius: 6, offset: Offset(0, 2))]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                color: isSelected ? Colors.white : const Color(0xFF475569),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final monthStr = DateFormat('MMMM yyyy').format(_selectedMonth);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -469,10 +631,33 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Reports & Exports',
+          'Reports & Analytics Hub',
           style: TextStyle(color: AppColors.textNavy, fontWeight: FontWeight.w800, fontSize: 17),
         ),
         centerTitle: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildNavTab(0, 'Monthly Report', Icons.calendar_month_rounded),
+                  const SizedBox(width: 8),
+                  _buildNavTab(1, 'Student Tenure (Months)', Icons.history_edu_rounded),
+                  const SizedBox(width: 8),
+                  _buildNavTab(2, 'Payment Analysis', Icons.pie_chart_rounded),
+                  const SizedBox(width: 8),
+                  _buildNavTab(3, 'Shift Occupancy', Icons.group_work_rounded),
+                  const SizedBox(width: 8),
+                  _buildNavTab(4, 'Fee Dues & Defaulters', Icons.warning_amber_rounded),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
       body: StreamBuilder<List<StudentInfo>>(
         stream: _service.streamStudents(),
@@ -487,47 +672,26 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                   final expenses = expenseSnap.data ?? [];
                   final students = studentSnap.data ?? _service.currentStudents;
 
-                  // Filter by month
-                  final monthPayments = payments.where((p) =>
-                      p.date.year == _selectedMonth.year &&
-                      p.date.month == _selectedMonth.month).toList();
-                  final monthExpenses = expenses.where((e) =>
-                      e.date.year == _selectedMonth.year &&
-                      e.date.month == _selectedMonth.month).toList();
-                  final monthStudents = students.where((s) =>
-                      s.joinedAt != null &&
-                      s.joinedAt!.year == _selectedMonth.year &&
-                      s.joinedAt!.month == _selectedMonth.month).toList();
-
-                  final collectedAmount = monthPayments.fold<int>(0, (sum, p) => sum + p.amount);
-                  final paymentsCount = monthPayments.length;
-
-                  final expenseAmount = monthExpenses.fold<int>(0, (sum, e) => sum + e.amount);
-                  final expenseCount = monthExpenses.length;
-
-                  final net = collectedAmount - expenseAmount;
-                  final newAdmissionsCount = monthStudents.length;
-
                   return SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // EXCEL-FIRST HYBRID DATA HUB CARD
+                        // EXCEL-FIRST DATA HUB CARD (Always present at top)
                         Container(
                           width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 24),
-                          padding: const EdgeInsets.all(20),
+                          margin: const EdgeInsets.only(bottom: 20),
+                          padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.35)),
                             boxShadow: const [
-                              BoxShadow(color: Color(0x18000000), blurRadius: 14, offset: Offset(0, 6)),
+                              BoxShadow(color: Color(0x18000000), blurRadius: 12, offset: Offset(0, 4)),
                             ],
                           ),
                           child: Column(
@@ -548,7 +712,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                                       ),
                                       const SizedBox(width: 10),
                                       const Text(
-                                        'EXCEL-FIRST DATA HUB',
+                                        'LIBRARY DATA HUB & BACKUP',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w900,
@@ -565,18 +729,18 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Text(
-                                      'HYBRID ARCHITECTURE',
+                                      'EXCEL READY',
                                       style: TextStyle(color: Color(0xFF34D399), fontSize: 9, fontWeight: FontWeight.w900),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 8),
                               const Text(
-                                'Manage with database speed and reliability, with 100% offline Excel portability.',
+                                'Manage complete library database with speed and reliability, and 100% offline Excel portability.',
                                 style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), height: 1.4),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 14),
                               Row(
                                 children: [
                                   Expanded(
@@ -585,10 +749,10 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                                         backgroundColor: const Color(0xFF0D9488),
                                         foregroundColor: Colors.white,
                                         elevation: 0,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(vertical: 11),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                       ),
-                                      icon: const Icon(Icons.download_for_offline_rounded, size: 18),
+                                      icon: const Icon(Icons.download_for_offline_rounded, size: 17),
                                       label: const Text(
                                         'Master Excel Backup',
                                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -619,10 +783,10 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: Colors.white,
                                         side: const BorderSide(color: Color(0xFF334155)),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(vertical: 11),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                       ),
-                                      icon: const Icon(Icons.file_upload_outlined, size: 18, color: Color(0xFF38BDF8)),
+                                      icon: const Icon(Icons.file_upload_outlined, size: 17, color: Color(0xFF38BDF8)),
                                       label: const Text(
                                         'Bulk Excel Import',
                                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -636,257 +800,19 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                           ),
                         ),
 
-                        // Section Header: MONTHLY REPORT
-                        const Text(
-                          'MONTHLY REPORT',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
+                        // Render Tab Content
+                        if (_selectedTab == 0)
+                          _buildMonthlyReportTab(students, payments, expenses)
+                        else if (_selectedTab == 1)
+                          _buildStudentTenureTab(students, payments)
+                        else if (_selectedTab == 2)
+                          _buildPaymentAnalysisTab(payments)
+                        else if (_selectedTab == 3)
+                          _buildShiftOccupancyTab(students)
+                        else if (_selectedTab == 4)
+                          _buildFeeDuesTab(students),
 
-                        // Month Picker Card
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFF1F5F9)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textNavy),
-                                onPressed: _prevMonth,
-                              ),
-                              Text(
-                                monthStr,
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.textNavy,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textNavy),
-                                onPressed: _nextMonth,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 2x2 Metrics Grid
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _metricCard(
-                                label: 'COLLECTED',
-                                value: '₹$collectedAmount',
-                                valueColor: const Color(0xFF16A34A),
-                                subtitle: '$paymentsCount payments',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _metricCard(
-                                label: 'EXPENSES',
-                                value: '₹$expenseAmount',
-                                valueColor: const Color(0xFFF59E0B),
-                                subtitle: '$expenseCount entries',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _metricCard(
-                                label: 'NET',
-                                value: '${net < 0 ? "-" : "+"}₹${net.abs()}',
-                                valueColor: net < 0 ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
-                                subtitle: net < 0 ? 'loss' : 'profit',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _metricCard(
-                                label: 'NEW ADMISSIONS',
-                                value: '$newAdmissionsCount',
-                                valueColor: const Color(0xFF0284C7),
-                                subtitle: 'students joined',
-                              ),
-                            ),
-                          ],
-                        ),
                         const SizedBox(height: 24),
-
-                        // Monthly Export Category Rows Card
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFF1F5F9)),
-                          ),
-                          child: Column(
-                            children: [
-                              // Payments
-                              _exportListRow(
-                                icon: Icons.account_balance_wallet_outlined,
-                                iconBg: const Color(0xFFECFDF5),
-                                iconColor: const Color(0xFF10B981),
-                                title: 'Payments Report',
-                                subtitle: '$paymentsCount payments in $monthStr (₹$collectedAmount)',
-                                onDownload: () {
-                                  final csv = _generatePaymentsCsv(monthPayments);
-                                  final headers = ['Receipt', 'Date', 'Student', 'Phone', 'Seat', 'Shift', 'Amount', 'Mode', 'Notes'];
-                                  final previewRows = monthPayments.map((p) => [
-                                    p.id,
-                                    DateFormat('dd-MM-yy').format(p.date),
-                                    p.studentName,
-                                    p.studentPhone,
-                                    p.seatNumber != null ? 'S-${p.seatNumber}' : 'Unallocated',
-                                    p.shift,
-                                    '₹${p.amount}',
-                                    p.paymentMode,
-                                    p.notes,
-                                  ]).toList();
-                                  final summary = '${_service.profile.libraryName} - Payments Report ($monthStr)\nTotal Collected: ₹$collectedAmount across $paymentsCount transactions.';
-                                  _exportCategory(
-                                    categoryName: 'Payments ($monthStr)',
-                                    rowCount: paymentsCount,
-                                    csvData: csv,
-                                    headers: headers,
-                                    previewRows: previewRows,
-                                    summaryText: summary,
-                                  );
-                                },
-                              ),
-                              const Divider(height: 1),
-
-                              // Expenses
-                              _exportListRow(
-                                icon: Icons.receipt_long_outlined,
-                                iconBg: const Color(0xFFFFFBEB),
-                                iconColor: const Color(0xFFF59E0B),
-                                title: 'Expenses Report',
-                                subtitle: '$expenseCount entries in $monthStr (₹$expenseAmount)',
-                                onDownload: () {
-                                  final csv = _generateExpensesCsv(monthExpenses);
-                                  final headers = ['ID', 'Date', 'Title', 'Category', 'Amount', 'Mode', 'Note'];
-                                  final previewRows = monthExpenses.map((e) => [
-                                    e.id,
-                                    DateFormat('dd-MM-yy').format(e.date),
-                                    e.title,
-                                    e.category,
-                                    '₹${e.amount}',
-                                    e.paymentMode,
-                                    e.note,
-                                  ]).toList();
-                                  final summary = '${_service.profile.libraryName} - Expenses Report ($monthStr)\nTotal Expenses: ₹$expenseAmount across $expenseCount entries.';
-                                  _exportCategory(
-                                    categoryName: 'Expenses ($monthStr)',
-                                    rowCount: expenseCount,
-                                    csvData: csv,
-                                    headers: headers,
-                                    previewRows: previewRows,
-                                    summaryText: summary,
-                                  );
-                                },
-                              ),
-                              const Divider(height: 1),
-
-                              // New Admissions
-                              _exportListRow(
-                                icon: Icons.person_add_outlined,
-                                iconBg: const Color(0xFFF0F9FF),
-                                iconColor: const Color(0xFF0284C7),
-                                title: 'New Admissions',
-                                subtitle: '$newAdmissionsCount students joined in $monthStr',
-                                onDownload: () {
-                                  final csv = _generateAdmissionsCsv(monthStudents);
-                                  final headers = ['Joined', 'Name', 'Phone', 'Seat', 'Shift', 'Monthly', 'Status'];
-                                  final previewRows = monthStudents.map((s) => [
-                                    s.joinedAt != null ? DateFormat('dd-MM-yy').format(s.joinedAt!) : 'N/A',
-                                    s.name,
-                                    s.phone,
-                                    s.seatNumber != null ? 'S-${s.seatNumber}' : 'None',
-                                    s.shift,
-                                    '₹${s.monthlyFee}',
-                                    s.status,
-                                  ]).toList();
-                                  final summary = '${_service.profile.libraryName} - New Admissions ($monthStr)\nTotal Admissions: $newAdmissionsCount students.';
-                                  _exportCategory(
-                                    categoryName: 'New Admissions ($monthStr)',
-                                    rowCount: newAdmissionsCount,
-                                    csvData: csv,
-                                    headers: headers,
-                                    previewRows: previewRows,
-                                    summaryText: summary,
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // FULL DATA Section
-                        const Text(
-                          'FULL DATA',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFF1F5F9)),
-                          ),
-                          child: _exportListRow(
-                            icon: Icons.people_outline_rounded,
-                            iconBg: const Color(0xFFF0F9FF),
-                            iconColor: const Color(0xFF0284C7),
-                            title: 'All Students Roster',
-                            subtitle: 'Complete library roster (${students.length} students enrolled)',
-                            onDownload: () {
-                              final csv = _generateAllStudentsCsv(students);
-                              final headers = ['ID', 'Name', 'Phone', 'Seat', 'Shift', 'Status', 'Monthly', 'Dues', 'Joined'];
-                              final previewRows = students.map((s) => [
-                                s.id,
-                                s.name,
-                                s.phone,
-                                s.seatNumber != null ? 'S-${s.seatNumber}' : 'None',
-                                s.shift,
-                                s.status,
-                                '₹${s.monthlyFee}',
-                                '₹${s.effectiveDues}',
-                                s.joinedAt != null ? DateFormat('dd-MM-yy').format(s.joinedAt!) : 'N/A',
-                              ]).toList();
-                              final summary = '${_service.profile.libraryName} - Full Student Roster\nTotal Students: ${students.length}';
-                              _exportCategory(
-                                categoryName: 'Complete Student Roster',
-                                rowCount: students.length,
-                                csvData: csv,
-                                headers: headers,
-                                previewRows: previewRows,
-                                summaryText: summary,
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
                         // Footer Note
                         const Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -895,8 +821,8 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Files open in Excel or Google Sheets. Copy to clipboard or share directly to WhatsApp or Drive.',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
+                                'All reports can be downloaded in .CSV format or copied directly into Microsoft Excel & Google Sheets. Click on any report to preview data table or share via WhatsApp.',
+                                style: TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.4),
                               ),
                             ),
                           ],
@@ -911,6 +837,1140 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
           );
         },
       ),
+    );
+  }
+
+  // TAB 0: MONTHLY REPORT
+  Widget _buildMonthlyReportTab(
+    List<StudentInfo> students,
+    List<PaymentTransaction> payments,
+    List<ExpenseItem> expenses,
+  ) {
+    final monthStr = DateFormat('MMMM yyyy').format(_selectedMonth);
+    final monthPayments = payments.where((p) =>
+        p.date.year == _selectedMonth.year &&
+        p.date.month == _selectedMonth.month).toList();
+    final monthExpenses = expenses.where((e) =>
+        e.date.year == _selectedMonth.year &&
+        e.date.month == _selectedMonth.month).toList();
+    final monthStudents = students.where((s) =>
+        s.joinedAt != null &&
+        s.joinedAt!.year == _selectedMonth.year &&
+        s.joinedAt!.month == _selectedMonth.month).toList();
+
+    final collectedAmount = monthPayments.fold<int>(0, (sum, p) => sum + p.amount);
+    final paymentsCount = monthPayments.length;
+    final expenseAmount = monthExpenses.fold<int>(0, (sum, e) => sum + e.amount);
+    final expenseCount = monthExpenses.length;
+    final net = collectedAmount - expenseAmount;
+    final newAdmissionsCount = monthStudents.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'MONTHLY FINANCIAL OVERVIEW',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 10),
+
+        // Month Picker Card
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textNavy),
+                onPressed: _prevMonth,
+              ),
+              Text(
+                monthStr,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textNavy),
+                onPressed: _nextMonth,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 2x2 Metrics Grid
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'COLLECTED',
+                value: '₹$collectedAmount',
+                valueColor: const Color(0xFF16A34A),
+                subtitle: '$paymentsCount payments',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'EXPENSES',
+                value: '₹$expenseAmount',
+                valueColor: const Color(0xFFF59E0B),
+                subtitle: '$expenseCount entries',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'NET BALANCE',
+                value: '${net < 0 ? "-" : "+"}₹${net.abs()}',
+                valueColor: net < 0 ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
+                subtitle: net < 0 ? 'loss' : 'profit',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'NEW ADMISSIONS',
+                value: '$newAdmissionsCount',
+                valueColor: const Color(0xFF0284C7),
+                subtitle: 'students joined',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Export Categories Card
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: Column(
+            children: [
+              _exportListRow(
+                icon: Icons.account_balance_wallet_outlined,
+                iconBg: const Color(0xFFECFDF5),
+                iconColor: const Color(0xFF10B981),
+                title: 'Payments Report ($monthStr)',
+                subtitle: '$paymentsCount payments recorded • Total ₹$collectedAmount',
+                onDownload: () {
+                  final csv = _generatePaymentsCsv(monthPayments);
+                  final headers = ['Receipt', 'Date', 'Student', 'Phone', 'Seat', 'Shift', 'Amount', 'Mode', 'Notes'];
+                  final previewRows = monthPayments.map((p) => [
+                    p.id,
+                    DateFormat('dd-MM-yy').format(p.date),
+                    p.studentName,
+                    p.studentPhone,
+                    p.seatNumber != null ? 'S-${p.seatNumber}' : 'Unallocated',
+                    p.shift,
+                    '₹${p.amount}',
+                    p.paymentMode,
+                    p.notes,
+                  ]).toList();
+                  final summary = '${_service.profile.libraryName} - Payments Report ($monthStr)\nTotal Collected: ₹$collectedAmount across $paymentsCount transactions.';
+                  _exportCategory(
+                    categoryName: 'Payments ($monthStr)',
+                    rowCount: paymentsCount,
+                    csvData: csv,
+                    headers: headers,
+                    previewRows: previewRows,
+                    summaryText: summary,
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              _exportListRow(
+                icon: Icons.receipt_long_outlined,
+                iconBg: const Color(0xFFFFFBEB),
+                iconColor: const Color(0xFFF59E0B),
+                title: 'Expenses Report ($monthStr)',
+                subtitle: '$expenseCount entries recorded • Total ₹$expenseAmount',
+                onDownload: () {
+                  final csv = _generateExpensesCsv(monthExpenses);
+                  final headers = ['ID', 'Date', 'Title', 'Category', 'Amount', 'Mode', 'Note'];
+                  final previewRows = monthExpenses.map((e) => [
+                    e.id,
+                    DateFormat('dd-MM-yy').format(e.date),
+                    e.title,
+                    e.category,
+                    '₹${e.amount}',
+                    e.paymentMode,
+                    e.note,
+                  ]).toList();
+                  final summary = '${_service.profile.libraryName} - Expenses Report ($monthStr)\nTotal Expenses: ₹$expenseAmount across $expenseCount entries.';
+                  _exportCategory(
+                    categoryName: 'Expenses ($monthStr)',
+                    rowCount: expenseCount,
+                    csvData: csv,
+                    headers: headers,
+                    previewRows: previewRows,
+                    summaryText: summary,
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              _exportListRow(
+                icon: Icons.person_add_outlined,
+                iconBg: const Color(0xFFF0F9FF),
+                iconColor: const Color(0xFF0284C7),
+                title: 'New Admissions ($monthStr)',
+                subtitle: '$newAdmissionsCount students joined in $monthStr',
+                onDownload: () {
+                  final csv = _generateAdmissionsCsv(monthStudents);
+                  final headers = ['Joined', 'Name', 'Phone', 'Seat', 'Shift', 'Monthly', 'Status'];
+                  final previewRows = monthStudents.map((s) => [
+                    s.joinedAt != null ? DateFormat('dd-MM-yy').format(s.joinedAt!) : 'N/A',
+                    s.name,
+                    s.phone,
+                    s.seatNumber != null ? 'S-${s.seatNumber}' : 'None',
+                    s.shift,
+                    '₹${s.monthlyFee}',
+                    s.status,
+                  ]).toList();
+                  final summary = '${_service.profile.libraryName} - New Admissions ($monthStr)\nTotal Admissions: $newAdmissionsCount students.';
+                  _exportCategory(
+                    categoryName: 'New Admissions ($monthStr)',
+                    rowCount: newAdmissionsCount,
+                    csvData: csv,
+                    headers: headers,
+                    previewRows: previewRows,
+                    summaryText: summary,
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              _exportListRow(
+                icon: Icons.people_outline_rounded,
+                iconBg: const Color(0xFFF5F3FF),
+                iconColor: const Color(0xFF8B5CF6),
+                title: 'Complete Student Roster',
+                subtitle: 'All ${students.length} students enrolled in library',
+                onDownload: () {
+                  final csv = _generateAllStudentsCsv(students);
+                  final headers = ['ID', 'Name', 'Phone', 'Seat', 'Shift', 'Status', 'Monthly', 'Dues', 'Joined'];
+                  final previewRows = students.map((s) => [
+                    s.id,
+                    s.name,
+                    s.phone,
+                    s.seatNumber != null ? 'S-${s.seatNumber}' : 'None',
+                    s.shift,
+                    s.status,
+                    '₹${s.monthlyFee}',
+                    '₹${s.effectiveDues}',
+                    s.joinedAt != null ? DateFormat('dd-MM-yy').format(s.joinedAt!) : 'N/A',
+                  ]).toList();
+                  final summary = '${_service.profile.libraryName} - Full Student Roster\nTotal Students: ${students.length}';
+                  _exportCategory(
+                    categoryName: 'Complete Student Roster',
+                    rowCount: students.length,
+                    csvData: csv,
+                    headers: headers,
+                    previewRows: previewRows,
+                    summaryText: summary,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // TAB 1: STUDENT TENURE & DURATION ANALYSIS (How many months students study)
+  Widget _buildStudentTenureTab(List<StudentInfo> students, List<PaymentTransaction> payments) {
+    final activeStudents = students.where((s) => s.status != 'INACTIVE').toList();
+    final now = DateTime.now();
+
+    final tenureList = activeStudents.map((s) {
+      final joined = s.joinedAt ?? now;
+      final months = ((now.year - joined.year) * 12 + (now.month - joined.month)).clamp(0, 120);
+      final days = now.difference(joined).inDays.clamp(0, 99999);
+      final sPhoneNorm = LibraryService.normalizePhone(s.phone);
+      final sNameLower = s.name.trim().toLowerCase();
+
+      final totalPaid = payments.where((p) {
+        if (p.studentId.isNotEmpty && p.studentId == s.id) return true;
+        if (sPhoneNorm.isNotEmpty && p.studentPhone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == sPhoneNorm) return true;
+        if (sNameLower.isNotEmpty && p.studentName.trim().toLowerCase() == sNameLower) return true;
+        return false;
+      }).fold<int>(0, (sum, p) => sum + p.amount);
+
+      return (
+        student: s,
+        months: months,
+        days: days,
+        totalPaid: totalPaid,
+      );
+    }).toList();
+
+    tenureList.sort((a, b) => b.months.compareTo(a.months));
+
+    final totalStudents = tenureList.length;
+    final avgMonths = totalStudents > 0
+        ? (tenureList.fold<int>(0, (sum, t) => sum + t.months) / totalStudents).toStringAsFixed(1)
+        : '0.0';
+
+    final longest = tenureList.isNotEmpty ? tenureList.first : null;
+    final under1m = tenureList.where((t) => t.months < 1).length;
+    final m1to3 = tenureList.where((t) => t.months >= 1 && t.months < 3).length;
+    final m3to6 = tenureList.where((t) => t.months >= 3 && t.months < 6).length;
+    final m6to12 = tenureList.where((t) => t.months >= 6 && t.months < 12).length;
+    final over12m = tenureList.where((t) => t.months >= 12).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'STUDENT STUDY DURATION & TENURE ANALYSIS',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Detailed analysis of how many months students have been studying in your library and their fee contribution.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 14),
+
+        // 4 KPI Cards
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'AVERAGE TENURE',
+                value: '$avgMonths Mo',
+                valueColor: const Color(0xFF0D9488),
+                subtitle: 'mean study duration',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'LONGEST ENROLLED',
+                value: '${longest?.months ?? 0} Mo',
+                valueColor: const Color(0xFF8B5CF6),
+                subtitle: longest != null ? longest.student.name.split(' ').first : 'None',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'NEW JOINERS (<1M)',
+                value: '$under1m Students',
+                valueColor: const Color(0xFF0284C7),
+                subtitle: 'last 30 days',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'LONG-TERM (6M+)',
+                value: '${m6to12 + over12m} Students',
+                valueColor: const Color(0xFF16A34A),
+                subtitle: 'veteran members',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Tenure Distribution Card with Progress Bars
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.bar_chart_rounded, color: Color(0xFF0D9488), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Study Duration Buckets',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildProgressRow(
+                label: '< 1 Month (New Admissions)',
+                count: under1m,
+                total: totalStudents,
+                barColor: const Color(0xFF38BDF8),
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: '1 – 3 Months (Recent)',
+                count: m1to3,
+                total: totalStudents,
+                barColor: const Color(0xFF0D9488),
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: '3 – 6 Months (Established)',
+                count: m3to6,
+                total: totalStudents,
+                barColor: const Color(0xFF10B981),
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: '6 – 12 Months (Long-Term)',
+                count: m6to12,
+                total: totalStudents,
+                barColor: const Color(0xFFF59E0B),
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: '> 1 Year (Veterans & Alumni)',
+                count: over12m,
+                total: totalStudents,
+                barColor: const Color(0xFF8B5CF6),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Export & Preview Action Card
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: _exportListRow(
+            icon: Icons.history_edu_rounded,
+            iconBg: const Color(0xFFF0FDFA),
+            iconColor: const Color(0xFF0D9488),
+            title: 'Student Tenure & Duration Report',
+            subtitle: 'Export individual study duration (in months) and total fees paid for all $totalStudents students',
+            onDownload: () {
+              final csv = _generateTenureCsv(activeStudents, payments);
+              final headers = ['Name', 'Phone', 'Seat', 'Shift', 'Joined', 'Months', 'Category', 'Total Paid', 'Status'];
+              final previewRows = tenureList.map((t) => [
+                t.student.name,
+                t.student.phone,
+                t.student.seatNumber != null ? 'S-${t.student.seatNumber}' : 'None',
+                t.student.shift,
+                t.student.joinedAt != null ? DateFormat('dd-MM-yy').format(t.student.joinedAt!) : 'N/A',
+                '${t.months} mo',
+                t.months < 1 ? '<1 Mo' : (t.months <= 3 ? '1-3 Mo' : (t.months <= 6 ? '3-6 Mo' : (t.months <= 12 ? '6-12 Mo' : '>1 Yr'))),
+                '₹${t.totalPaid}',
+                t.student.status,
+              ]).toList();
+              final summary = '${_service.profile.libraryName} - Student Tenure Report\n'
+                  'Total Active Students: $totalStudents\n'
+                  'Average Study Duration: $avgMonths Months\n'
+                  'Studying >6 Months: ${m6to12 + over12m} students\n'
+                  'New (<1 Month): $under1m students';
+              _exportCategory(
+                categoryName: 'Student Tenure & Study Duration',
+                rowCount: totalStudents,
+                csvData: csv,
+                headers: headers,
+                previewRows: previewRows,
+                summaryText: summary,
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Top Longest-Standing Students List
+        const Text(
+          'LONGEST-STUDYING MEMBERS',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: Column(
+            children: [
+              ...tenureList.take(5).map((t) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D9488).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${t.months}m',
+                            style: const TextStyle(
+                              color: Color(0xFF0D9488),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t.student.name,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textNavy),
+                            ),
+                            Text(
+                              'Seat S-${t.student.seatNumber ?? "None"} • ${t.student.shift} • Joined ${t.student.joinedAt != null ? DateFormat("MMM yyyy").format(t.student.joinedAt!) : "N/A"}',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                        ),
+                        child: Text(
+                          '₹${t.totalPaid}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF059669),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // TAB 2: PAYMENT & REVENUE ANALYSIS (Modes, UPI vs Cash, Averages)
+  Widget _buildPaymentAnalysisTab(List<PaymentTransaction> payments) {
+    final allTimeCollected = payments.fold<int>(0, (sum, p) => sum + p.amount);
+
+    final upiList = payments.where((p) => p.paymentMode.toUpperCase().contains('UPI')).toList();
+    final upiTotal = upiList.fold<int>(0, (sum, p) => sum + p.amount);
+    final upiPct = allTimeCollected > 0 ? ((upiTotal / allTimeCollected) * 100).toStringAsFixed(1) : '0.0';
+
+    final cashList = payments.where((p) => p.paymentMode.toUpperCase().contains('CASH')).toList();
+    final cashTotal = cashList.fold<int>(0, (sum, p) => sum + p.amount);
+    final cashPct = allTimeCollected > 0 ? ((cashTotal / allTimeCollected) * 100).toStringAsFixed(1) : '0.0';
+
+    final otherList = payments.where((p) =>
+        !p.paymentMode.toUpperCase().contains('UPI') &&
+        !p.paymentMode.toUpperCase().contains('CASH')).toList();
+    final otherTotal = otherList.fold<int>(0, (sum, p) => sum + p.amount);
+    final otherPct = allTimeCollected > 0 ? ((otherTotal / allTimeCollected) * 100).toStringAsFixed(1) : '0.0';
+
+    final avgTicket = payments.isNotEmpty ? (allTimeCollected / payments.length).round() : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'PAYMENT MODES & REVENUE BREAKDOWN',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Analyze collection split across digital UPI, cash, cards, and payment ticket size.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 14),
+
+        // 4 KPI Cards
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'TOTAL REVENUE',
+                value: '₹$allTimeCollected',
+                valueColor: const Color(0xFF16A34A),
+                subtitle: '${payments.length} payments recorded',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'UPI SHARE',
+                value: '$upiPct%',
+                valueColor: const Color(0xFF0284C7),
+                subtitle: '₹$upiTotal collected',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'CASH SHARE',
+                value: '$cashPct%',
+                valueColor: const Color(0xFF0D9488),
+                subtitle: '₹$cashTotal collected',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'AVERAGE PAYMENT',
+                value: '₹$avgTicket',
+                valueColor: const Color(0xFFF59E0B),
+                subtitle: 'average ticket size',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Payment Mode Share Card
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.pie_chart_outline_rounded, color: Color(0xFF0D9488), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Revenue by Payment Mode',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildProgressRow(
+                label: 'Digital UPI Payments',
+                count: upiTotal,
+                total: allTimeCollected,
+                barColor: const Color(0xFF0284C7),
+                suffixText: '₹$upiTotal (${upiList.length} txns)',
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: 'Cash In Hand',
+                count: cashTotal,
+                total: allTimeCollected,
+                barColor: const Color(0xFF10B981),
+                suffixText: '₹$cashTotal (${cashList.length} txns)',
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: 'Card & Bank Transfers',
+                count: otherTotal,
+                total: allTimeCollected,
+                barColor: const Color(0xFF8B5CF6),
+                suffixText: '₹$otherTotal (${otherList.length} txns)',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Export Category
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: _exportListRow(
+            icon: Icons.payments_outlined,
+            iconBg: const Color(0xFFECFDF5),
+            iconColor: const Color(0xFF10B981),
+            title: 'Payment Modes Analytics Report',
+            subtitle: 'Download revenue summary, transaction counts, and shares across payment modes',
+            onDownload: () {
+              final csv = _generatePaymentModeCsv(payments);
+              final headers = ['Mode', 'Transactions', 'Total (INR)', 'Share (%)'];
+              final previewRows = [
+                ['UPI', '${upiList.length}', '₹$upiTotal', '$upiPct%'],
+                ['Cash', '${cashList.length}', '₹$cashTotal', '$cashPct%'],
+                ['Card & Bank', '${otherList.length}', '₹$otherTotal', '$otherPct%'],
+              ];
+              final summary = '${_service.profile.libraryName} - Payment Mode Analytics\n'
+                  'Total Revenue: ₹$allTimeCollected (${payments.length} txns)\n'
+                  'UPI Share: $upiPct% (₹$upiTotal)\n'
+                  'Cash Share: $cashPct% (₹$cashTotal)\n'
+                  'Card/Bank Share: $otherPct% (₹$otherTotal)';
+              _exportCategory(
+                categoryName: 'Payment Modes Analysis',
+                rowCount: previewRows.length,
+                csvData: csv,
+                headers: headers,
+                previewRows: previewRows,
+                summaryText: summary,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // TAB 3: SHIFT OCCUPANCY & CAPACITY UTILIZATION
+  Widget _buildShiftOccupancyTab(List<StudentInfo> students) {
+    final activeStudents = students.where((s) => s.status != 'INACTIVE').toList();
+    final totalSeats = _service.totalSeatsCount > 0 ? _service.totalSeatsCount : 30;
+
+    final morningList = activeStudents.where((s) => LibraryService.doShiftsConflict(s.shift, 'Morning Shift')).toList();
+    final eveningList = activeStudents.where((s) => LibraryService.doShiftsConflict(s.shift, 'Evening Shift')).toList();
+    final nightList = activeStudents.where((s) => LibraryService.doShiftsConflict(s.shift, 'Night Shift')).toList();
+    final fullDayList = activeStudents.where((s) => LibraryService.doShiftsConflict(s.shift, 'Full Day')).toList();
+
+    final seatMap = <int, int>{};
+    for (final s in activeStudents) {
+      if (s.seatNumber != null) {
+        seatMap[s.seatNumber!] = (seatMap[s.seatNumber!] ?? 0) + 1;
+      }
+    }
+    final sharedSeats = seatMap.values.where((c) => c > 1).length;
+    final singleSeats = seatMap.values.where((c) => c == 1).length;
+    final occupiedSeats = seatMap.keys.length;
+    final vacantSeats = (totalSeats - occupiedSeats).clamp(0, 9999);
+    final overallRate = totalSeats > 0 ? ((occupiedSeats / totalSeats) * 100).toStringAsFixed(1) : '0.0';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'SHIFT OCCUPANCY & SEAT UTILIZATION',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Track multi-shift seat sharing, vacant slots, and capacity utilization across shifts.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 14),
+
+        // 4 KPI Cards
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'OCCUPANCY RATE',
+                value: '$overallRate%',
+                valueColor: const Color(0xFF0D9488),
+                subtitle: '$occupiedSeats of $totalSeats seats filled',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'MULTI-SHIFT SEATS',
+                value: '$sharedSeats Seats',
+                valueColor: const Color(0xFF8B5CF6),
+                subtitle: 'shared across shifts',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'DEDICATED SEATS',
+                value: '$singleSeats Seats',
+                valueColor: const Color(0xFF0284C7),
+                subtitle: 'single shift occupied',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'VACANT SEATS',
+                value: '$vacantSeats Seats',
+                valueColor: const Color(0xFF16A34A),
+                subtitle: 'fully available',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Shift Capacity Progress Bars
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.schedule_rounded, color: Color(0xFF0D9488), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Shift-Wise Capacity Utilization',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildProgressRow(
+                label: 'Morning Shift (06:00 AM - 12:00 PM)',
+                count: morningList.length,
+                total: totalSeats,
+                barColor: const Color(0xFFF59E0B),
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: 'Evening Shift (12:00 PM - 06:00 PM)',
+                count: eveningList.length,
+                total: totalSeats,
+                barColor: const Color(0xFF0284C7),
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: 'Night Shift (06:00 PM - 11:00 PM)',
+                count: nightList.length,
+                total: totalSeats,
+                barColor: const Color(0xFF7C3AED),
+              ),
+              const SizedBox(height: 12),
+              _buildProgressRow(
+                label: 'Full Day & 24 Hours',
+                count: fullDayList.length,
+                total: totalSeats,
+                barColor: const Color(0xFF10B981),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Export Shift Report
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: _exportListRow(
+            icon: Icons.group_work_rounded,
+            iconBg: const Color(0xFFF0FDF4),
+            iconColor: const Color(0xFF16A34A),
+            title: 'Shift Occupancy & Capacity Report',
+            subtitle: 'Download capacity metrics, multi-shift sharing numbers, and occupancy rates',
+            onDownload: () {
+              final csv = _generateShiftOccupancyCsv(activeStudents, totalSeats);
+              final headers = ['Shift', 'Students', 'Total Seats', 'Occupancy %'];
+              final previewRows = [
+                ['Morning Shift', '${morningList.length}', '$totalSeats', '${(morningList.length / totalSeats * 100).toStringAsFixed(1)}%'],
+                ['Evening Shift', '${eveningList.length}', '$totalSeats', '${(eveningList.length / totalSeats * 100).toStringAsFixed(1)}%'],
+                ['Night Shift', '${nightList.length}', '$totalSeats', '${(nightList.length / totalSeats * 100).toStringAsFixed(1)}%'],
+                ['Full Day', '${fullDayList.length}', '$totalSeats', '${(fullDayList.length / totalSeats * 100).toStringAsFixed(1)}%'],
+              ];
+              final summary = '${_service.profile.libraryName} - Shift Occupancy Report\n'
+                  'Total Seats: $totalSeats\n'
+                  'Occupied Seats: $occupiedSeats ($overallRate%)\n'
+                  'Shared Multi-Shift Seats: $sharedSeats\n'
+                  'Morning: ${morningList.length} | Evening: ${eveningList.length} | Night: ${nightList.length} | Full Day: ${fullDayList.length}';
+              _exportCategory(
+                categoryName: 'Shift Occupancy & Utilization',
+                rowCount: previewRows.length,
+                csvData: csv,
+                headers: headers,
+                previewRows: previewRows,
+                summaryText: summary,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // TAB 4: FEE DUES & DEFAULTERS ANALYSIS
+  Widget _buildFeeDuesTab(List<StudentInfo> students) {
+    final activeStudents = students.where((s) => s.status != 'INACTIVE').toList();
+    final defaulters = activeStudents.where((s) => s.hasDues || s.effectiveDues > 0).toList();
+    final totalDuesAmount = defaulters.fold<int>(0, (sum, s) => sum + s.effectiveDues);
+    final paidCount = activeStudents.length - defaulters.length;
+    final rate = activeStudents.isNotEmpty ? ((paidCount / activeStudents.length) * 100).toStringAsFixed(1) : '100';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'FEE DUES & RECOVERY REPORT',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Monitor outstanding dues balances, overdue members, and send direct WhatsApp payment reminders.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 14),
+
+        // 3 KPI Cards
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'TOTAL OVERDUE',
+                value: '₹$totalDuesAmount',
+                valueColor: const Color(0xFFE11D48),
+                subtitle: 'uncollected revenue',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _metricCard(
+                label: 'DEFAULTERS',
+                value: '${defaulters.length} Members',
+                valueColor: const Color(0xFFF59E0B),
+                subtitle: 'out of ${activeStudents.length} active',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _metricCard(
+                label: 'COLLECTION EFFICIENCY',
+                value: '$rate%',
+                valueColor: const Color(0xFF16A34A),
+                subtitle: '$paidCount students fully paid',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Export Defaulters Action Card
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: _exportListRow(
+            icon: Icons.warning_amber_rounded,
+            iconBg: const Color(0xFFFFF1F2),
+            iconColor: const Color(0xFFE11D48),
+            title: 'Defaulters & Pending Dues List',
+            subtitle: 'Download contact details, overdue amounts, and seats for all ${defaulters.length} students with dues',
+            onDownload: () {
+              final csv = _generateDefaultersCsv(activeStudents);
+              final headers = ['Name', 'Phone', 'Seat', 'Shift', 'Due Amount', 'Monthly Fee', 'Joined'];
+              final previewRows = defaulters.map((s) => [
+                s.name,
+                s.phone,
+                s.seatNumber != null ? 'S-${s.seatNumber}' : 'None',
+                s.shift,
+                '₹${s.effectiveDues}',
+                '₹${s.monthlyFee}',
+                s.joinedAt != null ? DateFormat('dd-MM-yy').format(s.joinedAt!) : 'N/A',
+              ]).toList();
+              final summary = '${_service.profile.libraryName} - Defaulters Report\n'
+                  'Total Outstanding Overdue: ₹$totalDuesAmount\n'
+                  'Members with Pending Dues: ${defaulters.length} students\n'
+                  'Collection Efficiency: $rate%';
+              _exportCategory(
+                categoryName: 'Defaulters & Pending Dues',
+                rowCount: defaulters.length,
+                csvData: csv,
+                headers: headers,
+                previewRows: previewRows,
+                summaryText: summary,
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // List of Defaulters with 1-Tap WhatsApp Reminder
+        const Text(
+          'PENDING DUES FOLLOW-UP',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 10),
+        if (defaulters.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFF1F5F9)),
+            ),
+            child: const Center(
+              child: Column(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 40),
+                  SizedBox(height: 8),
+                  Text('No Outstanding Dues!', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF15803D))),
+                  SizedBox(height: 4),
+                  Text('All active students have cleared their monthly library fees.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                ],
+              ),
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFF1F5F9)),
+            ),
+            child: Column(
+              children: [
+                ...defaulters.take(8).map((s) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF1F2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFFECDD3)),
+                          ),
+                          child: const Center(
+                            child: Icon(Icons.person_outline_rounded, color: Color(0xFFE11D48), size: 20),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                s.name,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textNavy),
+                              ),
+                              Text(
+                                'Seat S-${s.seatNumber ?? "None"} • ${s.shift} • Phone: ${s.phone}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '₹${s.effectiveDues}',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFE11D48)),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                final reminderText = '🏛️ *${_service.profile.libraryName}*\n'
+                                    'Dear ${s.name},\n'
+                                    'This is a friendly reminder regarding your pending library fee of *₹${s.effectiveDues}* for Seat S-${s.seatNumber ?? "Unassigned"} (${s.shift}).\n'
+                                    'Kindly clear the dues at your earliest convenience.\n'
+                                    'Thank you!';
+                                _shareViaWhatsApp(reminderText, phone: s.phone);
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.send_rounded, size: 12, color: Color(0xFF10B981)),
+                                    SizedBox(width: 2),
+                                    Text('Remind', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildProgressRow({
+    required String label,
+    required int count,
+    required int total,
+    required Color barColor,
+    String? suffixText,
+  }) {
+    final pct = total > 0 ? (count / total).clamp(0.0, 1.0) : 0.0;
+    final pctString = (pct * 100).toStringAsFixed(0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+              ),
+            ),
+            Text(
+              suffixText ?? '$count ($pctString%)',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: barColor),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: pct,
+            backgroundColor: const Color(0xFFF1F5F9),
+            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+            minHeight: 8,
+          ),
+        ),
+      ],
     );
   }
 
@@ -977,12 +2037,12 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textNavy),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                 ),
               ],
             ),
