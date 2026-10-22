@@ -1556,7 +1556,7 @@ class LibraryService {
         });
       }
 
-      final otherStudents = _currentStudents.where(
+      final otherStudents = _mockStudents.where(
         (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
       ).toList();
 
@@ -1632,7 +1632,7 @@ class LibraryService {
         'seat_number': null,
       });
       if (seatNumber != null) {
-        final otherStudents = _currentStudents.where(
+        final otherStudents = _mockStudents.where(
           (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
         ).toList();
         final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
@@ -1702,7 +1702,7 @@ class LibraryService {
       final studentDocRef = _tenantCol('students').doc(studentId);
       batch.delete(studentDocRef);
       if (seatNumber != null) {
-        final otherStudents = _currentStudents.where(
+        final otherStudents = _mockStudents.where(
           (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
         ).toList();
         final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
