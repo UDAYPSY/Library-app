@@ -45,10 +45,34 @@ jobs:
           flutter pub get
 
       - name: Run Automated Test Suite
-        run: flutter test
+        run: |
+          flutter test 2>&1 | tee test_run.log || {
+            echo "==================== TEST FAILURE LOG ===================="
+            tail -n 150 test_run.log
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -B ci-error-log
+            cp test_run.log CI_FAILURE.log
+            git add CI_FAILURE.log
+            git commit -m "ci: test suite failure log"
+            git push -f origin ci-error-log || true
+            exit 1
+          }
 
       - name: Compile Release APK
-        run: flutter build apk --release --no-tree-shake-icons
+        run: |
+          flutter build apk --release --no-tree-shake-icons 2>&1 | tee apk_build.log || {
+            echo "==================== APK BUILD FAILURE LOG ===================="
+            tail -n 150 apk_build.log
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -B ci-error-log
+            cp apk_build.log CI_FAILURE.log
+            git add CI_FAILURE.log
+            git commit -m "ci: apk build failure log"
+            git push -f origin ci-error-log || true
+            exit 1
+          }
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -78,10 +102,34 @@ jobs:
           flutter pub get
 
       - name: Run Automated Test Suite
-        run: flutter test
+        run: |
+          flutter test 2>&1 | tee test_run.log || {
+            echo "==================== TEST FAILURE LOG ===================="
+            tail -n 150 test_run.log
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -B ci-error-log
+            cp test_run.log CI_FAILURE.log
+            git add CI_FAILURE.log
+            git commit -m "ci: test suite failure log"
+            git push -f origin ci-error-log || true
+            exit 1
+          }
 
       - name: Compile Flutter Web
-        run: flutter build web --release --base-href "/Library-app/"
+        run: |
+          flutter build web --release --base-href "/Library-app/" 2>&1 | tee web_build.log || {
+            echo "==================== WEB BUILD FAILURE LOG ===================="
+            tail -n 150 web_build.log
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -B ci-error-log
+            cp web_build.log CI_FAILURE.log
+            git add CI_FAILURE.log
+            git commit -m "ci: web build failure log"
+            git push -f origin ci-error-log || true
+            exit 1
+          }
 
       - name: Upload Web Build Artifact
         uses: actions/upload-pages-artifact@v3

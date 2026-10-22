@@ -611,6 +611,10 @@ class LibraryService {
     return activeOccupants.any((s) => doShiftsConflict(s.shift, shift, allShifts: shifts));
   }
 
+  bool isSeatAvailableForShift(int seatNum, String? shift, {String? excludeStudentId}) {
+    return !isSeatOccupied(seatNum, shift: shift, excludeStudentId: excludeStudentId);
+  }
+
   StudentInfo? getStudentForSeat(int seatNum, {String? shift}) {
     ensureInitialized();
     final activeOccupants = _mockStudents.where((s) => s.seatNumber == seatNum && s.status != 'INACTIVE').toList();
