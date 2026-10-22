@@ -36,49 +36,49 @@ jobs:
           flutter create --org com.example.library_manager --project-name library_manager --platforms android .
           cp pubspec.yaml.bak pubspec.yaml
           rm -f test/widget_test.dart
-          # Ensure Android minimum SDK satisfies Cloud Firestore (minSdk 23) in both Groovy and Kotlin DSL
-          echo "flutter.minSdkVersion=23" >> android/local.properties || true
-          find android/app -name "build.gradle*" -exec sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/g' {} + || true
-          find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' {} + || true
-          find android/app -name "build.gradle*" -exec sed -i 's/minSdk = [0-9]*/minSdk = 23/g' {} + || true
-          find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion [0-9]*/minSdkVersion 23/g' {} + || true
+          python3 .github/scripts/patch_android_gradle.py
           flutter pub get
 
       - name: Run Automated Test Suite
         run: |
-          flutter test 2>&1 | tee test_run.log || {
-            echo "==================== TEST FAILURE LOG ===================="
-            tail -n 150 test_run.log
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git checkout -B ci-error-log
-            cp test_run.log CI_FAILURE.log
-            git add CI_FAILURE.log
-            git commit -m "ci: test suite failure log"
-            git push -f origin ci-error-log || true
-            exit 1
-          }
+          set -e -o pipefail
+          flutter test 2>&1 | tee test_run.log
 
       - name: Compile Release APK
         run: |
-          flutter build apk --release --no-tree-shake-icons 2>&1 | tee apk_build.log || {
-            echo "==================== APK BUILD FAILURE LOG ===================="
-            tail -n 150 apk_build.log
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git checkout -B ci-error-log
-            cp apk_build.log CI_FAILURE.log
-            git add CI_FAILURE.log
-            git commit -m "ci: apk build failure log"
-            git push -f origin ci-error-log || true
-            exit 1
-          }
+          set -e -o pipefail
+          flutter build apk --release --no-tree-shake-icons 2>&1 | tee apk_build.log
+          echo "=== APK files built ==="
+          ls -la build/app/outputs/flutter-apk/ || true
+
+      - name: Save Failure Diagnostics
+        if: failure()
+        run: |
+          echo "==================== BUILD FAILED ===================="
+          tail -n 250 apk_build.log || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-error-log
+          cp apk_build.log CI_FAILURE.log || true
+          cp test_run.log CI_TEST_FAILURE.log || true
+          git add CI_FAILURE.log CI_TEST_FAILURE.log || true
+          git commit -m "ci: build failure diagnostics [skip ci]" || true
+          git push -f origin ci-error-log || true
+
+      - name: Upload Build Log Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-build-log
+          path: apk_build.log
+          if-no-files-found: ignore
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: library-manager-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
 
       - name: Publish Release with APK Asset
         uses: softprops/action-gh-release@v2
@@ -90,8 +90,8 @@ jobs:
             ### 📱 Library Manager Android APK
             Automated release build with the latest fee management, shift-wise seat allotment, and data synchronization features.
             
-            - **Direct Download**: Click `app-release.apk` below to download directly to your Android device.
-          files: build/app/outputs/flutter-apk/app-release.apk
+            - **Direct Download**: Download `app-release.apk` below directly to your device.
+          files: build/app/outputs/flutter-apk/*.apk
           prerelease: false
           make_latest: true
         env:
