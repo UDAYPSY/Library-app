@@ -293,11 +293,14 @@ class StudentInfo {
     return 0;
   }
 
+  static const Object _sentinel = Object();
+
   StudentInfo copyWith({
     String? id,
     String? name,
     String? phone,
-    int? seatNumber,
+    Object? seatNumber = _sentinel,
+    bool clearSeatNumber = false,
     String? shift,
     String? status,
     DateTime? feeDueDate,
@@ -318,7 +321,11 @@ class StudentInfo {
       id: id ?? this.id,
       name: name ?? this.name,
       phone: phone ?? this.phone,
-      seatNumber: seatNumber ?? this.seatNumber,
+      seatNumber: clearSeatNumber
+          ? null
+          : (identical(seatNumber, _sentinel)
+              ? this.seatNumber
+              : seatNumber as int?),
       shift: shift ?? this.shift,
       status: status ?? this.status,
       feeDueDate: feeDueDate ?? this.feeDueDate,

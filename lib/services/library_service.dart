@@ -1253,7 +1253,7 @@ class LibraryService {
         if (_mockStudents[i].id != studentId &&
             _mockStudents[i].seatNumber == newSeatNumber &&
             doShiftsConflict(_mockStudents[i].shift, effectiveShift, allShifts: shifts)) {
-          _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null);
+          _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null, clearSeatNumber: true);
         }
       }
 
@@ -1488,7 +1488,7 @@ class LibraryService {
         for (int i = 0; i < _mockStudents.length; i++) {
           if (_mockStudents[i].seatNumber == seatNumber &&
               doShiftsConflict(_mockStudents[i].shift, shift, allShifts: shifts)) {
-            _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null);
+            _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null, clearSeatNumber: true);
           }
         }
       }
@@ -1586,6 +1586,7 @@ class LibraryService {
           final s = _mockStudents[studentIndex];
           _mockStudents[studentIndex] = s.copyWith(
             seatNumber: null,
+            clearSeatNumber: true,
           );
         }
       }
@@ -1635,6 +1636,7 @@ class LibraryService {
         _mockStudents[idx] = _mockStudents[idx].copyWith(
           status: 'INACTIVE',
           seatNumber: null,
+          clearSeatNumber: true,
         );
       }
       _syncSeatsWithStudents();
