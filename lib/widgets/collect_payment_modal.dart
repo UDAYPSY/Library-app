@@ -342,7 +342,8 @@ Future<void> showCollectPaymentModal(
                       final totalOwed = selectedAdvanceMonths > 0
                           ? defaultMonthly * selectedAdvanceMonths
                           : (student.duesAmount > 0 ? student.duesAmount : defaultMonthly);
-                      final remaining = (totalOwed - paid).clamp(0, 999999);
+                      final clampedPaid = paid.clamp(0, totalOwed);
+                      final remaining = (totalOwed - clampedPaid).clamp(0, totalOwed);
                       setModalState(() {
                         remainingDuesCtrl.text = '$remaining';
                       });
@@ -380,6 +381,17 @@ Future<void> showCollectPaymentModal(
                       border: InputBorder.none,
                       prefixIcon: Icon(Icons.currency_rupee, color: Color(0xFFEF4444), size: 20),
                     ),
+                    onChanged: (val) {
+                      final due = int.tryParse(val.trim()) ?? 0;
+                      final totalOwed = selectedAdvanceMonths > 0
+                          ? defaultMonthly * selectedAdvanceMonths
+                          : (student.duesAmount > 0 ? student.duesAmount : defaultMonthly);
+                      final clampedDue = due.clamp(0, totalOwed);
+                      final paid = (totalOwed - clampedDue).clamp(0, totalOwed);
+                      setModalState(() {
+                        amountPaidCtrl.text = '$paid';
+                      });
+                    },
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -662,8 +674,13 @@ Future<void> showCollectPaymentModal(
                           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         onPressed: () async {
-                          final paid = int.tryParse(amountPaidCtrl.text.trim()) ?? 0;
-                          final dues = int.tryParse(remainingDuesCtrl.text.trim()) ?? 0;
+                          final totalOwed = selectedAdvanceMonths > 0
+                              ? defaultMonthly * selectedAdvanceMonths
+                              : (student.duesAmount > 0 ? student.duesAmount : defaultMonthly);
+                          final rawPaid = int.tryParse(amountPaidCtrl.text.trim()) ?? 0;
+                          final rawDues = int.tryParse(remainingDuesCtrl.text.trim()) ?? 0;
+                          final paid = rawPaid.clamp(0, totalOwed);
+                          final dues = rawDues.clamp(0, totalOwed);
                           Navigator.pop(ctx);
 
                           if (paid > 0) {

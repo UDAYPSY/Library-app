@@ -359,13 +359,15 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                       Expanded(
                         child: TextField(
                           controller: feeCtrl,
+                          readOnly: true,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Monthly Fee (₹)',
+                            labelText: 'Monthly Fee (₹) [Fixed]',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.currency_rupee, size: 16),
+                            suffixIcon: Icon(Icons.lock_rounded, size: 16, color: Color(0xFF64748B)),
+                            helperText: 'Fixed from shift',
                           ),
-                          onChanged: (_) => setModalState(() {}),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -378,7 +380,14 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.payment, size: 16),
                           ),
-                          onChanged: (_) => setModalState(() {}),
+                          onChanged: (val) {
+                            final raw = int.tryParse(val.trim()) ?? 0;
+                            if (raw > mFee) {
+                              paidCtrl.text = '$mFee';
+                              paidCtrl.selection = TextSelection.fromPosition(TextPosition(offset: paidCtrl.text.length));
+                            }
+                            setModalState(() {});
+                          },
                         ),
                       ),
                     ],
@@ -473,8 +482,9 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                         Navigator.pop(ctx);
 
                         final parsedFee = int.tryParse(feeCtrl.text.trim()) ?? initialFee;
-                        final parsedPaid = int.tryParse(paidCtrl.text.trim()) ?? 0;
-                        final dues = (parsedFee - parsedPaid).clamp(0, 999999);
+                        final rawPaid = int.tryParse(paidCtrl.text.trim()) ?? 0;
+                        final parsedPaid = rawPaid.clamp(0, parsedFee);
+                        final dues = (parsedFee - parsedPaid).clamp(0, parsedFee);
                         final finalStatus = status == 'TRIAL'
                             ? 'TRIAL'
                             : (dues > 0 || parsedPaid == 0 ? 'DUES' : 'ACTIVE');
@@ -679,8 +689,13 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   }
 
   void _openMarkDuesSheet(StudentInfo st) {
-    final defaultDues = st.effectiveDues > 0 ? st.effectiveDues : st.monthlyFee;
-    final duesCtrl = TextEditingController(text: defaultDues.toString());
+    final maxFee = st.monthlyFee > 0 ? st.monthlyFee : 500;
+    final currentDues = st.effectiveDues;
+    final targetFee = currentDues > 0 ? currentDues : maxFee;
+
+    final duesCtrl = TextEditingController(text: targetFee.toString());
+    final collectCtrl = TextEditingController(text: '0');
+    String paymentMode = 'UPI';
     DateTime selectedDate = st.feeDueDate ?? DateTime.now().add(const Duration(days: 7));
     final noteCtrl = TextEditingController(
       text: 'Fee due for ${DateFormat('MMMM yyyy').format(DateTime.now())}',
@@ -692,157 +707,300 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => StatefulBuilder(
-        builder: (sheetContext, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        builder: (sheetContext, setModalState) {
+          final rawDue = int.tryParse(duesCtrl.text.trim()) ?? 0;
+          final rawCollect = int.tryParse(collectCtrl.text.trim()) ?? 0;
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Mark Fee Due - ${st.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-                      const SizedBox(height: 2),
-                      Text('Seat: ${st.seatNumber != null ? "S-${st.seatNumber}" : "Unallocated"} • Shift: ${st.shift}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Fee Management - ${st.name}',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Seat: ${st.seatNumber != null ? "S-${st.seatNumber}" : "Unallocated"} • Shift: ${st.shift}',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                     ],
                   ),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: duesCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Due Amount (₹)',
-                  hintText: 'Enter pending fee amount',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.currency_rupee, color: Color(0xFFEF4444)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2035),
-                  );
-                  if (picked != null) {
-                    setModalState(() => selectedDate = picked);
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  const SizedBox(height: 12),
+                  // Summary Banner
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Monthly Fee: ₹$maxFee', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF334155))),
+                        Text('Current Due: ₹$currentDues', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFFE11D48))),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_month_outlined, color: Color(0xFF0284C7), size: 20),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 14),
+                  // Collect Fee Now Field
+                  TextField(
+                    controller: collectCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Collect Fee Now / Paid Amount (₹)',
+                      hintText: 'Enter amount being collected now',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.payment_rounded, color: Color(0xFF0D9488)),
+                    ),
+                    onChanged: (val) {
+                      final paid = int.tryParse(val.trim()) ?? 0;
+                      final clampedPaid = paid.clamp(0, targetFee);
+                      final remaining = (targetFee - clampedPaid).clamp(0, targetFee);
+                      setModalState(() {
+                        duesCtrl.text = '$remaining';
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  // Mark Due Field
+                  TextField(
+                    controller: duesCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Due Amount (₹) [Max ₹$targetFee]',
+                      hintText: 'Enter pending due fee',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.currency_rupee, color: Color(0xFFEF4444)),
+                      helperText: 'Due amount cannot exceed total/monthly fee (₹$targetFee)',
+                    ),
+                    onChanged: (val) {
+                      final due = int.tryParse(val.trim()) ?? 0;
+                      final clampedDue = due.clamp(0, targetFee);
+                      final paid = (targetFee - clampedDue).clamp(0, targetFee);
+                      setModalState(() {
+                        collectCtrl.text = '$paid';
+                      });
+                    },
+                  ),
+                  if (rawCollect > 0) ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: paymentMode,
+                      items: ['UPI', 'Cash', 'Card', 'Net Banking']
+                          .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                          .toList(),
+                      onChanged: (v) => setModalState(() => paymentMode = v ?? paymentMode),
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Mode for Collected Fee',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2035),
+                      );
+                      if (picked != null) {
+                        setModalState(() => selectedDate = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Row(
                         children: [
-                          const Text('Payment Due Date', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-                          Text(DateFormat('dd MMM yyyy').format(selectedDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                          const Icon(Icons.calendar_month_outlined, color: Color(0xFF0284C7), size: 20),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Payment Due Date', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                              Text(DateFormat('dd MMM yyyy').format(selectedDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                            ],
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
                         ],
                       ),
-                      const Spacer(),
-                      const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Reason / Note',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.edit_note_rounded),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFE2E8F0)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => setModalState(() => duesCtrl.text = '${st.monthlyFee}'),
-                      child: Text('Full Fee (₹${st.monthlyFee})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF10B981),
-                        side: const BorderSide(color: Color(0xFFA7F3D0)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: noteCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason / Note',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.edit_note_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => setModalState(() {
+                            duesCtrl.text = '$targetFee';
+                            collectCtrl.text = '0';
+                          }),
+                          child: Text('Full Due (₹$targetFee)', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        ),
                       ),
-                      onPressed: () => setModalState(() => duesCtrl.text = '0'),
-                      child: const Text('Clear Dues (₹0)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF10B981),
+                            side: const BorderSide(color: Color(0xFFA7F3D0)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => setModalState(() {
+                            collectCtrl.text = '$targetFee';
+                            duesCtrl.text = '0';
+                          }),
+                          child: Text('Collect All (₹$targetFee)', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF64748B),
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => setModalState(() {
+                            collectCtrl.text = '0';
+                            duesCtrl.text = '0';
+                          }),
+                          child: const Text('Clear (₹0)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: rawDue > 0 ? const Color(0xFFE11D48) : const Color(0xFF0D9488),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () async {
+                        final paid = (int.tryParse(collectCtrl.text.trim()) ?? 0).clamp(0, targetFee);
+                        final dues = (int.tryParse(duesCtrl.text.trim()) ?? 0).clamp(0, targetFee);
+                        Navigator.pop(ctx);
+
+                        if (paid > 0) {
+                          await _service.recordPayment(
+                            studentId: st.id,
+                            studentName: st.name,
+                            phone: st.phone,
+                            seatNumber: st.seatNumber,
+                            shift: st.shift,
+                            amount: paid,
+                            paymentMode: paymentMode,
+                            notes: noteCtrl.text.trim().isNotEmpty ? noteCtrl.text.trim() : 'Fee collection',
+                          );
+                        }
+
+                        if (dues <= 0) {
+                          await _service.updateStudent(
+                            studentId: st.id,
+                            name: st.name,
+                            phone: st.phone,
+                            shift: st.shift,
+                            seatNumber: st.seatNumber,
+                            duesAmount: 0,
+                            status: st.status == 'DUES' ? 'ACTIVE' : st.status,
+                            feeDueDate: selectedDate,
+                          );
+                          if (mounted) {
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(paid > 0
+                                    ? 'Collected ₹$paid & cleared all dues for ${st.name}!'
+                                    : 'Cleared all dues for ${st.name}!'),
+                                backgroundColor: const Color(0xFF10B981),
+                              ),
+                            );
+                          }
+                        } else {
+                          await _service.markStudentDues(st.id, dues, selectedDate);
+                          await _service.updateStudent(
+                            studentId: st.id,
+                            name: st.name,
+                            phone: st.phone,
+                            shift: st.shift,
+                            seatNumber: st.seatNumber,
+                            duesAmount: dues,
+                            status: 'DUES',
+                            feeDueDate: selectedDate,
+                          );
+                          if (mounted) {
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(paid > 0
+                                    ? 'Collected ₹$paid and marked ₹$dues due for ${st.name}!'
+                                    : 'Marked ₹$dues due for ${st.name}!'),
+                                backgroundColor: const Color(0xFFE11D48),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Text(
+                        rawCollect > 0
+                            ? (rawDue > 0 ? 'Collect ₹$rawCollect & Mark ₹$rawDue Due' : 'Collect ₹$rawCollect (Full Paid)')
+                            : (rawDue > 0 ? 'Save Due Fee (₹$rawDue)' : 'Clear Dues (₹0)'),
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE11D48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  onPressed: () async {
-                    final dues = int.tryParse(duesCtrl.text.trim()) ?? 0;
-                    Navigator.pop(ctx);
-                    if (dues <= 0) {
-                      await _service.updateStudent(
-                        studentId: st.id,
-                        name: st.name,
-                        phone: st.phone,
-                        shift: st.shift,
-                        seatNumber: st.seatNumber,
-                        duesAmount: 0,
-                        status: st.status == 'DUES' ? 'ACTIVE' : st.status,
-                      );
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Cleared all dues for ${st.name}!'), backgroundColor: const Color(0xFF10B981)),
-                        );
-                      }
-                    } else {
-                      await _service.markStudentDues(st.id, dues, selectedDate);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Marked ₹$dues due for ${st.name}!'), backgroundColor: const Color(0xFFE11D48)),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Save Due Fee', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

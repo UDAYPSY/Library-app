@@ -38,6 +38,15 @@ class _RevenueScreenState extends State<RevenueScreen> {
     'Dec'
   ];
 
+  String _selectedPaymentMethod = 'All Methods';
+  final List<String> _paymentMethods = [
+    'All Methods',
+    'UPI',
+    'Cash',
+    'Card',
+    'Net Banking / Cheque',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -98,180 +107,11 @@ class _RevenueScreenState extends State<RevenueScreen> {
       _searchCtrl.clear();
       _selectedYear = 'All Years';
       _selectedMonth = 'All Months';
+      _selectedPaymentMethod = 'All Methods';
     });
   }
 
-  void _openRecordPaymentModal() {
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final amountCtrl = TextEditingController(text: '500');
-    final notesCtrl = TextEditingController();
-    String paymentMode = 'UPI';
-    int? seatNum;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.card(context),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (modalCtx, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Record Payment',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.text(context),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: AppColors.text(context)),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Student Name',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person_outline_rounded),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: amountCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Amount (₹)',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.currency_rupee_rounded),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: paymentMode,
-                        items: ['UPI', 'Cash']
-                            .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                            .toList(),
-                        onChanged: (v) => setModalState(() => paymentMode = v ?? paymentMode),
-                        decoration: const InputDecoration(
-                          labelText: 'Mode',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int?>(
-                        value: seatNum,
-                        hint: const Text('Seat (Optional)'),
-                        items: [
-                          const DropdownMenuItem<int?>(value: null, child: Text('No Seat')),
-                          ...List.generate(_service.totalSeatsCount, (i) => i + 1).map(
-                            (s) => DropdownMenuItem<int?>(value: s, child: Text('Seat S-$s')),
-                          ),
-                        ],
-                        onChanged: (v) => setModalState(() => seatNum = v),
-                        decoration: const InputDecoration(
-                          labelText: 'Seat Allocation',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: phoneCtrl,
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
-                          labelText: 'Phone',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (Optional)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.note_alt_outlined),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryTeal,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () async {
-                      final name = nameCtrl.text.trim();
-                      final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
-                      if (name.isEmpty || amt <= 0) return;
-                      Navigator.pop(ctx);
-
-                      await _service.recordPayment(
-                        studentName: name,
-                        phone: phoneCtrl.text.trim(),
-                        seatNumber: seatNum,
-                        amount: amt,
-                        paymentMode: paymentMode,
-                        notes: notesCtrl.text.trim(),
-                      );
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Payment of ₹$amt recorded for $name!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text(
-                      'Save Payment Record',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -302,6 +142,19 @@ class _RevenueScreenState extends State<RevenueScreen> {
           if (_selectedMonth != 'All Months') {
             final pMonth = DateFormat('MMM').format(p.date);
             if (pMonth.toLowerCase() != _selectedMonth.toLowerCase()) return false;
+          }
+
+          // Payment method filter
+          if (_selectedPaymentMethod != 'All Methods') {
+            final pMode = p.paymentMode.toUpperCase();
+            if (_selectedPaymentMethod == 'UPI' && !pMode.contains('UPI')) return false;
+            if (_selectedPaymentMethod == 'Cash' && !pMode.contains('CASH')) return false;
+            if (_selectedPaymentMethod == 'Card' && !pMode.contains('CARD')) return false;
+            if (_selectedPaymentMethod == 'Net Banking / Cheque' &&
+                !pMode.contains('BANK') &&
+                !pMode.contains('CHEQUE') &&
+                !pMode.contains('ONLINE') &&
+                !pMode.contains('NET')) return false;
           }
 
           return true;
@@ -512,6 +365,69 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                 ),
                               );
                             },
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Payment Method Filter Chips
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: _paymentMethods.map((method) {
+                              final isSelected = _selectedPaymentMethod == method;
+                              IconData icon;
+                              if (method == 'UPI') {
+                                icon = Icons.qr_code_2_rounded;
+                              } else if (method == 'Cash') {
+                                icon = Icons.payments_rounded;
+                              } else if (method == 'Card') {
+                                icon = Icons.credit_card_rounded;
+                              } else if (method == 'Net Banking / Cheque') {
+                                icon = Icons.account_balance_rounded;
+                              } else {
+                                icon = Icons.tune_rounded;
+                              }
+
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () => setState(() => _selectedPaymentMethod = method),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? (AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFE6F4F1))
+                                          : AppColors.subSurface(context),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: isSelected ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
+                                        width: isSelected ? 1.5 : 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          icon,
+                                          size: 14,
+                                          color: isSelected ? AppColors.primaryTeal : AppColors.textMutedColor(context),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          method,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                            color: isSelected ? AppColors.primaryTeal : AppColors.text(context),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
                         ),
                       ],
@@ -728,12 +644,6 @@ class _RevenueScreenState extends State<RevenueScreen> {
                 ),
               ],
             ),
-          ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: _openRecordPaymentModal,
-            backgroundColor: AppColors.primaryTeal,
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Record Payment', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         );
       },

@@ -37,12 +37,20 @@ class _SeatsScreenState extends State<SeatsScreen> {
     final newPhoneCtrl = TextEditingController();
     String? phoneError;
 
-    // Available shifts from library
-    final availableShifts = _service.shifts.isNotEmpty
+    // Available shifts from library - exclude shifts conflicting with current active occupants of this seat
+    final seatOccupants = students.where((s) => s.seatNumber == seat.seatNumber && s.status != 'INACTIVE').toList();
+    final allLibraryShifts = _service.shifts.isNotEmpty
         ? _service.shifts.map((s) => s.name).toSet().toList()
         : ['Full Day', 'Morning Shift', 'Evening Shift', 'Night Shift', '24 Hours'];
+    final nonConflictingShifts = allLibraryShifts.where((sh) {
+      return !seatOccupants.any((occ) => LibraryService.doShiftsConflict(occ.shift, sh, allShifts: _service.shifts));
+    }).toList();
+    final availableShifts = nonConflictingShifts.isNotEmpty ? nonConflictingShifts : allLibraryShifts;
+
     String selectedShift = selectedStudent?.shift ??
-        (_selectedShift.toUpperCase() != 'ALL' ? _selectedShift : (seat.shift.isNotEmpty ? seat.shift : availableShifts.first));
+        (_selectedShift.toUpperCase() != 'ALL' && availableShifts.contains(_selectedShift)
+            ? _selectedShift
+            : (seat.shift.isNotEmpty && availableShifts.contains(seat.shift) ? seat.shift : availableShifts.first));
     if (!availableShifts.contains(selectedShift)) {
       selectedShift = availableShifts.first;
     }
@@ -61,8 +69,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
         ? selectedStudent.monthlyFee
         : 500;
 
-    // Payment collection dropdown
+    // Payment collection
     int feePaidNow = 0;
+    final feePaidCtrl = TextEditingController(text: '0');
     String paymentMode = 'UPI';
 
     showModalBottomSheet(
@@ -694,28 +703,76 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Collect Fee Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                            const Text('Collect Fee Now (₹)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
                             const SizedBox(height: 6),
                             Container(
+                              height: 44,
                               padding: const EdgeInsets.symmetric(horizontal: 10),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: feePaidNow,
-                                  isExpanded: true,
-                                  items: [
-                                    const DropdownMenuItem(value: 0, child: Text('₹0 (No pay now)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
-                                    DropdownMenuItem(value: selectedFeePlan, child: Text('₹$selectedFeePlan (Full)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
-                                  ],
-                                  onChanged: (val) {
-                                    if (val != null) setModalState(() => feePaidNow = val);
-                                  },
+                              child: TextField(
+                                controller: feePaidCtrl,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(vertical: 11),
+                                  border: InputBorder.none,
+                                  prefixIcon: Icon(Icons.currency_rupee, size: 16, color: Color(0xFF0D766E)),
                                 ),
+                                onChanged: (val) {
+                                  final parsed = int.tryParse(val.trim()) ?? 0;
+                                  if (parsed > selectedFeePlan) {
+                                    feePaidCtrl.text = '$selectedFeePlan';
+                                    feePaidCtrl.selection = TextSelection.fromPosition(TextPosition(offset: feePaidCtrl.text.length));
+                                  }
+                                  setModalState(() {
+                                    feePaidNow = (int.tryParse(feePaidCtrl.text.trim()) ?? 0).clamp(0, selectedFeePlan);
+                                  });
+                                },
                               ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                InkWell(
+                                  onTap: () {
+                                    setModalState(() {
+                                      feePaidNow = selectedFeePlan;
+                                      feePaidCtrl.text = '$selectedFeePlan';
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: feePaidNow == selectedFeePlan ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: feePaidNow == selectedFeePlan ? const Color(0xFF10B981) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Text('Full (₹$selectedFeePlan)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: feePaidNow == selectedFeePlan ? const Color(0xFF059669) : const Color(0xFF64748B))),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                InkWell(
+                                  onTap: () {
+                                    setModalState(() {
+                                      feePaidNow = 0;
+                                      feePaidCtrl.text = '0';
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: feePaidNow == 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: feePaidNow == 0 ? const Color(0xFFEF4444) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Text('₹0 Due', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: feePaidNow == 0 ? const Color(0xFFDC2626) : const Color(0xFF64748B))),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -784,13 +841,14 @@ class _SeatsScreenState extends State<SeatsScreen> {
                             );
                             return;
                           }
+                          final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, selectedFeePlan);
                           Navigator.pop(ctx);
                           await _service.assignSeatToExistingStudent(
                             newSeatNumber: seat.seatNumber,
                             studentId: selectedStudent!.id,
                             shift: selectedShift,
                             sectionName: selectedSection,
-                            feePaidNow: feePaidNow,
+                            feePaidNow: effectiveFeePaid,
                             paymentMode: paymentMode,
                           );
                           if (mounted) {
@@ -848,6 +906,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
                             return;
                           }
 
+                          final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, selectedFeePlan);
+                          final effectiveDues = (selectedFeePlan - effectiveFeePaid).clamp(0, 999999);
+                          final effectiveStatus = (effectiveFeePaid == selectedFeePlan && effectiveFeePaid > 0) ? 'ACTIVE' : 'DUES';
+
                           Navigator.pop(ctx);
                           await _service.assignSeatAndRegisterStudent(
                             seatNumber: seat.seatNumber,
@@ -855,11 +917,11 @@ class _SeatsScreenState extends State<SeatsScreen> {
                             phone: phone,
                             shift: selectedShift,
                             deviceUserId: _service.profile.adminName,
-                            feeAmount: feePaidNow,
+                            feeAmount: effectiveFeePaid,
                             monthlyFee: selectedFeePlan,
-                            duesAmount: (selectedFeePlan - feePaidNow).clamp(0, 999999),
+                            duesAmount: effectiveDues,
                             paymentMode: paymentMode,
-                            status: (feePaidNow >= selectedFeePlan && feePaidNow > 0) ? 'ACTIVE' : 'DUES',
+                            status: effectiveStatus,
                           );
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -1439,72 +1501,18 @@ class _SeatsScreenState extends State<SeatsScreen> {
     );
   }
 
-  void _showAddMoreSeatsDialog() {
-    final countCtrl = TextEditingController(text: '5');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Add Seats to Main Hall', style: TextStyle(fontWeight: FontWeight.w900)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('How many seats would you like to add?', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-            const SizedBox(height: 12),
-            TextField(
-              controller: countCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Number of Seats',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D766E),
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              final count = int.tryParse(countCtrl.text.trim()) ?? 5;
-              Navigator.pop(ctx);
-              final currentTotal = _service.totalSeatsCount;
-              final newSections = [
-                SectionConfig(
-                  id: 'sec_1',
-                  name: 'Main Hall',
-                  startSeat: 1,
-                  endSeat: currentTotal + count,
-                ),
-              ];
-              setState(() {
-                _service.updateSectionsAndRebuildSeats(newSections);
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Added $count more seats! Total seats: ${currentTotal + count}'),
-                  backgroundColor: const Color(0xFF0D766E),
-                ),
-              );
-            },
-            child: const Text('Add Seats'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<SeatInfo>>(
       stream: _service.streamSeats(),
       builder: (context, seatSnapshot) {
         final seats = seatSnapshot.data ?? [];
-        final occupiedCount = seats.where((s) => s.isOccupied).length;
+        final int occupiedCount;
+        if (_selectedShift.toUpperCase() == 'ALL') {
+          occupiedCount = seats.where((s) => s.isOccupied).length;
+        } else {
+          occupiedCount = seats.where((s) => _service.isSeatOccupied(s.seatNumber, shift: _selectedShift)).length;
+        }
         final vacantCount = seats.length - occupiedCount;
         final totalSeats = seats.length;
 
@@ -1615,19 +1623,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                       const SnackBar(content: Text('Layout is clean.')),
                                     );
                                   },
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0D766E),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                                  onPressed: _showAddMoreSeatsDialog,
                                 ),
                               ),
                             ],
@@ -1760,55 +1755,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           mainAxisSpacing: 12,
                           childAspectRatio: 1.05,
                         ),
-                        itemCount: filteredSeats.length + 1, // +1 for "ADD MORE SEATS" card
+                        itemCount: filteredSeats.length,
                         itemBuilder: (ctx, idx) {
-                          // Position 0: ADD MORE SEATS TO MAIN HALL Card (Image 1 & 2)
-                          if (idx == 0) {
-                            return InkWell(
-                              onTap: _showAddMoreSeatsDialog,
-                              borderRadius: BorderRadius.circular(18),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.subSurface(context),
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: AppColors.cardBorderColor(context)),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 44,
-                                        height: 44,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFE6FFFA),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.add, color: Color(0xFF0D766E), size: 24),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                                        child: Text(
-                                          'ADD MORE SEATS TO MAIN HALL',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.4,
-                                            color: AppColors.text(context),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-
-                          // Actual Seat Cards (idx - 1)
-                          final seat = filteredSeats[idx - 1];
+                          // Actual Seat Cards
+                          final seat = filteredSeats[idx];
                           final seatStudents = students.where((s) => s.seatNumber == seat.seatNumber && s.status != 'INACTIVE').toList();
                           final bool isOccupied;
                           final StudentInfo student;

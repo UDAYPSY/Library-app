@@ -1369,6 +1369,7 @@ class LibraryService {
     String preparationFor = '',
     String gender = 'Male',
     String? photoBase64,
+    int durationMonths = 1,
   }) async {
     ensureInitialized();
 
@@ -1402,9 +1403,10 @@ class LibraryService {
         : (duesAmount > 0 && feeAmount == 0
             ? duesAmount
             : (feeAmount + duesAmount > 0 ? feeAmount + duesAmount : 500));
+    final effectiveMonths = durationMonths > 0 ? durationMonths : 1;
     final validUntil = (duesAmount > 0 && feeAmount == 0)
         ? now // Due immediately if no initial fee was paid
-        : now.add(const Duration(days: 30));
+        : now.add(Duration(days: 30 * effectiveMonths));
 
     if (isFirebaseConnected) {
       final studentDocRef = (studentId != null && studentId.isNotEmpty)
@@ -1480,22 +1482,12 @@ class LibraryService {
           ? studentId
           : 'std_${DateTime.now().millisecondsSinceEpoch}';
       if (seatNumber != null) {
-        // Enforce strictly 1 student per seat: unassign this seat from any previous student
+        // Unassign seat only from previous occupants who have conflicting shifts
         for (int i = 0; i < _mockStudents.length; i++) {
-          if (_mockStudents[i].seatNumber == seatNumber) {
+          if (_mockStudents[i].seatNumber == seatNumber &&
+              doShiftsConflict(_mockStudents[i].shift, shift, allShifts: shifts)) {
             _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null);
           }
-        }
-        final index = seatNumber - 1;
-        if (index >= 0 && index < _mockSeats.length) {
-          _mockSeats[index] = SeatInfo(
-            seatNumber: seatNumber,
-            isOccupied: true,
-            studentId: effectiveStudentId,
-            studentName: studentName,
-            shift: shift,
-          );
-          _mockSeatsController.add(List.unmodifiable(_mockSeats));
         }
       }
 
@@ -1542,6 +1534,7 @@ class LibraryService {
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));
       }
 
+      _syncSeatsWithStudents();
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
       _saveLocalState();
     }
@@ -1584,44 +1577,20 @@ class LibraryService {
 
       await batch.commit();
     } else {
-      final index = seatNumber - 1;
-      if (index >= 0 && index < _mockSeats.length) {
-        if (studentId != null && studentId.isNotEmpty) {
-          final studentIndex =
-              _mockStudents.indexWhere((s) => s.id == studentId);
-          if (studentIndex != -1) {
-            final s = _mockStudents[studentIndex];
-            _mockStudents[studentIndex] = s.copyWith(
-              seatNumber: null,
-            );
-          }
-        }
-
-        final otherStudents = _mockStudents.where(
-          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
-        ).toList();
-
-        if (otherStudents.isNotEmpty) {
-          final rem = otherStudents.first;
-          _mockSeats[index] = SeatInfo(
-            seatNumber: seatNumber,
-            isOccupied: true,
-            studentId: rem.id,
-            studentName: rem.name,
-            shift: rem.shift,
-            sectionName: _mockSeats[index].sectionName,
-          );
-        } else {
-          _mockSeats[index] = SeatInfo(
-            seatNumber: seatNumber,
-            sectionName: _mockSeats[index].sectionName,
+      if (studentId != null && studentId.isNotEmpty) {
+        final studentIndex =
+            _mockStudents.indexWhere((s) => s.id == studentId);
+        if (studentIndex != -1) {
+          final s = _mockStudents[studentIndex];
+          _mockStudents[studentIndex] = s.copyWith(
+            seatNumber: null,
           );
         }
-
-        _mockSeatsController.add(List.unmodifiable(_mockSeats));
-        _mockStudentsController.add(List.unmodifiable(_mockStudents));
-        _saveLocalState();
       }
+
+      _syncSeatsWithStudents();
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      _saveLocalState();
     }
   }
 
@@ -1666,28 +1635,7 @@ class LibraryService {
           seatNumber: null,
         );
       }
-      if (seatNumber != null && seatNumber > 0 && seatNumber <= _mockSeats.length) {
-        final otherStudents = _mockStudents.where(
-          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
-        ).toList();
-        if (otherStudents.isNotEmpty) {
-          final rem = otherStudents.first;
-          _mockSeats[seatNumber - 1] = SeatInfo(
-            seatNumber: seatNumber,
-            isOccupied: true,
-            studentId: rem.id,
-            studentName: rem.name,
-            shift: rem.shift,
-            sectionName: _mockSeats[seatNumber - 1].sectionName,
-          );
-        } else {
-          _mockSeats[seatNumber - 1] = SeatInfo(
-            seatNumber: seatNumber,
-            sectionName: _mockSeats[seatNumber - 1].sectionName,
-          );
-        }
-        _mockSeatsController.add(List.unmodifiable(_mockSeats));
-      }
+      _syncSeatsWithStudents();
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
       _saveLocalState();
     }
@@ -1730,28 +1678,7 @@ class LibraryService {
       await batch.commit();
     } else {
       _mockStudents.removeWhere((s) => s.id == studentId);
-      if (seatNumber != null && seatNumber > 0 && seatNumber <= _mockSeats.length) {
-        final otherStudents = _mockStudents.where(
-          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
-        ).toList();
-        if (otherStudents.isNotEmpty) {
-          final rem = otherStudents.first;
-          _mockSeats[seatNumber - 1] = SeatInfo(
-            seatNumber: seatNumber,
-            isOccupied: true,
-            studentId: rem.id,
-            studentName: rem.name,
-            shift: rem.shift,
-            sectionName: _mockSeats[seatNumber - 1].sectionName,
-          );
-        } else {
-          _mockSeats[seatNumber - 1] = SeatInfo(
-            seatNumber: seatNumber,
-            sectionName: _mockSeats[seatNumber - 1].sectionName,
-          );
-        }
-        _mockSeatsController.add(List.unmodifiable(_mockSeats));
-      }
+      _syncSeatsWithStudents();
       _mockStudentsController.add(List.unmodifiable(_mockStudents));
       _saveLocalState();
     }
@@ -1786,9 +1713,10 @@ class LibraryService {
   ]) async {
     ensureInitialized();
     final dDate = dueDate ?? DateTime.now();
+    final newStatus = duesAmount > 0 ? 'DUES' : 'ACTIVE';
     if (isFirebaseConnected) {
       await _tenantCol('students').doc(studentId).update({
-        'status': 'DUES',
+        'status': newStatus,
         'dues_amount': duesAmount,
         'fee_due_date': Timestamp.fromDate(dDate),
       });
@@ -1796,10 +1724,11 @@ class LibraryService {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
         _mockStudents[idx] = _mockStudents[idx].copyWith(
-          status: 'DUES',
+          status: newStatus,
           duesAmount: duesAmount,
           feeDueDate: dDate,
         );
+        _syncSeatsWithStudents();
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
         _saveLocalState();
       }
@@ -1833,21 +1762,12 @@ class LibraryService {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
         final s = _mockStudents[idx];
-        if (seatNumber != null && seatNumber > 0 && seatNumber <= _mockSeats.length) {
-          _mockSeats[seatNumber - 1] = SeatInfo(
-            seatNumber: seatNumber,
-            isOccupied: true,
-            studentId: studentId,
-            studentName: s.name,
-            shift: s.shift,
-          );
-          _mockSeatsController.add(List.unmodifiable(_mockSeats));
-        }
         _mockStudents[idx] = s.copyWith(
           status: 'ACTIVE',
           seatNumber: seatNumber ?? s.seatNumber,
           duesAmount: 0,
         );
+        _syncSeatsWithStudents();
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
         _saveLocalState();
       }
@@ -1911,9 +1831,6 @@ class LibraryService {
           }
         }
 
-        // Resync all seats to correctly reflect shift-wise occupants
-        _syncSeatsWithStudents();
-
         _mockStudents[idx] = s.copyWith(
           name: name,
           phone: phone,
@@ -1932,6 +1849,9 @@ class LibraryService {
           sectionName: sectionName ?? s.sectionName,
           photoBase64: photoBase64 ?? s.photoBase64,
         );
+
+        // Resync all seats to correctly reflect shift-wise occupants after student update
+        _syncSeatsWithStudents();
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
         _saveLocalState();
       }
