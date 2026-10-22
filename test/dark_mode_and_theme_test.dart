@@ -152,11 +152,15 @@ void main() {
       );
 
       // Light mode forced
-      await service.setThemeMode(ThemeMode.light);
+      await tester.runAsync(() async {
+        await service.setThemeMode(ThemeMode.light);
+      });
       expect(service.isDarkMode(capturedContext), isFalse);
 
       // Dark mode forced
-      await service.setThemeMode(ThemeMode.dark);
+      await tester.runAsync(() async {
+        await service.setThemeMode(ThemeMode.dark);
+      });
       expect(service.isDarkMode(capturedContext), isTrue);
     });
   });
