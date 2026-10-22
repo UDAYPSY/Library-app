@@ -3,6 +3,16 @@ import os
 import re
 
 def patch_gradle_files():
+    # 1. Update android/local.properties with flutter.minSdkVersion=23 if present or create it
+    local_props = 'android/local.properties'
+    try:
+        os.makedirs(os.path.dirname(local_props), exist_ok=True)
+        with open(local_props, 'a', encoding='utf-8') as f:
+            f.write('\nflutter.minSdkVersion=23\n')
+        print(f"Added flutter.minSdkVersion=23 to {local_props}")
+    except Exception as e:
+        print(f"Notice: could not update {local_props}: {e}")
+
     gradle_files = glob.glob('android/app/build.gradle*')
     print(f"Found gradle files to patch: {gradle_files}")
     for file_path in gradle_files:
@@ -11,11 +21,14 @@ def patch_gradle_files():
 
         is_kts = file_path.endswith('.kts')
         
-        # Update minSdk to 23 for Cloud Firestore compatibility
+        # Replace the entire line matching minSdk or minSdkVersion with clean minSdk = 23
         if is_kts:
-            content = re.sub(r'minSdk\s*=\s*.*', 'minSdk = 23', content)
+            content = re.sub(r'^\s*.*minSdk.*$', '        minSdk = 23', content, flags=re.MULTILINE)
         else:
-            content = re.sub(r'minSdkVersion\s*=?\s*.*', 'minSdkVersion 23', content)
+            if re.search(r'minSdk\s*=', content):
+                content = re.sub(r'^\s*.*minSdk.*$', '        minSdk = 23', content, flags=re.MULTILINE)
+            else:
+                content = re.sub(r'^\s*.*minSdk(Version)?.*$', '        minSdkVersion 23', content, flags=re.MULTILINE)
 
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
