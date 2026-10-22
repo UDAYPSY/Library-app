@@ -8,6 +8,7 @@ import '../../models/library_models.dart';
 import '../../services/excel_import_service.dart';
 import '../../services/file_export_service.dart';
 import '../../services/library_service.dart';
+import '../../services/theme_service.dart';
 import '../login_screen.dart';
 import '../shifts/shift_system_screen.dart';
 import '../tools/library_branding_screen.dart';
@@ -24,7 +25,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final LibraryService _service = LibraryService();
-  String _currentTheme = 'Light';
+  String get _currentTheme => ThemeService().themeModeName;
 
   Future<void> _launchUrl(String urlString) async {
     final uri = Uri.parse(urlString);
@@ -294,10 +295,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showThemeSelector() {
+    final themeService = ThemeService();
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -307,39 +309,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Select Theme Mode',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: AppColors.text(context),
+              ),
             ),
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.wb_sunny_outlined, color: Color(0xFFF59E0B)),
-              title: const Text('Light Mode (Standard)', style: TextStyle(fontWeight: FontWeight.bold)),
-              trailing: _currentTheme == 'Light' ? const Icon(Icons.check_circle, color: Color(0xFF0D766E)) : null,
-              onTap: () {
-                setState(() => _currentTheme = 'Light');
-                Navigator.pop(ctx);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.nightlight_outlined, color: Color(0xFF6366F1)),
-              title: const Text('Dark Mode (Sleek Night)', style: TextStyle(fontWeight: FontWeight.bold)),
-              trailing: _currentTheme == 'Dark' ? const Icon(Icons.check_circle, color: Color(0xFF0D766E)) : null,
-              onTap: () {
-                setState(() => _currentTheme = 'Dark');
-                Navigator.pop(ctx);
+              title: Text(
+                'Light Mode (Standard)',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.text(context)),
+              ),
+              trailing: themeService.themeMode == ThemeMode.light
+                  ? const Icon(Icons.check_circle, color: Color(0xFF0D766E))
+                  : null,
+              onTap: () async {
+                await themeService.setThemeMode(ThemeMode.light);
+                if (mounted) setState(() {});
+                if (ctx.mounted) Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Dark Mode preference saved!')),
+                  const SnackBar(
+                    content: Text('Switched to Light Theme!'),
+                    backgroundColor: Color(0xFF0D766E),
+                    behavior: SnackBarBehavior.floating,
+                  ),
                 );
               },
             ),
             ListTile(
-              leading: const Icon(Icons.settings_suggest_outlined, color: Color(0xFF64748B)),
-              title: const Text('System Default', style: TextStyle(fontWeight: FontWeight.bold)),
-              trailing: _currentTheme == 'System' ? const Icon(Icons.check_circle, color: Color(0xFF0D766E)) : null,
-              onTap: () {
-                setState(() => _currentTheme = 'System');
-                Navigator.pop(ctx);
+              leading: const Icon(Icons.nightlight_outlined, color: Color(0xFF6366F1)),
+              title: Text(
+                'Dark Mode (Sleek Slate)',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.text(context)),
+              ),
+              trailing: themeService.themeMode == ThemeMode.dark
+                  ? const Icon(Icons.check_circle, color: Color(0xFF14B8A6))
+                  : null,
+              onTap: () async {
+                await themeService.setThemeMode(ThemeMode.dark);
+                if (mounted) setState(() {});
+                if (ctx.mounted) Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Switched to Dark Theme! 🌙'),
+                    backgroundColor: Color(0xFF14B8A6),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.settings_suggest_outlined, color: AppColors.textMutedColor(context)),
+              title: Text(
+                'System Default',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.text(context)),
+              ),
+              trailing: themeService.themeMode == ThemeMode.system
+                  ? const Icon(Icons.check_circle, color: Color(0xFF0D766E))
+                  : null,
+              onTap: () async {
+                await themeService.setThemeMode(ThemeMode.system);
+                if (mounted) setState(() {});
+                if (ctx.mounted) Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Theme set to follow System Default!'),
+                    backgroundColor: Color(0xFF0D766E),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               },
             ),
           ],
@@ -609,6 +651,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showUserManagementModal() {
+    if (!_service.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Access Denied: Only Library Administrator can manage staff accounts.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -709,8 +761,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showAddStaffDialog() {
+    if (!_service.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Access Denied: Only Library Administrator can add staff members.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
+    final pinCtrl = TextEditingController(text: '1234');
+    final emailCtrl = TextEditingController();
     String selectedRole = 'Receptionist & Desk';
 
     showDialog(
@@ -719,34 +783,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (dialogCtx, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: '10-Digit Mobile Number', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedRole,
-                decoration: const InputDecoration(labelText: 'Staff Role & Access', border: OutlineInputBorder()),
-                items: const [
-                  DropdownMenuItem(value: 'Receptionist & Desk', child: Text('Receptionist & Desk')),
-                  DropdownMenuItem(value: 'Shift Manager', child: Text('Shift Manager')),
-                  DropdownMenuItem(value: 'Accountant', child: Text('Accountant')),
-                  DropdownMenuItem(value: 'Night Supervisor', child: Text('Night Supervisor')),
-                ],
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedRole = val);
-                },
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: '10-Digit Mobile Number (Login ID)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: pinCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Staff Login PIN / Password', hintText: 'e.g. 1234', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email Address (Optional)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: const InputDecoration(labelText: 'Staff Role & Access', border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: 'Receptionist & Desk', child: Text('Receptionist & Desk')),
+                    DropdownMenuItem(value: 'Shift Manager', child: Text('Shift Manager')),
+                    DropdownMenuItem(value: 'Accountant', child: Text('Accountant')),
+                    DropdownMenuItem(value: 'Night Supervisor', child: Text('Night Supervisor')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedRole = val);
+                  },
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -760,11 +838,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final name = nameCtrl.text.trim();
                 final phone = phoneCtrl.text.trim();
                 if (name.isEmpty || phone.isEmpty) return;
+                final pin = pinCtrl.text.trim().isNotEmpty ? pinCtrl.text.trim() : '1234';
+                final email = emailCtrl.text.trim().isNotEmpty ? emailCtrl.text.trim() : null;
                 final newStaff = StaffMember(
                   id: 'staff_${DateTime.now().millisecondsSinceEpoch}',
                   name: name,
                   phone: phone,
                   role: selectedRole,
+                  email: email,
+                  pin: pin,
                   addedAt: DateTime.now(),
                 );
                 _service.addStaffMember(newStaff);
@@ -772,7 +854,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Staff account for $name created!'),
+                    content: Text('Staff account for $name created! Login PIN: $pin'),
                     backgroundColor: const Color(0xFF0D766E),
                   ),
                 );
@@ -1038,6 +1120,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showRestoreDatabaseModal() {
+    if (!_service.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Access Denied: Only Library Administrator can restore the database.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     final textCtrl = TextEditingController();
     Map<String, dynamic>? parsedData;
     String validationError = '';
@@ -1363,13 +1455,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
+              await _service.signOut();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
             },
             child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -1379,6 +1474,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showDeleteAccountDialog() {
+    if (!_service.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Access Denied: Only Library Administrator can wipe library data.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1429,12 +1534,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = _service.profile;
-    final adminName = profile.adminName.isNotEmpty ? profile.adminName : 'Nivi';
-    final adminEmail = profile.adminEmail.isNotEmpty ? profile.adminEmail : 'udaypratapsi2022@gmail.com';
-    final avatarLetter = adminName.isNotEmpty ? adminName[0].toUpperCase() : 'N';
+    final isAdmin = _service.isAdmin;
+    final currentRole = _service.currentUserRole;
+    final displayName = (_service.currentUserName.isNotEmpty && _service.currentUserName != 'Guest')
+        ? _service.currentUserName
+        : (profile.adminName.isNotEmpty ? profile.adminName : 'Nivi');
+    final displayEmail = _service.currentUserEmail.isNotEmpty
+        ? _service.currentUserEmail
+        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : 'udaypratapsi2022@gmail.com');
+    final avatarLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'N';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.scaffold(context),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
@@ -1442,21 +1553,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Top Header (Image 1)
-              const Text(
+              Text(
                 'Settings',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.textNavy,
+                  color: AppColors.text(context),
                 ),
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'Manage your account and preferences',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF64748B),
+                  color: AppColors.textMutedColor(context),
                 ),
               ),
               const SizedBox(height: 20),
@@ -1468,11 +1579,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.card(context),
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFFF1F5F9)),
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3)),
+                    border: Border.all(color: AppColors.cardBorderColor(context)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.isDark(context) ? Colors.black26 : const Color(0x06000000),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
                     ],
                   ),
                   child: Row(
@@ -1481,16 +1596,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         width: 54,
                         height: 54,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE6F4EA),
+                          color: isAdmin ? const Color(0xFFE6F4EA) : const Color(0xFFEEF2FF),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Center(
                           child: Text(
                             avatarLetter,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F766E),
+                              color: isAdmin ? const Color(0xFF0F766E) : const Color(0xFF4F46E5),
                             ),
                           ),
                         ),
@@ -1501,7 +1616,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              adminName,
+                              displayName,
                               style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
@@ -1510,7 +1625,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              adminEmail,
+                              displayEmail,
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -1519,28 +1634,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEF3C7),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.shield_rounded, size: 12, color: Color(0xFFD97706)),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'PRO MEMBER',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
-                                      color: Color(0xFFD97706),
-                                    ),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: isAdmin ? const Color(0xFFDCFCE7) : const Color(0xFFE0E7FF),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                ],
-                              ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isAdmin ? Icons.shield_rounded : Icons.badge_rounded,
+                                        size: 12,
+                                        color: isAdmin ? const Color(0xFF16A34A) : const Color(0xFF4F46E5),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        isAdmin ? 'ADMIN (FULL ACCESS)' : 'RECEPTIONIST (DESK ACCESS)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.5,
+                                          color: isAdmin ? const Color(0xFF16A34A) : const Color(0xFF4F46E5),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -2022,11 +2145,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _sectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w900,
         letterSpacing: 1.0,
-        color: Color(0xFF64748B),
+        color: AppColors.textMutedColor(context),
       ),
     );
   }
@@ -2034,11 +2157,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _cardGroup(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3)),
+        border: Border.all(color: AppColors.cardBorderColor(context)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.isDark(context) ? Colors.black26 : const Color(0x06000000),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -2087,15 +2214,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
-                          color: isDestructive ? const Color(0xFFEF4444) : AppColors.textNavy,
+                          color: isDestructive ? const Color(0xFFEF4444) : AppColors.text(context),
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
-                          color: Color(0xFF64748B),
+                          color: AppColors.textMutedColor(context),
                         ),
                       ),
                     ],
@@ -2103,7 +2230,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: isDestructive ? const Color(0xFFFCA5A5) : const Color(0xFFCBD5E1),
+                  color: isDestructive
+                      ? const Color(0xFFFCA5A5)
+                      : (AppColors.isDark(context) ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                   size: 20,
                 ),
               ],
@@ -2111,11 +2240,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         if (showDivider)
-          const Divider(
+          Divider(
             height: 1,
             indent: 72,
             endIndent: 16,
-            color: Color(0xFFF1F5F9),
+            color: AppColors.divider(context),
           ),
       ],
     );

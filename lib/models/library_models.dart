@@ -1,6 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class AuthResult {
+  final bool success;
+  final String? message;
+  final String? role;
+  final String? userName;
+  final String? userId;
+
+  const AuthResult({
+    required this.success,
+    this.message,
+    this.role,
+    this.userName,
+    this.userId,
+  });
+}
+
 class LibraryProfile {
+  String libraryId;
   String libraryName;
   String city;
   String adminName;
@@ -26,6 +43,7 @@ class LibraryProfile {
   String receiptTemplate;
 
   LibraryProfile({
+    this.libraryId = 'lib_patna_central',
     this.libraryName = 'Patna Central Library',
     this.city = 'City Center, Main St',
     this.adminName = 'Nivi',
@@ -51,6 +69,7 @@ class LibraryProfile {
 
   Map<String, dynamic> toMap() {
     return {
+      'library_id': libraryId,
       'library_name': libraryName,
       'city': city,
       'admin_name': adminName,
@@ -77,6 +96,7 @@ class LibraryProfile {
 
   factory LibraryProfile.fromMap(Map<String, dynamic> map) {
     return LibraryProfile(
+      libraryId: map['library_id'] ?? 'lib_patna_central',
       libraryName: map['library_name'] ?? 'Patna Central Library',
       city: map['city'] ?? 'City Center, Main St',
       adminName: map['admin_name'] ?? 'Nivi',
@@ -521,6 +541,8 @@ class StaffMember {
   final String role;
   final DateTime addedAt;
   final bool isActive;
+  final String? email;
+  final String? pin;
 
   const StaffMember({
     required this.id,
@@ -529,7 +551,31 @@ class StaffMember {
     this.role = 'Receptionist',
     required this.addedAt,
     this.isActive = true,
+    this.email,
+    this.pin,
   });
+
+  StaffMember copyWith({
+    String? id,
+    String? name,
+    String? phone,
+    String? role,
+    DateTime? addedAt,
+    bool? isActive,
+    String? email,
+    String? pin,
+  }) {
+    return StaffMember(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      role: role ?? this.role,
+      addedAt: addedAt ?? this.addedAt,
+      isActive: isActive ?? this.isActive,
+      email: email ?? this.email,
+      pin: pin ?? this.pin,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -539,6 +585,8 @@ class StaffMember {
       'role': role,
       'added_at': addedAt.toIso8601String(),
       'is_active': isActive,
+      'email': email,
+      'pin': pin,
     };
   }
 
@@ -550,6 +598,8 @@ class StaffMember {
       role: map['role'] ?? 'Receptionist',
       addedAt: map['added_at'] != null ? (DateTime.tryParse(map['added_at']) ?? DateTime.now()) : DateTime.now(),
       isActive: map['is_active'] ?? true,
+      email: map['email'] as String?,
+      pin: map['pin'] as String?,
     );
   }
 }

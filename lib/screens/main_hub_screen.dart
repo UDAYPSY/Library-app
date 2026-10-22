@@ -58,7 +58,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: AppColors.scaffold(context),
       body: SafeArea(
         child: IndexedStack(
           index: _currentTabIndex,
@@ -143,19 +143,19 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         children: [
                           Text(
                             greeting,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textMuted,
+                              color: AppColors.textMutedColor(context),
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             adminName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w900,
-                              color: AppColors.textNavy,
+                              color: AppColors.text(context),
                             ),
                           ),
                         ],
@@ -168,20 +168,24 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             width: 48,
                             height: 48,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.card(context),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+                              border: Border.all(color: AppColors.cardBorderColor(context)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.isDark(context) ? Colors.black26 : Colors.black12,
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
                               ],
                             ),
                             child: Center(
                               child: Text(
                                 avatarLetter,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
-                                  color: AppColors.primaryTeal,
+                                  color: AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal,
                                 ),
                               ),
                             ),
@@ -210,7 +214,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                     width: 200,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEDF2F7),
+                      color: AppColors.subSurface(context),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     padding: const EdgeInsets.all(3),
@@ -222,7 +226,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             onTap: () => setState(() => _isModernMode = false),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: !_isModernMode ? AppColors.primaryTeal : Colors.transparent,
+                                color: !_isModernMode
+                                    ? (AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(11),
                               ),
                               child: Row(
@@ -231,7 +237,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   Icon(
                                     Icons.grid_view_rounded,
                                     size: 14,
-                                    color: !_isModernMode ? Colors.white : AppColors.textNavy,
+                                    color: !_isModernMode
+                                        ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                                        : AppColors.textMutedColor(context),
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
@@ -239,7 +247,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: !_isModernMode ? Colors.white : AppColors.textNavy,
+                                      color: !_isModernMode
+                                          ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                                          : AppColors.textMutedColor(context),
                                     ),
                                   ),
                                 ],
@@ -253,7 +263,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             onTap: () => setState(() => _isModernMode = true),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: _isModernMode ? AppColors.primaryTeal : Colors.transparent,
+                                color: _isModernMode
+                                    ? (AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(11),
                               ),
                               child: Row(
@@ -262,7 +274,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   Icon(
                                     Icons.auto_awesome,
                                     size: 14,
-                                    color: _isModernMode ? Colors.white : AppColors.textNavy,
+                                    color: _isModernMode
+                                        ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                                        : AppColors.textMutedColor(context),
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
@@ -270,7 +284,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: _isModernMode ? Colors.white : AppColors.textNavy,
+                                      color: _isModernMode
+                                          ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                                          : AppColors.textMutedColor(context),
                                     ),
                                   ),
                                 ],
@@ -371,12 +387,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   const SizedBox(height: 26),
 
                   // Section Header: Library Overview (Image 1)
-                  const Text(
+                  Text(
                     'Library Overview',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textNavy,
+                      color: AppColors.text(context),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -436,12 +452,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   const SizedBox(height: 26),
 
                   // Section Header: Quick Actions (Image 1)
-                  const Text(
+                  Text(
                     'Quick Actions',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textNavy,
+                      color: AppColors.text(context),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -502,12 +518,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   const SizedBox(height: 26),
 
                   // Section Header: Recommended for You (Batch 6 Image 2)
-                  const Text(
+                  Text(
                     'Recommended for You',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textNavy,
+                      color: AppColors.text(context),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -558,9 +574,13 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.card(context),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFFFE4E6)),
+                      border: Border.all(
+                        color: AppColors.isDark(context)
+                            ? const Color(0xFF7F1D1D)
+                            : const Color(0xFFFFE4E6),
+                      ),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x0A000000),
@@ -575,7 +595,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFEE2E2),
+                            color: AppColors.isDark(context)
+                                ? const Color(0xFF450A0A)
+                                : const Color(0xFFFEE2E2),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Center(
@@ -591,12 +613,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Pending Dues',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.textNavy,
+                                  color: AppColors.text(context),
                                 ),
                               ),
                               const SizedBox(height: 3),
@@ -604,10 +626,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 dueStudentsCount > 0
                                     ? '₹$pendingDuesTotal from $dueStudentsCount student${dueStudentsCount == 1 ? '' : 's'}'
                                     : 'All dues cleared • ₹0 pending',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFF64748B),
+                                  color: AppColors.textMutedColor(context),
                                 ),
                               ),
                             ],
@@ -647,12 +669,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   const SizedBox(height: 26),
 
                   // Section Header: Manage (Batch 6 Image 2 & 3)
-                  const Text(
+                  Text(
                     'Manage',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textNavy,
+                      color: AppColors.text(context),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -721,9 +743,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.card(context),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFF1F5F9)),
+                        border: Border.all(color: AppColors.cardBorderColor(context)),
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x08000000),
@@ -738,7 +760,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             width: 46,
                             height: 46,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE6F4EA),
+                              color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFE6F4EA),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: const Center(
@@ -750,11 +772,11 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             ),
                           ),
                           const SizedBox(width: 14),
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
+                                const Text(
                                   'PRO TIP • TODAY',
                                   style: TextStyle(
                                     fontSize: 11,
@@ -763,13 +785,13 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                     color: Color(0xFF0D9488),
                                   ),
                                 ),
-                                SizedBox(height: 3),
+                                const SizedBox(height: 3),
                                 Text(
                                   'Use QR codes to let students check-in automatically.',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.textNavy,
+                                    color: AppColors.text(context),
                                   ),
                                 ),
                               ],
@@ -787,12 +809,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   const SizedBox(height: 26),
 
                   // Section Header: Tools & More (Batch 6 Image 3)
-                  const Text(
+                  Text(
                     'Tools & More',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textNavy,
+                      color: AppColors.text(context),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -880,9 +902,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.card(context),
                       borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: const Color(0xFFF1F5F9)),
+                      border: Border.all(color: AppColors.cardBorderColor(context)),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x0A000000),
@@ -899,7 +921,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE6F4EA),
+                                color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFE6F4EA),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: const Center(
@@ -911,7 +933,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               ),
                             ),
                             const SizedBox(width: 14),
-                            const Column(
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
@@ -919,17 +941,17 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w900,
-                                    color: AppColors.textNavy,
+                                    color: AppColors.text(context),
                                   ),
                                 ),
-                                SizedBox(height: 2),
+                                const SizedBox(height: 2),
                                 Text(
                                   "INDIA'S #1 LIBRARY MANAGEMENT APP",
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.6,
-                                    color: Color(0xFF64748B),
+                                    color: AppColors.textMutedColor(context),
                                   ),
                                 ),
                               ],
@@ -937,38 +959,38 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        const Divider(color: Color(0xFFF1F5F9), height: 1),
+                        Divider(color: AppColors.divider(context), height: 1),
                         const SizedBox(height: 14),
-                        const Row(
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 18),
-                                SizedBox(width: 6),
+                                const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 18),
+                                const SizedBox(width: 6),
                                 Text(
                                   '500+ Libraries',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
-                                    color: AppColors.textNavy,
+                                    color: AppColors.text(context),
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(width: 24),
+                            const SizedBox(width: 24),
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 20),
-                                SizedBox(width: 6),
+                                const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 20),
+                                const SizedBox(width: 6),
                                 Text(
                                   '4.8 Rating',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
-                                    color: AppColors.textNavy,
+                                    color: AppColors.text(context),
                                   ),
                                 ),
                               ],
@@ -995,9 +1017,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.card(context),
                       borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: const Color(0xFFF1F5F9)),
+                      border: Border.all(color: AppColors.cardBorderColor(context)),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x0A000000),
@@ -1015,7 +1037,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFECFDF5),
+                                color: AppColors.isDark(context) ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: const Center(
@@ -1027,7 +1049,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               ),
                             ),
                             const SizedBox(width: 14),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1036,16 +1058,16 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                     style: TextStyle(
                                       fontSize: 17,
                                       fontWeight: FontWeight.w800,
-                                      color: AppColors.textNavy,
+                                      color: AppColors.text(context),
                                     ),
                                   ),
-                                  SizedBox(height: 2),
+                                  const SizedBox(height: 2),
                                   Text(
                                     'Our support team is just a message away',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
-                                      color: Color(0xFF64748B),
+                                      color: AppColors.textMutedColor(context),
                                     ),
                                   ),
                                 ],
@@ -1081,8 +1103,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               flex: 4,
                               child: OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.textNavy,
-                                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                  foregroundColor: AppColors.text(context),
+                                  side: BorderSide(color: AppColors.cardBorderColor(context)),
                                   padding: const EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
@@ -1110,9 +1132,11 @@ class _MainHubScreenState extends State<MainHubScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEEF2FF),
+                        color: AppColors.isDark(context) ? const Color(0xFF1E1B4B) : const Color(0xFFEEF2FF),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE0E7FF)),
+                        border: Border.all(
+                          color: AppColors.isDark(context) ? const Color(0xFF3730A3) : const Color(0xFFE0E7FF),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -1120,7 +1144,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.card(context),
                               borderRadius: BorderRadius.circular(14),
                               boxShadow: const [
                                 BoxShadow(
@@ -1139,7 +1163,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             ),
                           ),
                           const SizedBox(width: 14),
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1148,16 +1172,16 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xFF312E81),
+                                    color: AppColors.isDark(context) ? const Color(0xFFE0E7FF) : const Color(0xFF312E81),
                                   ),
                                 ),
-                                SizedBox(height: 2),
+                                const SizedBox(height: 2),
                                 Text(
                                   'Help other library owners simplify their work.',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    color: Color(0xFF6366F1),
+                                    color: AppColors.isDark(context) ? const Color(0xFFA5B4FC) : const Color(0xFF6366F1),
                                   ),
                                 ),
                               ],
@@ -1179,13 +1203,17 @@ class _MainHubScreenState extends State<MainHubScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFFF7ED), Color(0xFFFEF3C7)],
+                      gradient: LinearGradient(
+                        colors: AppColors.isDark(context)
+                            ? const [Color(0xFF451A03), Color(0xFF78350F)]
+                            : const [Color(0xFFFFF7ED), Color(0xFFFEF3C7)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFFED7AA)),
+                      border: Border.all(
+                        color: AppColors.isDark(context) ? const Color(0xFF9A3412) : const Color(0xFFFED7AA),
+                      ),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x0A000000),
@@ -1223,21 +1251,21 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               ],
                             ),
                             const SizedBox(height: 10),
-                            const Text(
+                            Text(
                               'Enjoying the App?',
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFF78350F),
+                                color: AppColors.isDark(context) ? const Color(0xFFFEF3C7) : const Color(0xFF78350F),
                               ),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
+                            Text(
                               'Your 5-star rating helps us grow!',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF9A3412),
+                                color: AppColors.isDark(context) ? const Color(0xFFFED7AA) : const Color(0xFF9A3412),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -1294,11 +1322,15 @@ class _MainHubScreenState extends State<MainHubScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.card(context),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF1F5F9)),
-          boxShadow: const [
-            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+          border: Border.all(color: AppColors.cardBorderColor(context)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.isDark(context) ? Colors.black26 : Colors.black12,
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
           ],
         ),
         child: Column(
@@ -1316,20 +1348,20 @@ class _MainHubScreenState extends State<MainHubScreen> {
             const SizedBox(height: 14),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
-                color: AppColors.textNavy,
+                color: AppColors.text(context),
               ),
             ),
             const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.8,
-                color: AppColors.textMuted,
+                color: AppColors.textMutedColor(context),
               ),
             ),
           ],
@@ -1525,21 +1557,27 @@ class _MainHubScreenState extends State<MainHubScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.subSurface(context),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.cardBorderColor(context)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: iconColor),
+          Icon(
+            icon,
+            size: 14,
+            color: iconColor == Colors.black87
+                ? (AppColors.isDark(context) ? Colors.white70 : Colors.black87)
+                : iconColor,
+          ),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: AppColors.textNavy,
+              color: AppColors.text(context),
             ),
           ),
         ],
@@ -1552,9 +1590,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: AppColors.cardBorderColor(context)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x08000000),
@@ -1569,21 +1607,21 @@ class _MainHubScreenState extends State<MainHubScreen> {
             child: Row(
               children: [
                 Expanded(child: items[0]),
-                const VerticalDivider(color: Color(0xFFF1F5F9), width: 1, thickness: 1),
+                VerticalDivider(color: AppColors.divider(context), width: 1, thickness: 1),
                 Expanded(child: items[1]),
-                const VerticalDivider(color: Color(0xFFF1F5F9), width: 1, thickness: 1),
+                VerticalDivider(color: AppColors.divider(context), width: 1, thickness: 1),
                 Expanded(child: items[2]),
               ],
             ),
           ),
-          const Divider(color: Color(0xFFF1F5F9), height: 1, thickness: 1),
+          Divider(color: AppColors.divider(context), height: 1, thickness: 1),
           IntrinsicHeight(
             child: Row(
               children: [
                 Expanded(child: items[3]),
-                const VerticalDivider(color: Color(0xFFF1F5F9), width: 1, thickness: 1),
+                VerticalDivider(color: AppColors.divider(context), width: 1, thickness: 1),
                 Expanded(child: items[4]),
-                const VerticalDivider(color: Color(0xFFF1F5F9), width: 1, thickness: 1),
+                VerticalDivider(color: AppColors.divider(context), width: 1, thickness: 1),
                 Expanded(child: items[5]),
               ],
             ),
@@ -1622,10 +1660,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
             Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textNavy,
+                color: AppColors.text(context),
               ),
             ),
           ],
@@ -1652,9 +1690,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
 
         return Container(
           padding: const EdgeInsets.all(22),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          decoration: BoxDecoration(
+            color: AppColors.card(context),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1665,30 +1703,30 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   width: 44,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: AppColors.divider(context),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.access_time_filled_rounded, color: Color(0xFFF97316)),
-                  SizedBox(width: 8),
+                  const Icon(Icons.access_time_filled_rounded, color: Color(0xFFF97316)),
+                  const SizedBox(width: 8),
                   Text(
                     'Library Shifts & Timings',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.textNavy,
+                      color: AppColors.text(context),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Live configured shifts with monthly pricing and active seat counts.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                style: TextStyle(color: AppColors.textMutedColor(context), fontSize: 13),
               ),
               const SizedBox(height: 18),
               ConstrainedBox(
@@ -1760,9 +1798,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.subSurface(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.cardBorderColor(context)),
       ),
       child: Row(
         children: [
@@ -1781,12 +1819,12 @@ class _MainHubScreenState extends State<MainHubScreen> {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textNavy),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.text(context)),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '$timings • $fee',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 12, color: AppColors.textMutedColor(context), fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -3030,18 +3068,19 @@ Have a productive study session!
   // 6-ITEM BOTTOM NAVIGATION BAR (Image 1 & 2)
   // -------------------------------------------------------------
   Widget _buildBottomNavigationBar() {
+    final isDark = AppColors.isDark(context);
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+      decoration: BoxDecoration(
+        color: AppColors.card(context),
+        border: Border(top: BorderSide(color: AppColors.divider(context))),
       ),
       child: BottomNavigationBar(
         currentIndex: _currentTabIndex,
         onTap: (idx) => setState(() => _currentTabIndex = idx),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primaryTeal,
-        unselectedItemColor: const Color(0xFF94A3B8),
+        backgroundColor: AppColors.card(context),
+        selectedItemColor: isDark ? AppColors.mintAccent : AppColors.primaryTeal,
+        unselectedItemColor: isDark ? AppColors.darkTextSubtle : const Color(0xFF94A3B8),
         selectedFontSize: 11,
         unselectedFontSize: 11,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800),

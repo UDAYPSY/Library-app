@@ -1530,7 +1530,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
         }).toList();
 
         return Scaffold(
-          backgroundColor: AppColors.scaffoldBg,
+          backgroundColor: AppColors.scaffold(context),
           body: SafeArea(
             child: Stack(
               children: [
@@ -1547,12 +1547,12 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                             children: [
                               if (Navigator.canPop(context)) ...[
                                 IconButton(
-                                  icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textNavy),
+                                  icon: Icon(Icons.arrow_back_rounded, color: AppColors.text(context)),
                                   onPressed: () => Navigator.pop(context),
                                 ),
                                 const SizedBox(width: 4),
                               ],
-                              const Column(
+                              Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
@@ -1561,16 +1561,16 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 1.0,
-                                      color: AppColors.textMuted,
+                                      color: AppColors.textMutedColor(context),
                                     ),
                                   ),
-                                  SizedBox(height: 2),
+                                  const SizedBox(height: 2),
                                   Text(
                                     'Directory',
                                     style: TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.w900,
-                                      color: AppColors.textNavy,
+                                      color: AppColors.text(context),
                                     ),
                                   ),
                                 ],
@@ -1591,7 +1591,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                   width: 44,
                                   height: 44,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFE6F4F1),
+                                    color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFE6F4F1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(Icons.file_download_outlined, color: AppColors.primaryTeal, size: 22),
@@ -1602,7 +1602,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE6F4F1),
+                                  color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFE6F4F1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Column(
@@ -1639,19 +1639,20 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.card(context),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: AppColors.cardBorderColor(context)),
                         ),
                         child: TextField(
                           controller: _searchCtrl,
+                          style: TextStyle(color: AppColors.text(context), fontSize: 13),
                           onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             hintText: 'Search by name or number...',
-                            hintStyle: TextStyle(color: AppColors.textSubtle, fontSize: 13),
-                            prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+                            hintStyle: TextStyle(color: AppColors.textSubtleColor(context), fontSize: 13),
+                            prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMutedColor(context), size: 20),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
                       ),
@@ -1798,14 +1799,14 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                   margin: const EdgeInsets.only(bottom: 14),
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: AppColors.card(context),
                                     borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: const Color(0xFFF1F5F9)),
-                                    boxShadow: const [
+                                    border: Border.all(color: AppColors.cardBorderColor(context)),
+                                    boxShadow: [
                                       BoxShadow(
-                                        color: Color(0x06000000),
+                                        color: AppColors.isDark(context) ? Colors.black26 : const Color(0x06000000),
                                         blurRadius: 8,
-                                        offset: Offset(0, 2),
+                                        offset: const Offset(0, 2),
                                       ),
                                     ],
                                   ),
@@ -1850,7 +1851,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                                 ? const Color(0xFFEF4444)
                                                                 : const Color(0xFF22C55E))),
                                                     shape: BoxShape.circle,
-                                                    border: Border.all(color: Colors.white, width: 2),
+                                                    border: Border.all(color: AppColors.card(context), width: 2),
                                                   ),
                                                 ),
                                               ),
@@ -1863,20 +1864,20 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                               children: [
                                                 Text(
                                                   st.name.isNotEmpty ? st.name : 'Member',
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 17,
                                                     fontWeight: FontWeight.w900,
-                                                    color: AppColors.textNavy,
+                                                    color: AppColors.text(context),
                                                   ),
                                                 ),
                                                 const SizedBox(height: 2),
                                                 Text(
                                                   'MEMBER ID: #$memberId',
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.w800,
                                                     letterSpacing: 0.5,
-                                                    color: Color(0xFF64748B),
+                                                    color: AppColors.textMutedColor(context),
                                                   ),
                                                 ),
                                               ],
@@ -2042,23 +2043,23 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                             child: Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFF8FAFC),
+                                                color: AppColors.subSurface(context),
                                                 borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: const Color(0xFFF1F5F9)),
+                                                border: Border.all(color: AppColors.cardBorderColor(context)),
                                               ),
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  const Row(
+                                                  Row(
                                                     children: [
-                                                      Icon(Icons.phone_outlined, size: 12, color: Color(0xFF64748B)),
-                                                      SizedBox(width: 4),
+                                                      const Icon(Icons.phone_outlined, size: 12, color: Color(0xFF64748B)),
+                                                      const SizedBox(width: 4),
                                                       Text(
                                                         'PHONE',
                                                         style: TextStyle(
                                                           fontSize: 9,
                                                           fontWeight: FontWeight.w800,
-                                                          color: Color(0xFF64748B),
+                                                          color: AppColors.textMutedColor(context),
                                                         ),
                                                       ),
                                                     ],
@@ -2066,10 +2067,10 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                   const SizedBox(height: 4),
                                                   Text(
                                                     st.phone.isNotEmpty ? st.phone : 'Not provided',
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontSize: 13,
                                                       fontWeight: FontWeight.w700,
-                                                      color: AppColors.textNavy,
+                                                      color: AppColors.text(context),
                                                     ),
                                                   ),
                                                 ],
@@ -2081,23 +2082,23 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                             child: Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFF8FAFC),
+                                                color: AppColors.subSurface(context),
                                                 borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: const Color(0xFFF1F5F9)),
+                                                border: Border.all(color: AppColors.cardBorderColor(context)),
                                               ),
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  const Row(
+                                                  Row(
                                                     children: [
-                                                      Icon(Icons.info_outline_rounded, size: 12, color: Color(0xFF64748B)),
-                                                      SizedBox(width: 4),
+                                                      Icon(Icons.info_outline_rounded, size: 12, color: AppColors.textSubtleColor(context)),
+                                                      const SizedBox(width: 4),
                                                       Text(
                                                         'STATUS',
                                                         style: TextStyle(
                                                           fontSize: 9,
                                                           fontWeight: FontWeight.w800,
-                                                          color: Color(0xFF64748B),
+                                                          color: AppColors.textSubtleColor(context),
                                                         ),
                                                       ),
                                                     ],
@@ -2134,23 +2135,23 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                             child: Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFF8FAFC),
+                                                color: AppColors.subSurface(context),
                                                 borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: const Color(0xFFF1F5F9)),
+                                                border: Border.all(color: AppColors.cardBorderColor(context)),
                                               ),
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  const Row(
+                                                  Row(
                                                     children: [
-                                                      Icon(Icons.calendar_today_outlined, size: 12, color: Color(0xFF64748B)),
-                                                      SizedBox(width: 4),
+                                                      Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.textSubtleColor(context)),
+                                                      const SizedBox(width: 4),
                                                       Text(
                                                         'JOINED',
                                                         style: TextStyle(
                                                           fontSize: 9,
                                                           fontWeight: FontWeight.w800,
-                                                          color: Color(0xFF64748B),
+                                                          color: AppColors.textSubtleColor(context),
                                                         ),
                                                       ),
                                                     ],
@@ -2158,10 +2159,10 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                   const SizedBox(height: 4),
                                                   Text(
                                                     joinDateStr,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontSize: 13,
                                                       fontWeight: FontWeight.w700,
-                                                      color: AppColors.textNavy,
+                                                      color: AppColors.text(context),
                                                     ),
                                                   ),
                                                 ],
@@ -2173,23 +2174,23 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                             child: Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFF8FAFC),
+                                                color: AppColors.subSurface(context),
                                                 borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: const Color(0xFFF1F5F9)),
+                                                border: Border.all(color: AppColors.cardBorderColor(context)),
                                               ),
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  const Row(
+                                                  Row(
                                                     children: [
-                                                      Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF64748B)),
-                                                      SizedBox(width: 4),
+                                                      Icon(Icons.location_on_outlined, size: 12, color: AppColors.textSubtleColor(context)),
+                                                      const SizedBox(width: 4),
                                                       Text(
                                                         'SEAT',
                                                         style: TextStyle(
                                                           fontSize: 9,
                                                           fontWeight: FontWeight.w800,
-                                                          color: Color(0xFF64748B),
+                                                          color: AppColors.textSubtleColor(context),
                                                         ),
                                                       ),
                                                     ],
@@ -2197,10 +2198,10 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                   const SizedBox(height: 4),
                                                   Text(
                                                     seatLabel,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontSize: 13,
                                                       fontWeight: FontWeight.w700,
-                                                      color: AppColors.textNavy,
+                                                      color: AppColors.text(context),
                                                     ),
                                                   ),
                                                 ],
@@ -2242,21 +2243,21 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                            Container(
                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                              decoration: BoxDecoration(
-                                               color: Colors.white,
+                                               color: AppColors.isDark(context) ? AppColors.darkSubSurface : Colors.white,
                                                borderRadius: BorderRadius.circular(8),
-                                               border: Border.all(color: const Color(0xFFE2E8F0)),
+                                               border: Border.all(color: AppColors.cardBorderColor(context)),
                                              ),
                                              child: Row(
                                                mainAxisSize: MainAxisSize.min,
                                                children: [
-                                                 const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF64748B)),
+                                                 Icon(Icons.access_time_rounded, size: 12, color: AppColors.textSubtleColor(context)),
                                                  const SizedBox(width: 4),
                                                  Text(
                                                    shiftTimingStr,
-                                                   style: const TextStyle(
+                                                   style: TextStyle(
                                                      fontSize: 10,
                                                      fontWeight: FontWeight.w600,
-                                                     color: Color(0xFF64748B),
+                                                     color: AppColors.textSubtleColor(context),
                                                    ),
                                                  ),
                                                ],
@@ -2385,8 +2386,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                              Expanded(
                                                child: OutlinedButton.icon(
                                                  style: OutlinedButton.styleFrom(
-                                                   foregroundColor: AppColors.textNavy,
-                                                   side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                                   foregroundColor: AppColors.text(context),
+                                                   side: BorderSide(color: AppColors.cardBorderColor(context)),
                                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                                    shape: RoundedRectangleBorder(
                                                      borderRadius: BorderRadius.circular(14),
@@ -2404,8 +2405,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                              Expanded(
                                                child: OutlinedButton.icon(
                                                  style: OutlinedButton.styleFrom(
-                                                   foregroundColor: AppColors.textNavy,
-                                                   side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                                   foregroundColor: AppColors.text(context),
+                                                   side: BorderSide(color: AppColors.cardBorderColor(context)),
                                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                                    shape: RoundedRectangleBorder(
                                                      borderRadius: BorderRadius.circular(14),
@@ -2712,17 +2713,27 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryTeal : Colors.white,
+          color: isSelected
+              ? (AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal)
+              : AppColors.card(context),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.primaryTeal : const Color(0xFFE2E8F0),
+            color: isSelected
+                ? (AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal)
+                : AppColors.cardBorderColor(context),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 13, color: isSelected ? Colors.white : AppColors.textNavy),
+              Icon(
+                icon,
+                size: 13,
+                color: isSelected
+                    ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                    : AppColors.text(context),
+              ),
               const SizedBox(width: 5),
             ],
             Text(
@@ -2731,7 +2742,9 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.6,
-                color: isSelected ? Colors.white : AppColors.textNavy,
+                color: isSelected
+                    ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                    : AppColors.text(context),
               ),
             ),
           ],

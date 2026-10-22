@@ -6,6 +6,9 @@ import 'screens/login_screen.dart';
 import 'screens/tools/student_live_portal_screen.dart';
 import 'services/library_service.dart';
 
+import 'constants/app_theme.dart';
+import 'services/theme_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -53,7 +56,8 @@ void main() async {
     );
   };
 
-  // Initialize service in-memory baseline
+  // Initialize theme & services
+  await ThemeService().init();
   LibraryService().ensureInitialized();
 
   // Safe Firebase Initialization
@@ -76,34 +80,26 @@ void main() async {
   runApp(const TrackMyLibraryApp());
 }
 
-
 class TrackMyLibraryApp extends StatelessWidget {
   const TrackMyLibraryApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Track My Library',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: AppColors.scaffoldBg,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primaryTeal,
-          primary: AppColors.primaryTeal,
-          secondary: AppColors.mintAccent,
-        ),
-        fontFamily: 'Roboto',
-        appBarTheme: const AppBarTheme(
-          elevation: 0,
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.textNavy,
-        ),
-      ),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const LoginScreen(),
-        '/portal': (context) => const StudentLivePortalScreen(),
+    return AnimatedBuilder(
+      animation: ThemeService(),
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Track My Library',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeService().themeMode,
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const LoginScreen(),
+            '/portal': (context) => const StudentLivePortalScreen(),
+          },
+        );
       },
     );
   }

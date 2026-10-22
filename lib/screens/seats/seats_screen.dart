@@ -1202,7 +1202,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
             }).toList();
 
             return Scaffold(
-              backgroundColor: const Color(0xFFF8FAFC),
+              backgroundColor: AppColors.scaffold(context),
               body: SafeArea(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1213,7 +1213,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Column(
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -1222,16 +1222,16 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.8,
-                                  color: Color(0xFF64748B),
+                                  color: AppColors.textMutedColor(context),
                                 ),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
                               Text(
                                 'Space Grid',
                                 style: TextStyle(
                                   fontSize: 26,
                                   fontWeight: FontWeight.w900,
-                                  color: AppColors.textNavy,
+                                  color: AppColors.text(context),
                                 ),
                               ),
                             ],
@@ -1242,12 +1242,12 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: AppColors.card(context),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  border: Border.all(color: AppColors.cardBorderColor(context)),
                                 ),
                                 child: IconButton(
-                                  icon: const Icon(Icons.delete_outline_rounded, color: AppColors.textNavy, size: 20),
+                                  icon: Icon(Icons.delete_outline_rounded, color: AppColors.text(context), size: 20),
                                   onPressed: () {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('Layout is clean.')),
@@ -1280,19 +1280,20 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       child: Container(
                         height: 46,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.card(context),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: AppColors.cardBorderColor(context)),
                         ),
                         child: TextField(
                           controller: _searchCtrl,
+                          style: TextStyle(color: AppColors.text(context), fontSize: 13),
                           onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             hintText: 'Find student or seat...',
-                            hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                            prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                            hintStyle: TextStyle(color: AppColors.textSubtleColor(context), fontSize: 13),
+                            prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMutedColor(context), size: 20),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 13),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 13),
                           ),
                         ),
                       ),
@@ -1310,7 +1311,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           const SizedBox(width: 8),
                           Expanded(child: _metricCard('$studentsCount', 'STUDENTS', const Color(0xFFD97706))),
                           const SizedBox(width: 8),
-                          Expanded(child: _metricCard('$totalSeats', 'SEATS', AppColors.textNavy)),
+                          Expanded(child: _metricCard('$totalSeats', 'SEATS', AppColors.isDark(context) ? AppColors.darkTextPrimary : AppColors.textNavy)),
                         ],
                       ),
                     ),
@@ -1406,9 +1407,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
                               borderRadius: BorderRadius.circular(18),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
+                                  color: AppColors.subSurface(context),
                                   borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  border: Border.all(color: AppColors.cardBorderColor(context)),
                                 ),
                                 child: Center(
                                   child: Column(
@@ -1417,15 +1418,15 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                       Container(
                                         width: 44,
                                         height: 44,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFE6FFFA),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFE6FFFA),
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(Icons.add, color: Color(0xFF0D766E), size: 24),
                                       ),
                                       const SizedBox(height: 10),
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 10),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
                                         child: Text(
                                           'ADD MORE SEATS TO MAIN HALL',
                                           textAlign: TextAlign.center,
@@ -1433,7 +1434,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                             fontSize: 10,
                                             fontWeight: FontWeight.w900,
                                             letterSpacing: 0.4,
-                                            color: AppColors.textNavy,
+                                            color: AppColors.text(context),
                                           ),
                                         ),
                                       ),
@@ -1488,10 +1489,12 @@ class _SeatsScreenState extends State<SeatsScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: AppColors.card(context),
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: hasDues ? const Color(0xFFFECDD3) : const Color(0xFFE2E8F0),
+                                    color: hasDues
+                                        ? (AppColors.isDark(context) ? const Color(0xFF7F1D1D) : const Color(0xFFFECDD3))
+                                        : AppColors.cardBorderColor(context),
                                   ),
                                   boxShadow: const [
                                     BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
@@ -1519,10 +1522,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                             const SizedBox(width: 6),
                                             Text(
                                               '${seat.seatNumber}',
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w900,
-                                                color: AppColors.textNavy,
+                                                color: AppColors.text(context),
                                               ),
                                             ),
                                           ],
@@ -1606,26 +1609,28 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                           seat.studentName.isNotEmpty ? seat.studentName.toUpperCase() : 'OCCUPIED',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w900,
-                                            color: AppColors.textNavy,
+                                            color: AppColors.text(context),
                                           ),
                                         ),
                                         const SizedBox(height: 3),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFF0FDFA),
+                                            color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFF0FDFA),
                                             borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: const Color(0xFF99F6E4)),
+                                            border: Border.all(
+                                              color: AppColors.isDark(context) ? const Color(0xFF0D9488) : const Color(0xFF99F6E4),
+                                            ),
                                           ),
                                           child: Text(
                                             seat.shift.toUpperCase(),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 9,
                                               fontWeight: FontWeight.w800,
-                                              color: Color(0xFF0D9488),
+                                              color: AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D9488),
                                             ),
                                           ),
                                         ),
@@ -1644,9 +1649,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppColors.card(context),
                                 borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                border: Border.all(color: AppColors.cardBorderColor(context)),
                                 boxShadow: const [
                                   BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
                                 ],
@@ -1668,10 +1673,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                       const SizedBox(width: 6),
                                       Text(
                                         '${seat.seatNumber}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w900,
-                                          color: AppColors.textNavy,
+                                          color: AppColors.text(context),
                                         ),
                                       ),
                                     ],
@@ -1682,19 +1687,19 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                       height: 52,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                                        border: Border.all(color: AppColors.cardBorderColor(context), width: 1.5),
                                       ),
-                                      child: const Icon(Icons.add, color: Color(0xFF94A3B8), size: 22),
+                                      child: Icon(Icons.add, color: AppColors.textMutedColor(context), size: 22),
                                     ),
                                   ),
-                                  const Center(
+                                  Center(
                                     child: Text(
                                       'AVAILABLE',
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: 0.8,
-                                        color: Color(0xFF94A3B8),
+                                        color: AppColors.textMutedColor(context),
                                       ),
                                     ),
                                   ),
@@ -1719,9 +1724,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.cardBorderColor(context)),
       ),
       child: Column(
         children: [
@@ -1736,11 +1741,11 @@ class _SeatsScreenState extends State<SeatsScreen> {
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.5,
-              color: Color(0xFF64748B),
+              color: AppColors.textMutedColor(context),
             ),
           ),
         ],
@@ -1765,11 +1770,11 @@ class _SeatsScreenState extends State<SeatsScreen> {
               width: 58,
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.6,
-                  color: Color(0xFF64748B),
+                  color: AppColors.textMutedColor(context),
                 ),
               ),
             ),
@@ -1786,10 +1791,14 @@ class _SeatsScreenState extends State<SeatsScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isSel ? const Color(0xFF0D766E) : Colors.white,
+                      color: isSel
+                          ? (AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D766E))
+                          : AppColors.card(context),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSel ? const Color(0xFF0D766E) : const Color(0xFFE2E8F0),
+                        color: isSel
+                            ? (AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D766E))
+                            : AppColors.cardBorderColor(context),
                       ),
                     ),
                     child: Text(
@@ -1797,7 +1806,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: isSel ? Colors.white : AppColors.textNavy,
+                        color: isSel
+                            ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                            : AppColors.text(context),
                       ),
                     ),
                   ),

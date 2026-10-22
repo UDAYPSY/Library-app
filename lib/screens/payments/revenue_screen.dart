@@ -112,7 +112,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -132,16 +132,16 @@ class _RevenueScreenState extends State<RevenueScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Record Payment',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.textNavy,
+                        color: AppColors.text(context),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: AppColors.textNavy),
+                      icon: Icon(Icons.close, color: AppColors.text(context)),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
@@ -310,7 +310,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
         final totalRevenue = filteredPayments.fold<int>(0, (sum, p) => sum + p.amount);
 
         return Scaffold(
-          backgroundColor: AppColors.scaffoldBg,
+          backgroundColor: AppColors.scaffold(context),
           body: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,7 +326,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                         children: [
                           if (Navigator.canPop(context)) ...[
                             IconButton(
-                              icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textNavy),
+                              icon: Icon(Icons.arrow_back_rounded, color: AppColors.text(context)),
                               onPressed: () => Navigator.pop(context),
                             ),
                             const SizedBox(width: 4),
@@ -334,12 +334,12 @@ class _RevenueScreenState extends State<RevenueScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Revenue',
                                 style: TextStyle(
                                   fontSize: 28,
                                   fontWeight: FontWeight.w900,
-                                  color: AppColors.textNavy,
+                                  color: AppColors.text(context),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -356,10 +356,10 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                   const SizedBox(width: 6),
                                   Text(
                                     '${filteredPayments.length} Transactions',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.textMuted,
+                                      color: AppColors.textMutedColor(context),
                                     ),
                                   ),
                                 ],
@@ -371,13 +371,13 @@ class _RevenueScreenState extends State<RevenueScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text(
+                          Text(
                             'TOTAL',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.8,
-                              color: AppColors.textMuted,
+                              color: AppColors.textMutedColor(context),
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -401,9 +401,9 @@ class _RevenueScreenState extends State<RevenueScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.card(context),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: AppColors.cardBorderColor(context)),
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
@@ -419,19 +419,20 @@ class _RevenueScreenState extends State<RevenueScreen> {
                         Container(
                           height: 44,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
+                            color: AppColors.subSurface(context),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            border: Border.all(color: AppColors.cardBorderColor(context)),
                           ),
                           child: TextField(
                             controller: _searchCtrl,
                             onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
+                            style: TextStyle(color: AppColors.text(context), fontSize: 13),
+                            decoration: InputDecoration(
                               hintText: 'Search name or notes...',
-                              hintStyle: TextStyle(color: AppColors.textSubtle, fontSize: 13),
-                              prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+                              hintStyle: TextStyle(color: AppColors.textSubtleColor(context), fontSize: 13),
+                              prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMutedColor(context), size: 20),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(vertical: 12),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
@@ -451,10 +452,10 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: isSelected ? AppColors.primaryTeal : Colors.white,
+                                      color: isSelected ? AppColors.primaryTeal : AppColors.subSurface(context),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: isSelected ? AppColors.primaryTeal : const Color(0xFFE2E8F0),
+                                        color: isSelected ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
                                       ),
                                     ),
                                     child: Text(
@@ -462,7 +463,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w800,
-                                        color: isSelected ? Colors.white : AppColors.textNavy,
+                                        color: isSelected ? Colors.white : AppColors.text(context),
                                       ),
                                     ),
                                   ),
@@ -491,10 +492,10 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: isSelected ? AppColors.primaryTeal : Colors.white,
+                                      color: isSelected ? AppColors.primaryTeal : AppColors.subSurface(context),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: isSelected ? AppColors.primaryTeal : const Color(0xFFE2E8F0),
+                                        color: isSelected ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
                                       ),
                                     ),
                                     child: Center(
@@ -503,7 +504,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w800,
-                                          color: isSelected ? Colors.white : AppColors.textNavy,
+                                          color: isSelected ? Colors.white : AppColors.text(context),
                                         ),
                                       ),
                                     ),
@@ -527,10 +528,10 @@ class _RevenueScreenState extends State<RevenueScreen> {
                           child: Container(
                             width: double.infinity,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.5),
+                              color: AppColors.card(context),
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: const Color(0xFFE2E8F0),
+                                color: AppColors.cardBorderColor(context),
                                 width: 1.5,
                               ),
                             ),
@@ -541,33 +542,33 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                   width: 64,
                                   height: 64,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF1F5F9),
+                                    color: AppColors.subSurface(context),
                                     borderRadius: BorderRadius.circular(16),
                                   ),
-                                  child: const Center(
+                                  child: Center(
                                     child: Icon(
                                       Icons.receipt_long_outlined,
-                                      color: Color(0xFF94A3B8),
+                                      color: AppColors.textSubtleColor(context),
                                       size: 32,
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                const Text(
+                                Text(
                                   'No records found',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w900,
-                                    color: AppColors.textNavy,
+                                    color: AppColors.text(context),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
+                                Text(
                                   'Try adjusting your filters or record a\nnew payment.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: AppColors.textMuted,
+                                    color: AppColors.textMutedColor(context),
                                     height: 1.4,
                                   ),
                                 ),
@@ -578,7 +579,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFE6F4F1),
+                                      color: AppColors.isDark(context) ? const Color(0xFF133E3B) : const Color(0xFFE6F4F1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: const Text(
@@ -610,9 +611,9 @@ class _RevenueScreenState extends State<RevenueScreen> {
                               margin: const EdgeInsets.only(bottom: 12),
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppColors.card(context),
                                 borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: const Color(0xFFF1F5F9)),
+                                border: Border.all(color: AppColors.cardBorderColor(context)),
                                 boxShadow: const [
                                   BoxShadow(
                                     color: Color(0x06000000),
@@ -630,10 +631,10 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                     children: [
                                       Text(
                                         p.studentName.isNotEmpty ? p.studentName : 'Student',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.w900,
-                                          color: AppColors.textNavy,
+                                          color: AppColors.text(context),
                                         ),
                                       ),
                                       Text(
@@ -654,18 +655,18 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          const Icon(
+                                          Icon(
                                             Icons.access_time_rounded,
                                             size: 14,
-                                            color: Color(0xFF64748B),
+                                            color: AppColors.textSubtleColor(context),
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
                                             'Paid on $formattedPaidDate',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w500,
-                                              color: Color(0xFF64748B),
+                                              color: AppColors.textSubtleColor(context),
                                             ),
                                           ),
                                         ],
@@ -673,16 +674,16 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFF0F9FF),
+                                          color: AppColors.isDark(context) ? const Color(0xFF0C4A6E) : const Color(0xFFF0F9FF),
                                           borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFFBAE6FD)),
+                                          border: Border.all(color: AppColors.isDark(context) ? const Color(0xFF0284C7) : const Color(0xFFBAE6FD)),
                                         ),
                                         child: Text(
                                           p.paymentMode.toUpperCase(),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w800,
-                                            color: Color(0xFF0284C7),
+                                            color: AppColors.isDark(context) ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                                             letterSpacing: 0.4,
                                           ),
                                         ),
@@ -696,24 +697,24 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                     width: double.infinity,
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFF8FAFC),
+                                      color: AppColors.subSurface(context),
                                       borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      border: Border.all(color: AppColors.cardBorderColor(context)),
                                     ),
                                     child: Row(
                                       children: [
-                                        const Icon(
+                                        Icon(
                                           Icons.calendar_month_outlined,
                                           size: 15,
-                                          color: Color(0xFF64748B),
+                                          color: AppColors.textSubtleColor(context),
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
                                           '$formattedPaidDate — $validUntilDate',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
-                                            color: AppColors.textNavy,
+                                            color: AppColors.text(context),
                                           ),
                                         ),
                                       ],

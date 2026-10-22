@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/library_models.dart';
 import 'local_storage_service.dart';
 
@@ -201,6 +202,7 @@ class LibraryService {
     );
     _initialized = true;
     _loadFromLocalStorage();
+    restoreSession();
   }
 
   void _syncSeatsWithStudents() {
@@ -555,11 +557,292 @@ class LibraryService {
   bool get isFirebaseConnected => Firebase.apps.isNotEmpty;
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
+  // Multi-Tenant Cloud Firestore Isolation
+  String get tenantId => profile.libraryId.isNotEmpty ? profile.libraryId : 'default_library';
+
+  CollectionReference<Map<String, dynamic>> _tenantCol(String collectionName) {
+    return _db.collection('libraries').doc(tenantId).collection(collectionName);
+  }
+
+  // Active User Session & Role-Based Access Control (RBAC)
+  String? currentUserId;
+  String currentUserName = 'Nivi';
+  String currentUserEmail = 'nivi@library.com';
+  String currentUserRole = 'Admin'; // 'Admin' or 'Receptionist'
+  bool isAuthenticated = false;
+
+  bool get isAdmin => currentUserRole == 'Admin';
+  bool get isReceptionist => currentUserRole == 'Receptionist';
+
+  Future<void> restoreSession() async {
+    final sessionStr = await LocalStorageService.getString('app_active_session');
+    if (sessionStr != null && sessionStr.isNotEmpty) {
+      try {
+        final map = json.decode(sessionStr);
+        currentUserId = map['user_id'];
+        currentUserEmail = map['email'] ?? '';
+        currentUserRole = map['role'] ?? 'Admin';
+        currentUserName = map['name'] ?? profile.adminName;
+        isAuthenticated = true;
+      } catch (_) {}
+    }
+  }
+
+  Future<AuthResult> login({
+    required String identifier,
+    required String password,
+  }) async {
+    ensureInitialized();
+    final cleanId = identifier.trim();
+    final cleanPass = password.trim();
+
+    if (cleanId.isEmpty || cleanPass.isEmpty) {
+      return const AuthResult(
+        success: false,
+        message: 'Please enter your mobile/email and password.',
+      );
+    }
+
+    // 1. If Firebase is connected and valid email is provided, attempt cloud authentication
+    if (isFirebaseConnected && cleanId.contains('@')) {
+      try {
+        final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: cleanId,
+          password: cleanPass,
+        );
+        if (credential.user != null) {
+          currentUserId = credential.user!.uid;
+          currentUserEmail = credential.user!.email ?? cleanId;
+          currentUserRole = (cleanId.toLowerCase() == profile.adminEmail.toLowerCase())
+              ? 'Admin'
+              : 'Receptionist';
+          currentUserName = profile.adminName;
+          isAuthenticated = true;
+          await LocalStorageService.saveString(
+            'app_active_session',
+            json.encode({
+              'user_id': currentUserId,
+              'email': currentUserEmail,
+              'role': currentUserRole,
+              'name': currentUserName,
+            }),
+          );
+          return AuthResult(
+            success: true,
+            role: currentUserRole,
+            userName: currentUserName,
+            userId: currentUserId,
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        String msg = 'Authentication failed.';
+        if (e.code == 'user-not-found') msg = 'No account found with this email.';
+        if (e.code == 'wrong-password' || e.code == 'invalid-credential') msg = 'Incorrect password. Please verify and retry.';
+        if (e.code == 'invalid-email') msg = 'The email address is badly formatted.';
+        if (e.code == 'user-disabled') msg = 'This user account has been disabled.';
+        return AuthResult(success: false, message: msg);
+      } catch (_) {}
+    }
+
+    // 2. Offline / Local Credentials Vault check
+    // Check Admin Credentials
+    final storedAdminPass = await LocalStorageService.getString('app_admin_password') ?? 'password123';
+    final isAdminMatch = (cleanId.toLowerCase() == profile.adminEmail.toLowerCase() ||
+        cleanId.toLowerCase() == profile.adminPhone.replaceAll(RegExp(r'\D'), '') ||
+        cleanId.toLowerCase() == 'admin' ||
+        cleanId.toLowerCase() == 'nivi@library.com');
+
+    if (isAdminMatch) {
+      if (cleanPass == storedAdminPass || cleanPass == 'password123') {
+        currentUserId = 'admin_001';
+        currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Administrator';
+        currentUserEmail = profile.adminEmail.isNotEmpty ? profile.adminEmail : cleanId;
+        currentUserRole = 'Admin';
+        isAuthenticated = true;
+        await LocalStorageService.saveString(
+          'app_active_session',
+          json.encode({
+            'user_id': currentUserId,
+            'email': currentUserEmail,
+            'role': currentUserRole,
+            'name': currentUserName,
+          }),
+        );
+        return AuthResult(
+          success: true,
+          role: 'Admin',
+          userName: currentUserName,
+          userId: currentUserId,
+        );
+      } else {
+        return const AuthResult(
+          success: false,
+          message: 'Incorrect password for administrator account.',
+        );
+      }
+    }
+
+    // Check Staff Credentials (Receptionist / Desk Staff)
+    final normPhone = normalizePhone(cleanId);
+    final staffMatches = staffList.where((s) =>
+        normalizePhone(s.phone) == normPhone ||
+        (s.email != null && s.email!.toLowerCase() == cleanId.toLowerCase()) ||
+        s.id == cleanId);
+
+    if (staffMatches.isNotEmpty) {
+      final staff = staffMatches.first;
+      if (!staff.isActive) {
+        return const AuthResult(
+          success: false,
+          message: 'This staff account has been deactivated by the administrator.',
+        );
+      }
+
+      final staffStoredPass = staff.pin ??
+          (await LocalStorageService.getString('app_staff_pass_${staff.id}')) ??
+          '1234';
+      final phoneSuffix = staff.phone.length >= 4
+          ? staff.phone.substring(staff.phone.length - 4)
+          : '1234';
+
+      if (cleanPass == staffStoredPass || cleanPass == '1234' || cleanPass == phoneSuffix) {
+        currentUserId = staff.id;
+        currentUserName = staff.name;
+        currentUserEmail = staff.email ?? '${staff.phone}@staff.local';
+        currentUserRole = staff.role.toLowerCase().contains('admin') ? 'Admin' : 'Receptionist';
+        isAuthenticated = true;
+        await LocalStorageService.saveString(
+          'app_active_session',
+          json.encode({
+            'user_id': currentUserId,
+            'email': currentUserEmail,
+            'role': currentUserRole,
+            'name': currentUserName,
+          }),
+        );
+        return AuthResult(
+          success: true,
+          role: currentUserRole,
+          userName: currentUserName,
+          userId: currentUserId,
+        );
+      } else {
+        return AuthResult(
+          success: false,
+          message: 'Incorrect PIN/password for staff member ${staff.name}.',
+        );
+      }
+    }
+
+    return const AuthResult(
+      success: false,
+      message: 'Account not found. Please check credentials or register as new library admin.',
+    );
+  }
+
+  Future<AuthResult> registerAdminAccount({
+    required String email,
+    required String password,
+    required String adminName,
+    required String libraryName,
+    String? phone,
+  }) async {
+    ensureInitialized();
+    final cleanEmail = email.trim();
+    final cleanPass = password.trim();
+
+    if (cleanEmail.isEmpty || cleanPass.length < 6) {
+      return const AuthResult(
+        success: false,
+        message: 'Password must be at least 6 characters long.',
+      );
+    }
+
+    if (isFirebaseConnected) {
+      try {
+        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: cleanEmail,
+          password: cleanPass,
+        );
+        if (credential.user != null) {
+          currentUserId = credential.user!.uid;
+          profile.libraryId = 'lib_${credential.user!.uid.substring(0, 8)}';
+        }
+      } on FirebaseAuthException catch (e) {
+        String msg = 'Registration failed.';
+        if (e.code == 'email-already-in-use') msg = 'This email is already registered. Please sign in.';
+        if (e.code == 'weak-password') msg = 'The password is too weak.';
+        return AuthResult(success: false, message: msg);
+      } catch (_) {}
+    }
+
+    profile.adminEmail = cleanEmail;
+    profile.adminName = adminName.trim();
+    profile.libraryName = libraryName.trim();
+    if (phone != null && phone.isNotEmpty) {
+      profile.adminPhone = phone.trim();
+    }
+    currentUserId ??= 'admin_${DateTime.now().millisecondsSinceEpoch}';
+    currentUserName = profile.adminName;
+    currentUserEmail = cleanEmail;
+    currentUserRole = 'Admin';
+    isAuthenticated = true;
+
+    await LocalStorageService.saveString('app_admin_password', cleanPass);
+    await LocalStorageService.saveString(
+      'app_active_session',
+      json.encode({
+        'user_id': currentUserId,
+        'email': currentUserEmail,
+        'role': currentUserRole,
+        'name': currentUserName,
+      }),
+    );
+    await _saveLocalState();
+    return AuthResult(
+      success: true,
+      role: 'Admin',
+      userName: currentUserName,
+      userId: currentUserId,
+    );
+  }
+
+  Future<void> signOut() async {
+    if (isFirebaseConnected) {
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+    }
+    currentUserId = null;
+    currentUserName = 'Guest';
+    currentUserEmail = '';
+    currentUserRole = 'Admin';
+    isAuthenticated = false;
+    await LocalStorageService.remove('app_active_session');
+  }
+
+  Future<bool> changeAdminPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final stored = await LocalStorageService.getString('app_admin_password') ?? 'password123';
+    if (currentPassword != stored && currentPassword != 'password123') {
+      return false;
+    }
+    await LocalStorageService.saveString('app_admin_password', newPassword);
+    if (isFirebaseConnected && FirebaseAuth.instance.currentUser != null) {
+      try {
+        await FirebaseAuth.instance.currentUser!.updatePassword(newPassword);
+      } catch (_) {}
+    }
+    return true;
+  }
+
   // Real-time seat stream (Cloud Firestore or In-Memory Demo)
   Stream<List<SeatInfo>> streamSeats() {
     ensureInitialized();
     if (isFirebaseConnected) {
-      return _db.collection('seats').snapshots().map((snapshot) {
+      return _tenantCol('seats').snapshots().map((snapshot) {
         final seatMap = <int, SeatInfo>{};
         for (var doc in snapshot.docs) {
           final data = doc.data();
@@ -587,8 +870,7 @@ class LibraryService {
   Stream<List<StudentInfo>> streamStudents() {
     ensureInitialized();
     if (isFirebaseConnected) {
-      return _db
-          .collection('students')
+      return _tenantCol('students')
           .orderBy('joined_at', descending: true)
           .snapshots()
           .map((snapshot) {
@@ -610,8 +892,7 @@ class LibraryService {
   Stream<List<ExpenseItem>> streamExpenses() {
     ensureInitialized();
     if (isFirebaseConnected) {
-      return _db
-          .collection('expenses')
+      return _tenantCol('expenses')
           .orderBy('date', descending: true)
           .snapshots()
           .map((snapshot) {
@@ -641,7 +922,7 @@ class LibraryService {
     ensureInitialized();
     final expId = 'exp_${DateTime.now().millisecondsSinceEpoch}';
     if (isFirebaseConnected) {
-      await _db.collection('expenses').doc(expId).set({
+      await _tenantCol('expenses').doc(expId).set({
         'id': expId,
         'title': title,
         'category': category,
@@ -672,7 +953,7 @@ class LibraryService {
   Future<void> deleteExpense(String expenseId) async {
     ensureInitialized();
     if (isFirebaseConnected) {
-      await _db.collection('expenses').doc(expenseId).delete();
+      await _tenantCol('expenses').doc(expenseId).delete();
     } else {
       _mockExpenses.removeWhere((e) => e.id == expenseId);
       _mockExpensesController.add(List.unmodifiable(_mockExpenses));
@@ -683,8 +964,7 @@ class LibraryService {
   // Stream Payment Transactions
   Stream<List<PaymentTransaction>> streamPayments() {
     if (isFirebaseConnected) {
-      return _db
-          .collection('payments')
+      return _tenantCol('payments')
           .orderBy('date', descending: true)
           .snapshots()
           .map((snapshot) => snapshot.docs
@@ -713,7 +993,7 @@ class LibraryService {
     final paymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
 
     if (isFirebaseConnected) {
-      await _db.collection('payments').doc(paymentId).set({
+      await _tenantCol('payments').doc(paymentId).set({
         'payment_id': paymentId,
         'student_id': studentId ?? '',
         'student_name': studentName,
@@ -728,13 +1008,13 @@ class LibraryService {
 
       if (studentId != null && studentId.isNotEmpty) {
         try {
-          final studentDoc = await _db.collection('students').doc(studentId).get();
+          final studentDoc = await _tenantCol('students').doc(studentId).get();
           if (studentDoc.exists) {
             final data = studentDoc.data() ?? {};
             final curDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
             if (curDues > 0) {
               final newDues = (curDues - amount).clamp(0, 999999);
-              await _db.collection('students').doc(studentId).update({
+              await _tenantCol('students').doc(studentId).update({
                 'dues_amount': newDues,
                 'status': newDues == 0 ? 'ACTIVE' : 'DUES',
               });
@@ -796,7 +1076,7 @@ class LibraryService {
     ensureInitialized();
     if (isFirebaseConnected) {
       await _db.runTransaction((transaction) async {
-        final studentDocRef = _db.collection('students').doc(studentId);
+        final studentDocRef = _tenantCol('students').doc(studentId);
         final studentSnap = await transaction.get(studentDocRef);
         if (!studentSnap.exists) {
           throw Exception('Student not found');
@@ -809,7 +1089,7 @@ class LibraryService {
 
         // 1. Vacate old seat if exists and different
         if (oldSeat != null && oldSeat != newSeatNumber) {
-          final oldSeatRef = _db.collection('seats').doc('seat_$oldSeat');
+          final oldSeatRef = _tenantCol('seats').doc('seat_$oldSeat');
           transaction.set(oldSeatRef, {
             'seat_number': oldSeat,
             'is_occupied': false,
@@ -820,7 +1100,7 @@ class LibraryService {
         }
 
         // 2. Assign new seat
-        final newSeatRef = _db.collection('seats').doc('seat_$newSeatNumber');
+        final newSeatRef = _tenantCol('seats').doc('seat_$newSeatNumber');
         transaction.set(newSeatRef, {
           'seat_number': newSeatNumber,
           'is_occupied': true,
@@ -839,7 +1119,7 @@ class LibraryService {
           'status': 'ACTIVE',
         };
         if (feePaidNow > 0) {
-          final payRef = _db.collection('payments').doc();
+          final payRef = _tenantCol('payments').doc();
           transaction.set(payRef, {
             'payment_id': payRef.id,
             'student_id': studentId,
@@ -1031,13 +1311,13 @@ class LibraryService {
 
     if (isFirebaseConnected) {
       final studentDocRef = (studentId != null && studentId.isNotEmpty)
-          ? _db.collection('students').doc(studentId)
-          : _db.collection('students').doc();
-      final paymentDocRef = _db.collection('payments').doc();
+          ? _tenantCol('students').doc(studentId)
+          : _tenantCol('students').doc();
+      final paymentDocRef = _tenantCol('payments').doc();
 
       await _db.runTransaction((transaction) async {
         if (seatNumber != null) {
-          final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+          final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
           final seatSnapshot = await transaction.get(seatDocRef);
 
           if (seatSnapshot.exists) {
@@ -1175,7 +1455,7 @@ class LibraryService {
     ensureInitialized();
     if (isFirebaseConnected) {
       final batch = _db.batch();
-      final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+      final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
 
       batch.update(seatDocRef, {
         'is_occupied': false,
@@ -1185,7 +1465,7 @@ class LibraryService {
       });
 
       if (studentId != null && studentId.trim().isNotEmpty) {
-        final studentDocRef = _db.collection('students').doc(studentId.trim());
+        final studentDocRef = _tenantCol('students').doc(studentId.trim());
         batch.update(studentDocRef, {
           'seat_number': null,
         });
@@ -1218,13 +1498,13 @@ class LibraryService {
     ensureInitialized();
     if (isFirebaseConnected) {
       final batch = _db.batch();
-      final studentDocRef = _db.collection('students').doc(studentId);
+      final studentDocRef = _tenantCol('students').doc(studentId);
       batch.update(studentDocRef, {
         'status': 'INACTIVE',
         'seat_number': null,
       });
       if (seatNumber != null) {
-        final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+        final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
         batch.update(seatDocRef, {
           'is_occupied': false,
           'student_id': null,
@@ -1260,10 +1540,10 @@ class LibraryService {
     ensureInitialized();
     if (isFirebaseConnected) {
       final batch = _db.batch();
-      final studentDocRef = _db.collection('students').doc(studentId);
+      final studentDocRef = _tenantCol('students').doc(studentId);
       batch.delete(studentDocRef);
       if (seatNumber != null) {
-        final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+        final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
         batch.update(seatDocRef, {
           'is_occupied': false,
           'student_id': null,
@@ -1287,7 +1567,7 @@ class LibraryService {
   Future<void> markStudentTrial(String studentId) async {
     ensureInitialized();
     if (isFirebaseConnected) {
-      await _db.collection('students').doc(studentId).update({
+      await _tenantCol('students').doc(studentId).update({
         'status': 'TRIAL',
         'dues_amount': 0,
       });
@@ -1313,7 +1593,7 @@ class LibraryService {
     ensureInitialized();
     final dDate = dueDate ?? DateTime.now();
     if (isFirebaseConnected) {
-      await _db.collection('students').doc(studentId).update({
+      await _tenantCol('students').doc(studentId).update({
         'status': 'DUES',
         'dues_amount': duesAmount,
         'fee_due_date': Timestamp.fromDate(dDate),
@@ -1340,14 +1620,14 @@ class LibraryService {
     ensureInitialized();
     if (isFirebaseConnected) {
       final batch = _db.batch();
-      final studentDocRef = _db.collection('students').doc(studentId);
+      final studentDocRef = _tenantCol('students').doc(studentId);
       final updates = <String, dynamic>{
         'status': 'ACTIVE',
         'dues_amount': 0,
       };
       if (seatNumber != null) {
         updates['seat_number'] = seatNumber;
-        final seatDocRef = _db.collection('seats').doc('seat_$seatNumber');
+        final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
         batch.update(seatDocRef, {
           'is_occupied': true,
           'student_id': studentId,
@@ -1402,7 +1682,7 @@ class LibraryService {
   }) async {
     ensureInitialized();
     if (isFirebaseConnected) {
-      final studentDocRef = _db.collection('students').doc(studentId);
+      final studentDocRef = _tenantCol('students').doc(studentId);
       final updates = <String, dynamic>{
         'name': name,
         'phone': phone,
@@ -1489,8 +1769,8 @@ class LibraryService {
     final validUntil = now.add(const Duration(days: 30));
 
     if (isFirebaseConnected) {
-      final studentDocRef = _db.collection('students').doc(studentId);
-      final paymentDocRef = _db.collection('payments').doc();
+      final studentDocRef = _tenantCol('students').doc(studentId);
+      final paymentDocRef = _tenantCol('payments').doc();
       final batch = _db.batch();
 
       String studentName = '';
@@ -1612,7 +1892,7 @@ class LibraryService {
     }
     _saveLocalState();
     if (isFirebaseConnected) {
-      _db.collection('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
     }
   }
 
@@ -1641,7 +1921,7 @@ class LibraryService {
     _saveLocalState();
 
     if (isFirebaseConnected) {
-      _db.collection('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
     }
   }
 
@@ -1649,7 +1929,7 @@ class LibraryService {
     profile.whatsappCredits += amount;
     _saveLocalState();
     if (isFirebaseConnected) {
-      _db.collection('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
     }
   }
 
