@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import '../../widgets/collect_payment_modal.dart';
 import 'add_student_wizard_screen.dart';
 
 class MemberProfileScreen extends StatefulWidget {
@@ -163,7 +164,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                 ),
                 items: List.generate(_service.totalSeatsCount, (i) => i + 1).map((num) {
                   final isCurrent = num == _student.seatNumber;
-                  final isOcc = _service.isSeatOccupied(num) && !isCurrent;
+                  final isOcc = _service.isSeatOccupied(num, shift: _student.shift, excludeStudentId: _student.id) && !isCurrent;
                   return DropdownMenuItem<int>(
                     value: num,
                     enabled: !isOcc,
@@ -253,130 +254,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
   }
 
   void _showRecordPaymentSheet() {
-    final payAmountCtrl = TextEditingController(
-      text: _student.hasDues ? '${_student.effectiveDues}' : '${_student.monthlyFee}',
-    );
-    String selectedMode = 'Cash';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (sheetCtx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Collect Member Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(sheetCtx)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDFA),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF99F6E4)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded, color: Color(0xFF0D9488), size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Member: ${_student.name} • Seat: #${_student.seatNumber ?? 'Unallocated'}\nPending Dues: ₹${_student.effectiveDues}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F766E)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Amount to Collect (₹)*', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: payAmountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.currency_rupee, color: Color(0xFF0D9488)),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
-              const SizedBox(height: 8),
-              Row(
-                children: ['Cash', 'UPI', 'Card', 'Net Banking'].map((mode) {
-                  final isSelected = selectedMode == mode;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(mode),
-                      selected: isSelected,
-                      selectedColor: const Color(0xFF0D9488),
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textNavy,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onSelected: (val) {
-                        if (val) setSheetState(() => selectedMode = mode);
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D9488),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  icon: const Icon(Icons.check_circle_outline, size: 20),
-                  label: const Text('Confirm & Record Payment', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-                  onPressed: () async {
-                    final amt = int.tryParse(payAmountCtrl.text.trim()) ?? 0;
-                    if (amt <= 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter a valid amount')),
-                      );
-                      return;
-                    }
-                    await _service.collectStudentFee(
-                      studentId: _student.id,
-                      amount: amt,
-                      paymentMode: selectedMode,
-                      notes: 'Collected via Member Profile',
-                    );
-                    Navigator.pop(sheetCtx);
-                    _refreshStudent();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('₹$amt collected successfully! Member is now Active.'), backgroundColor: const Color(0xFF0D9488)),
-                      );
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    showCollectPaymentModal(
+      context,
+      _student,
+      onPaymentRecorded: _refreshStudent,
     );
   }
 

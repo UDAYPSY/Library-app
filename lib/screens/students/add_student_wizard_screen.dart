@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -244,6 +245,27 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       );
       return;
     }
+    if (phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mobile number must be exactly 10 digits.'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    final aadhaar = _aadhaarCtrl.text.trim();
+    if (aadhaar.isNotEmpty && aadhaar.length != 12) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aadhaar number (UID) must be exactly 12 digits.'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (_service.isDuplicateStudentPhone(phone, excludeStudentId: widget.studentToEdit?.id)) {
       final existing = _service.findStudentByPhone(phone);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -261,11 +283,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   void _goToStep3() {
     if (_selectedSeat != null) {
       final isCurrent = widget.studentToEdit != null && widget.studentToEdit!.seatNumber == _selectedSeat;
-      if (!isCurrent && _service.isSeatOccupied(_selectedSeat!)) {
-        final occ = _service.getStudentForSeat(_selectedSeat!);
+      if (!isCurrent && _service.isSeatOccupied(_selectedSeat!, shift: _selectedShift.name, excludeStudentId: widget.studentToEdit?.id)) {
+        final occ = _service.getStudentForSeat(_selectedSeat!, shift: _selectedShift.name);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Seat S-$_selectedSeat is already occupied${occ != null ? " by ${occ.name}" : ""}. It cannot be assigned to another member.'),
+            content: Text('Seat S-$_selectedSeat is already occupied for ${_selectedShift.name}${occ != null ? " by ${occ.name}" : ""}. It cannot be assigned to another member.'),
             backgroundColor: const Color(0xFFE11D48),
             behavior: SnackBarBehavior.floating,
           ),
@@ -291,13 +313,36 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final phone = _phoneCtrl.text.trim();
     final seatNum = _selectedSeat;
 
+    if (phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mobile number must be exactly 10 digits.'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final aadhaar = _aadhaarCtrl.text.trim();
+    if (aadhaar.isNotEmpty && aadhaar.length != 12) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aadhaar number (UID) must be exactly 12 digits.'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (seatNum != null) {
       final isCurrent = widget.studentToEdit != null && widget.studentToEdit!.seatNumber == seatNum;
-      if (!isCurrent && _service.isSeatOccupied(seatNum)) {
-        final occ = _service.getStudentForSeat(seatNum);
+      if (!isCurrent && _service.isSeatOccupied(seatNum, shift: _selectedShift.name, excludeStudentId: widget.studentToEdit?.id)) {
+        final occ = _service.getStudentForSeat(seatNum, shift: _selectedShift.name);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Seat S-$seatNum is already occupied${occ != null ? " by ${occ.name}" : ""}. It cannot be assigned to another member.'),
+            content: Text('Seat S-$seatNum is already occupied for ${_selectedShift.name}${occ != null ? " by ${occ.name}" : ""}. It cannot be assigned to another member.'),
             backgroundColor: const Color(0xFFE11D48),
             behavior: SnackBarBehavior.floating,
           ),
@@ -713,8 +758,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               const SizedBox(height: 6),
               _formTextField(
                 controller: _phoneCtrl,
-                hintText: '98765 43210',
+                hintText: '9876543210 (10 digits)',
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -829,12 +878,16 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               ),
               const SizedBox(height: 16),
 
-              _fieldLabel('Aadhaar Number (Optional)', isRequired: false),
+              _fieldLabel('Aadhaar Number (12-Digit UID)', isRequired: false),
               const SizedBox(height: 6),
               _formTextField(
                 controller: _aadhaarCtrl,
                 hintText: '12-digit UID',
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(12),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -932,8 +985,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   ...List.generate(_service.totalSeatsCount, (i) => i + 1).map(
                     (s) {
                       final isCurrent = widget.studentToEdit != null && widget.studentToEdit!.seatNumber == s;
-                      final isOcc = _service.isSeatOccupied(s) && !isCurrent;
-                      final occStudent = isOcc ? _service.getStudentForSeat(s) : null;
+                      final isOcc = _service.isSeatOccupied(s, shift: _selectedShift.name, excludeStudentId: widget.studentToEdit?.id) && !isCurrent;
+                      final occStudent = isOcc ? _service.getStudentForSeat(s, shift: _selectedShift.name) : null;
                       return DropdownMenuItem<int?>(
                         value: s,
                         enabled: !isOcc,
@@ -1820,6 +1873,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     int maxLines = 1,
     Widget? prefixIcon,
     ValueChanged<String>? onChanged,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1832,6 +1886,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         keyboardType: keyboardType,
         maxLines: maxLines,
         onChanged: onChanged,
+        inputFormatters: inputFormatters,
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
         decoration: InputDecoration(
           hintText: hintText,

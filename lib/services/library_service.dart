@@ -210,18 +210,20 @@ class LibraryService {
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
     );
-    for (var s in _mockStudents) {
-      if (s.seatNumber != null &&
-          s.seatNumber! > 0 &&
-          s.seatNumber! <= _mockSeats.length &&
-          s.status != 'INACTIVE') {
-        _mockSeats[s.seatNumber! - 1] = SeatInfo(
-          seatNumber: s.seatNumber!,
+    for (int seatNum = 1; seatNum <= totalSeatsCount; seatNum++) {
+      final occupants = _mockStudents.where(
+        (s) => s.seatNumber == seatNum && s.status != 'INACTIVE',
+      ).toList();
+      if (occupants.isNotEmpty) {
+        final names = occupants.map((s) => s.name).join(', ');
+        final shiftNames = occupants.map((s) => s.shift).toSet().join(', ');
+        _mockSeats[seatNum - 1] = SeatInfo(
+          seatNumber: seatNum,
           isOccupied: true,
-          studentName: s.name,
-          studentId: s.id,
-          shift: s.shift,
-          sectionName: s.sectionName,
+          studentName: names,
+          studentId: occupants.first.id,
+          shift: shiftNames,
+          sectionName: occupants.first.sectionName,
         );
       }
     }
@@ -512,32 +514,121 @@ class LibraryService {
     }
   }
 
-  bool isSeatOccupied(int seatNum) {
-    ensureInitialized();
-    if (seatNum <= 0) return false;
-    final seatOccupiedInSeats = (seatNum <= _mockSeats.length) && _mockSeats[seatNum - 1].isOccupied;
-    final seatOccupiedInStudents = _mockStudents.any((s) => s.seatNumber == seatNum && s.status != 'INACTIVE');
-    return seatOccupiedInSeats || seatOccupiedInStudents;
+  /// Determines whether two shifts overlap or conflict.
+  /// Full Day / 24 Hours conflicts with all shifts.
+  /// Identical shifts conflict.
+  /// Non-overlapping shifts (e.g. Morning vs Evening vs Night) do not conflict.
+  static bool doShiftsConflict(String shiftA, String shiftB, {List<ShiftConfig>? allShifts}) {
+    final a = shiftA.trim().toLowerCase();
+    final b = shiftB.trim().toLowerCase();
+
+    if (a.isEmpty || b.isEmpty) return true;
+    if (a == b) return true;
+
+    final isAFull = a.contains('full') || a.contains('24') || a.contains('whole');
+    final isBFull = b.contains('full') || b.contains('24') || b.contains('whole');
+    if (isAFull || isBFull) return true;
+
+    if (allShifts != null && allShifts.isNotEmpty) {
+      ShiftConfig? cfgA;
+      ShiftConfig? cfgB;
+      for (final s in allShifts) {
+        final sName = s.name.trim().toLowerCase();
+        if (sName == a || a.contains(sName) || sName.contains(a)) cfgA = s;
+        if (sName == b || b.contains(sName) || sName.contains(b)) cfgB = s;
+      }
+      if (cfgA != null && cfgB != null && cfgA.startsAt.isNotEmpty && cfgB.startsAt.isNotEmpty) {
+        final int? startA = _parseTimeToMinutes(cfgA.startsAt);
+        final int? endA = _parseTimeToMinutes(cfgA.endsAt);
+        final int? startB = _parseTimeToMinutes(cfgB.startsAt);
+        final int? endB = _parseTimeToMinutes(cfgB.endsAt);
+        if (startA != null && endA != null && startB != null && endB != null) {
+          return _intervalsOverlap(startA, endA, startB, endB);
+        }
+      }
+    }
+
+    final isAMorning = a.contains('morning');
+    final isBMorning = b.contains('morning');
+    final isAEvening = a.contains('evening') || a.contains('afternoon');
+    final isBEvening = b.contains('evening') || b.contains('afternoon');
+    final isANight = a.contains('night');
+    final isBNight = b.contains('night');
+
+    if (isAMorning && (isBEvening || isBNight)) return false;
+    if (isAEvening && (isBMorning || isBNight)) return false;
+    if (isANight && (isBMorning || isAEvening)) return false;
+
+    return false;
   }
 
-  StudentInfo? getStudentForSeat(int seatNum) {
-    ensureInitialized();
+  static int? _parseTimeToMinutes(String timeStr) {
     try {
-      return _mockStudents.firstWhere((s) => s.seatNumber == seatNum && s.status != 'INACTIVE');
+      final clean = timeStr.trim().toUpperCase();
+      final isPM = clean.contains('PM');
+      final isAM = clean.contains('AM');
+      final digits = clean.replaceAll('AM', '').replaceAll('PM', '').trim();
+      final parts = digits.split(':');
+      if (parts.isEmpty) return null;
+      int hour = int.parse(parts[0].trim());
+      int min = parts.length > 1 ? int.parse(parts[1].trim()) : 0;
+      if (isPM && hour < 12) hour += 12;
+      if (isAM && hour == 12) hour = 0;
+      return hour * 60 + min;
     } catch (_) {
-      try {
-        if (seatNum > 0 && seatNum <= _mockSeats.length) {
-          final seat = _mockSeats[seatNum - 1];
-          if (seat.studentId.isNotEmpty) {
-            return _mockStudents.firstWhere((s) => s.id == seat.studentId);
-          }
-          if (seat.studentName.isNotEmpty) {
-            return _mockStudents.firstWhere((s) => s.name.toLowerCase() == seat.studentName.toLowerCase());
-          }
-        }
-      } catch (_) {}
       return null;
     }
+  }
+
+  static bool _intervalsOverlap(int startA, int endA, int startB, int endB) {
+    List<List<int>> intervalsA = endA <= startA
+        ? [[startA, 1440], [0, endA]]
+        : [[startA, endA]];
+    List<List<int>> intervalsB = endB <= startB
+        ? [[startB, 1440], [0, endB]]
+        : [[startB, endB]];
+
+    for (final iA in intervalsA) {
+      for (final iB in intervalsB) {
+        final maxStart = iA[0] > iB[0] ? iA[0] : iB[0];
+        final minEnd = iA[1] < iB[1] ? iA[1] : iB[1];
+        if (maxStart < minEnd) return true;
+      }
+    }
+    return false;
+  }
+
+  bool isSeatOccupied(int seatNum, {String? shift, String? excludeStudentId}) {
+    ensureInitialized();
+    if (seatNum <= 0) return false;
+    final activeOccupants = _mockStudents.where(
+      (s) => s.seatNumber == seatNum && s.status != 'INACTIVE' && (excludeStudentId == null || s.id != excludeStudentId),
+    ).toList();
+    if (activeOccupants.isEmpty) return false;
+    if (shift == null || shift.trim().isEmpty) {
+      return true;
+    }
+    return activeOccupants.any((s) => doShiftsConflict(s.shift, shift, allShifts: shifts));
+  }
+
+  StudentInfo? getStudentForSeat(int seatNum, {String? shift}) {
+    ensureInitialized();
+    final activeOccupants = _mockStudents.where((s) => s.seatNumber == seatNum && s.status != 'INACTIVE').toList();
+    if (activeOccupants.isEmpty) return null;
+    if (shift != null && shift.trim().isNotEmpty) {
+      for (final s in activeOccupants) {
+        if (doShiftsConflict(s.shift, shift, allShifts: shifts)) {
+          return s;
+        }
+      }
+      return null;
+    }
+    return activeOccupants.first;
+  }
+
+  List<StudentInfo> getStudentsForSeat(int seatNum) {
+    ensureInitialized();
+    return _mockStudents.where((s) => s.seatNumber == seatNum && s.status != 'INACTIVE').toList();
   }
 
   List<StudentInfo> get currentStudents => List.unmodifiable(_mockStudents);
@@ -1152,9 +1243,11 @@ class LibraryService {
         }
       }
 
-      // 2. Ensure new seat doesn't belong to any other student
+      // 2. Clear only conflicting shift occupants from new seat
       for (int i = 0; i < _mockStudents.length; i++) {
-        if (_mockStudents[i].id != studentId && _mockStudents[i].seatNumber == newSeatNumber) {
+        if (_mockStudents[i].id != studentId &&
+            _mockStudents[i].seatNumber == newSeatNumber &&
+            doShiftsConflict(_mockStudents[i].shift, effectiveShift, allShifts: shifts)) {
           _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null);
         }
       }
@@ -1291,11 +1384,11 @@ class LibraryService {
       return;
     }
 
-    // Ensure seat is not already occupied by another student
-    if (seatNumber != null && isSeatOccupied(seatNumber)) {
-      final occ = getStudentForSeat(seatNumber);
+    // Ensure seat is not already occupied by another student for the same or conflicting shift
+    if (seatNumber != null && isSeatOccupied(seatNumber, shift: shift)) {
+      final occ = getStudentForSeat(seatNumber, shift: shift);
       if (occ != null) {
-        throw Exception('Seat S-$seatNumber is already occupied by ${occ.name}. It cannot be assigned to another member.');
+        throw Exception('Seat S-$seatNumber is already occupied for shift "$shift" by ${occ.name}. It cannot be assigned.');
       }
     }
 
@@ -1709,29 +1802,16 @@ class LibraryService {
         final oldSeat = s.seatNumber;
         final newSeat = seatNumber ?? oldSeat;
 
-        // If changing to a new seat, ensure it is not already occupied by another student
-        if (newSeat != null && newSeat != oldSeat && isSeatOccupied(newSeat)) {
-          final occ = getStudentForSeat(newSeat);
+        // If changing to a new seat or shift, ensure it is not already occupied for that shift
+        if (newSeat != null && (newSeat != oldSeat || shift != s.shift) && isSeatOccupied(newSeat, shift: shift, excludeStudentId: studentId)) {
+          final occ = getStudentForSeat(newSeat, shift: shift);
           if (occ != null && occ.id != studentId) {
-            throw Exception('Seat S-$newSeat is already occupied by ${occ.name}. It cannot be assigned to another member.');
+            throw Exception('Seat S-$newSeat is already occupied for shift "$shift" by ${occ.name}.');
           }
         }
 
-        // Reallocate seats if seat changed
-        if (oldSeat != null && newSeat != oldSeat && oldSeat > 0 && oldSeat <= _mockSeats.length) {
-          _mockSeats[oldSeat - 1] = SeatInfo(seatNumber: oldSeat);
-        }
-        if (newSeat != null && newSeat > 0 && newSeat <= _mockSeats.length) {
-          _mockSeats[newSeat - 1] = SeatInfo(
-            seatNumber: newSeat,
-            isOccupied: true,
-            studentId: studentId,
-            studentName: name,
-            shift: shift,
-            sectionName: sectionName ?? s.sectionName,
-          );
-        }
-        _mockSeatsController.add(List.unmodifiable(_mockSeats));
+        // Resync all seats to correctly reflect shift-wise occupants
+        _syncSeatsWithStudents();
 
         _mockStudents[idx] = s.copyWith(
           name: name,

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
 import '../../services/excel_import_service.dart';
 import '../../services/file_export_service.dart';
+import '../../widgets/collect_payment_modal.dart';
 import 'add_student_wizard_screen.dart';
 import 'member_profile_screen.dart';
 
@@ -295,8 +297,13 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                   TextField(
                     controller: phoneCtrl,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
                     decoration: const InputDecoration(
-                      labelText: 'WhatsApp Phone Number',
+                      labelText: 'WhatsApp Phone Number (10 Digits)',
+                      hintText: '10-digit number',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.phone_outlined),
                     ),
@@ -444,6 +451,15 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                         final name = nameCtrl.text.trim();
                         final phone = phoneCtrl.text.trim();
                         if (name.isEmpty || phone.isEmpty) return;
+                        if (phone.length != 10) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Mobile number must be exactly 10 digits.'),
+                              backgroundColor: Color(0xFFE11D48),
+                            ),
+                          );
+                          return;
+                        }
                         if (_service.isDuplicateStudentPhone(phone)) {
                           final existing = _service.findStudentByPhone(phone);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -936,549 +952,12 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   }
 
   void _openPaySheet(StudentInfo st) {
-    final defaultMonthly = st.monthlyFee > 0 ? st.monthlyFee : 500;
-    final initialPaid = st.duesAmount > 0 ? st.duesAmount : defaultMonthly;
-    final amountPaidCtrl = TextEditingController(text: '$initialPaid');
-    final remainingDuesCtrl = TextEditingController(text: '0');
-    final notesCtrl = TextEditingController();
-
-    DateTime fromDate = st.feeDueDate ?? DateTime.now();
-    DateTime untilDate = fromDate.add(const Duration(days: 30));
-    DateTime paymentDate = DateTime.now();
-    String selectedMethod = 'UPI';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFFF0F5F8),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (sheetContext, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 12,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Centered Drag Handle (Image 2)
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFCBD5E1),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Top Header Row: Record Payment + Admin Badge (Image 2)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Record Payment',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textNavy,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Track and record fee processing',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE6F4F1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.person, size: 14, color: AppColors.primaryTeal),
-                          const SizedBox(width: 4),
-                          Text(
-                            _service.profile.adminName.isNotEmpty ? _service.profile.adminName : 'Admin',
-                            style: const TextStyle(
-                              color: AppColors.primaryTeal,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Amount Paid (₹) (Image 2)
-                const Text(
-                  'Amount Paid (₹)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textNavy,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: amountPaidCtrl,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textNavy,
-                    ),
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      border: InputBorder.none,
-                    ),
-                    onChanged: (val) {
-                      final paid = int.tryParse(val.trim()) ?? 0;
-                      final totalOwed = st.duesAmount > 0 ? st.duesAmount : (st.monthlyFee > 0 ? st.monthlyFee : 500);
-                      final remaining = (totalOwed - paid).clamp(0, 999999);
-                      setModalState(() {
-                        remainingDuesCtrl.text = '$remaining';
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Remaining Fees / Due (₹) (Image 2)
-                const Text(
-                  'Remaining Fees / Due (₹)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textNavy,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: remainingDuesCtrl,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFEF4444), // Red as shown in Image 2 & 3
-                    ),
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // From & Until Dates (Image 2 & 3)
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'From',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textNavy,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: fromDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2035),
-                              );
-                              if (picked != null) {
-                                setModalState(() {
-                                  fromDate = picked;
-                                  untilDate = fromDate.add(const Duration(days: 30));
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    DateFormat('dd-MMM-yyyy').format(fromDate),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textNavy,
-                                    ),
-                                  ),
-                                  const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF64748B)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Until',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textNavy,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: untilDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2035),
-                              );
-                              if (picked != null) {
-                                setModalState(() => untilDate = picked);
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    DateFormat('dd-MMM-yyyy').format(untilDate),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textNavy,
-                                    ),
-                                  ),
-                                  const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF64748B)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-
-                // Payment Date (Image 2 & 3)
-                const Text(
-                  'Payment Date',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textNavy,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: paymentDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2035),
-                    );
-                    if (picked != null) {
-                      setModalState(() => paymentDate = picked);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('dd-MMM-yyyy').format(paymentDate),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textNavy,
-                          ),
-                        ),
-                        const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF64748B)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Payment Method (Image 2 & 3: CASH vs UPI)
-                const Text(
-                  'Payment Method',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textNavy,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => setModalState(() => selectedMethod = 'Cash'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: selectedMethod == 'Cash' ? const Color(0xFF0F766E) : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: selectedMethod == 'Cash' ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.payments_outlined,
-                                size: 18,
-                                color: selectedMethod == 'Cash' ? Colors.white : AppColors.textNavy,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'CASH',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: selectedMethod == 'Cash' ? Colors.white : AppColors.textNavy,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => setModalState(() => selectedMethod = 'UPI'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: selectedMethod == 'UPI' ? const Color(0xFF0F766E) : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: selectedMethod == 'UPI' ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.phone_android_rounded,
-                                size: 18,
-                                color: selectedMethod == 'UPI' ? Colors.white : AppColors.textNavy,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'UPI',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: selectedMethod == 'UPI' ? Colors.white : AppColors.textNavy,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-
-                // Notes (Optional) (Image 2 & 3)
-                const Text(
-                  'Notes (Optional)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textNavy,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: notesCtrl,
-                    maxLines: 2,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textNavy,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'Add remark...',
-                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Bottom Buttons: [ Discard ]  [ (✓) Save Payment ] (Image 3)
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: AppColors.textNavy,
-                          side: const BorderSide(color: Color(0xFFE2E8F0)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text(
-                          'Discard',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 3,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F766E),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                        label: const Text(
-                          'Save Payment',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                        ),
-                        onPressed: () async {
-                          final paid = int.tryParse(amountPaidCtrl.text.trim()) ?? 0;
-                          final dues = int.tryParse(remainingDuesCtrl.text.trim()) ?? 0;
-                          Navigator.pop(ctx);
-
-                          if (paid > 0) {
-                            await _service.recordPayment(
-                              studentId: st.id,
-                              studentName: st.name,
-                              phone: st.phone,
-                              seatNumber: st.seatNumber,
-                              shift: st.shift,
-                              amount: paid,
-                              date: paymentDate,
-                              paymentMode: selectedMethod,
-                              notes: notesCtrl.text.trim(),
-                            );
-                          }
-
-                          await _service.updateStudent(
-                            studentId: st.id,
-                            name: st.name,
-                            phone: st.phone,
-                            shift: st.shift,
-                            seatNumber: st.seatNumber,
-                            duesAmount: dues,
-                            status: dues > 0 ? 'DUES' : 'ACTIVE',
-                            feeDueDate: untilDate,
-                          );
-
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  dues > 0
-                                      ? 'Payment of ₹$paid recorded. Remaining ₹$dues due!'
-                                      : 'Payment of ₹$paid recorded! Dues fully cleared.',
-                                ),
-                                backgroundColor: dues > 0 ? const Color(0xFFE11D48) : AppColors.primaryTeal,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    showCollectPaymentModal(
+      context,
+      st,
+      onPaymentRecorded: () {
+        if (mounted) setState(() {});
+      },
     );
   }
 
@@ -1579,13 +1058,42 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                           ),
                           Row(
                             children: [
-                              // Download / Export Icon Button (Image 2)
+                              // Download / Export Icon Button (Real CSV File Download)
                               InkWell(
                                 borderRadius: BorderRadius.circular(12),
-                                onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Exported ${allStudents.length} student records.')),
-                                  );
+                                onTap: () async {
+                                  final buffer = StringBuffer();
+                                  buffer.writeln('Student ID,Full Name,Phone,Seat Number,Shift,Status,Monthly Fee (INR),Pending Dues (INR),Joining Date,Father Name,Address,Aadhaar');
+                                  for (final s in allStudents) {
+                                    final seatStr = s.seatNumber != null ? 'S-${s.seatNumber}' : 'Unallocated';
+                                    final joinStr = s.joinedAt != null ? DateFormat('dd-MM-yyyy').format(s.joinedAt!) : 'N/A';
+                                    final row = [
+                                      s.id,
+                                      '"${s.name.replaceAll('"', '""')}"',
+                                      s.phone,
+                                      seatStr,
+                                      '"${s.shift.replaceAll('"', '""')}"',
+                                      s.status,
+                                      '${s.monthlyFee}',
+                                      '${s.effectiveDues}',
+                                      joinStr,
+                                      '"${s.fatherName.replaceAll('"', '""')}"',
+                                      '"${s.address.replaceAll('"', '""')}"',
+                                      s.aadhaarNumber,
+                                    ].join(',');
+                                    buffer.writeln(row);
+                                  }
+                                  final fileName = 'student_directory_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+                                  final ok = await FileExportService.download(fileName: fileName, content: buffer.toString());
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(ok ? 'Exported ${allStudents.length} student records to $fileName!' : 'Export file saved!'),
+                                        backgroundColor: const Color(0xFF0D9488),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
                                 },
                                 child: Container(
                                   width: 44,

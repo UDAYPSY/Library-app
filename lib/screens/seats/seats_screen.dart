@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
@@ -40,7 +41,8 @@ class _SeatsScreenState extends State<SeatsScreen> {
     final availableShifts = _service.shifts.isNotEmpty
         ? _service.shifts.map((s) => s.name).toSet().toList()
         : ['Full Day', 'Morning Shift', 'Evening Shift', 'Night Shift', '24 Hours'];
-    String selectedShift = selectedStudent?.shift ?? (seat.shift.isNotEmpty ? seat.shift : availableShifts.first);
+    String selectedShift = selectedStudent?.shift ??
+        (_selectedShift.toUpperCase() != 'ALL' ? _selectedShift : (seat.shift.isNotEmpty ? seat.shift : availableShifts.first));
     if (!availableShifts.contains(selectedShift)) {
       selectedShift = availableShifts.first;
     }
@@ -550,6 +552,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       child: TextField(
                         controller: newPhoneCtrl,
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
                         onChanged: (val) {
                           if (_service.isDuplicateStudentPhone(val.trim())) {
                             final dup = _service.findStudentByPhone(val.trim());
@@ -767,6 +773,17 @@ class _SeatsScreenState extends State<SeatsScreen> {
                             );
                             return;
                           }
+                          if (_service.isSeatOccupied(seat.seatNumber, shift: selectedShift, excludeStudentId: selectedStudent!.id)) {
+                            final occ = _service.getStudentForSeat(seat.seatNumber, shift: selectedShift);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Seat S-${seat.seatNumber} is already occupied for "$selectedShift"${occ != null ? " by ${occ.name}" : ""}.'),
+                                backgroundColor: const Color(0xFFE11D48),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
                           Navigator.pop(ctx);
                           await _service.assignSeatToExistingStudent(
                             newSeatNumber: seat.seatNumber,
@@ -800,12 +817,32 @@ class _SeatsScreenState extends State<SeatsScreen> {
                             );
                             return;
                           }
+                          if (phone.length != 10) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Mobile number must be exactly 10 digits.'),
+                                backgroundColor: Color(0xFFE11D48),
+                              ),
+                            );
+                            return;
+                          }
                           if (_service.isDuplicateStudentPhone(phone)) {
                             final dup = _service.findStudentByPhone(phone);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Duplicate: Student "${dup?.name}" already exists with this phone! No duplicate entry allowed.'),
                                 backgroundColor: const Color(0xFFE11D48),
+                              ),
+                            );
+                            return;
+                          }
+                          if (_service.isSeatOccupied(seat.seatNumber, shift: selectedShift)) {
+                            final occ = _service.getStudentForSeat(seat.seatNumber, shift: selectedShift);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Seat S-${seat.seatNumber} is already occupied for "$selectedShift"${occ != null ? " by ${occ.name}" : ""}.'),
+                                backgroundColor: const Color(0xFFE11D48),
+                                behavior: SnackBarBehavior.floating,
                               ),
                             );
                             return;
@@ -1157,37 +1194,38 @@ class _SeatsScreenState extends State<SeatsScreen> {
             // Apply search, shift, status, and dues filters
             final query = _searchCtrl.text.trim().toLowerCase();
             final filteredSeats = seats.where((seat) {
+              final seatStudents = students.where((s) => s.seatNumber == seat.seatNumber && s.status != 'INACTIVE').toList();
+
               if (query.isNotEmpty) {
                 final matchNum = seat.seatNumber.toString().contains(query);
-                final matchName = seat.studentName.toLowerCase().contains(query);
+                final matchName = seatStudents.any((s) => s.name.toLowerCase().contains(query)) ||
+                    seat.studentName.toLowerCase().contains(query);
                 if (!matchNum && !matchName) return false;
               }
 
-              // Shift filter
-              if (_selectedShift.toUpperCase() != 'ALL') {
-                if (!seat.isOccupied) return false;
-                final seatShift = seat.shift.trim().toUpperCase();
-                final selShift = _selectedShift.trim().toUpperCase();
-                if (seatShift != selShift &&
-                    !seatShift.contains(selShift) &&
-                    !selShift.contains(seatShift)) {
-                  return false;
-                }
+              // Shift-wise occupancy check
+              final bool isOccInView;
+              final StudentInfo? studentInShift;
+              if (_selectedShift.toUpperCase() == 'ALL') {
+                isOccInView = seatStudents.isNotEmpty || seat.isOccupied;
+                studentInShift = seatStudents.isNotEmpty ? seatStudents.first : null;
+              } else {
+                studentInShift = seatStudents.cast<StudentInfo?>().firstWhere(
+                  (s) => s != null && LibraryService.doShiftsConflict(s.shift, _selectedShift),
+                  orElse: () => null,
+                );
+                isOccInView = studentInShift != null;
               }
 
               // Status filter
-              if (_selectedStatus == 'VACANT' && seat.isOccupied) return false;
-              if (_selectedStatus == 'OCCUPIED' && !seat.isOccupied) return false;
+              if (_selectedStatus == 'VACANT' && isOccInView) return false;
+              if (_selectedStatus == 'OCCUPIED' && !isOccInView) return false;
 
               // Dues filter (PAID, UNPAID, TRIAL)
               if (_selectedDues != 'ALL') {
-                if (!seat.isOccupied) return false;
-                final student = students.firstWhere(
-                  (s) => (seat.studentId.isNotEmpty && s.id == seat.studentId) || s.seatNumber == seat.seatNumber,
-                  orElse: () => StudentInfo(id: '', name: seat.studentName, phone: ''),
-                );
-                final hasDues = student.hasDues || student.effectiveDues > 0 || student.duesAmount > 0 || student.status == 'DUES';
-                final isTrial = student.status == 'TRIAL';
+                if (!isOccInView || studentInShift == null) return false;
+                final hasDues = studentInShift.hasDues || studentInShift.effectiveDues > 0 || studentInShift.duesAmount > 0 || studentInShift.status == 'DUES';
+                final isTrial = studentInShift.status == 'TRIAL';
 
                 if (_selectedDues == 'PAID') {
                   if (hasDues || isTrial) return false;
@@ -1447,20 +1485,38 @@ class _SeatsScreenState extends State<SeatsScreen> {
 
                           // Actual Seat Cards (idx - 1)
                           final seat = filteredSeats[idx - 1];
-                          final isOccupied = seat.isOccupied;
+                          final seatStudents = students.where((s) => s.seatNumber == seat.seatNumber && s.status != 'INACTIVE').toList();
+                          final bool isOccupied;
+                          final StudentInfo student;
+
+                          if (_selectedShift.toUpperCase() == 'ALL') {
+                            isOccupied = seatStudents.isNotEmpty || seat.isOccupied;
+                            student = seatStudents.isNotEmpty
+                                ? seatStudents.first
+                                : (_service.getStudentForSeat(seat.seatNumber) ?? StudentInfo(
+                                    id: seat.studentId.isNotEmpty ? seat.studentId : 'S-${seat.seatNumber}',
+                                    name: seat.studentName.isNotEmpty ? seat.studentName : 'Student S-${seat.seatNumber}',
+                                    phone: '',
+                                    seatNumber: seat.seatNumber,
+                                    shift: seat.shift,
+                                  ));
+                          } else {
+                            final shiftStudent = seatStudents.cast<StudentInfo?>().firstWhere(
+                              (s) => s != null && LibraryService.doShiftsConflict(s.shift, _selectedShift),
+                              orElse: () => null,
+                            );
+                            isOccupied = shiftStudent != null;
+                            student = shiftStudent ?? StudentInfo(
+                              id: 'S-${seat.seatNumber}',
+                              name: 'Student S-${seat.seatNumber}',
+                              phone: '',
+                              seatNumber: seat.seatNumber,
+                              shift: _selectedShift,
+                            );
+                          }
 
                           // OCCUPIED / ASSIGNED SEAT CARD
                           if (isOccupied) {
-                            final student = students.firstWhere(
-                              (s) => (seat.studentId.isNotEmpty && s.id == seat.studentId) || s.seatNumber == seat.seatNumber,
-                              orElse: () => _service.getStudentForSeat(seat.seatNumber) ?? StudentInfo(
-                                id: seat.studentId.isNotEmpty ? seat.studentId : 'S-${seat.seatNumber}',
-                                name: seat.studentName.isNotEmpty ? seat.studentName : 'Student S-${seat.seatNumber}',
-                                phone: '',
-                                seatNumber: seat.seatNumber,
-                                shift: seat.shift,
-                              ),
-                            );
                             final studentIdx = students.indexWhere((s) => s.id == student.id);
                             final memberId = studentIdx != -1 ? studentIdx + 1 : seat.seatNumber;
                             final hasDues = student.hasDues || student.effectiveDues > 0 || student.duesAmount > 0 || student.status == 'DUES';
