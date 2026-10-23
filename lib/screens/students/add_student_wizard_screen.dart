@@ -1954,7 +1954,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                                     fontWeight: FontWeight.w900,
                                     color: Color(0xFFE11D48),
                                   ),
-                                          Text(
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
                                   isEdit
                                       ? 'Paid ₹$currentPaid now of ₹$maxPayable due (Remaining Due: ₹$remainingDues • ₹$_alreadyPaidAmount already paid for current cycle)'
                                       : 'Paid ₹$currentPaid of ₹$totalFee total fee ($totalFee - $currentPaid = ₹$remainingDues remaining)',
