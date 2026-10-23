@@ -87,8 +87,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
     int feePaidNow = selectedStudent?.hasDues == true ? selectedStudent!.effectiveDues : 0;
     final feePaidCtrl = TextEditingController(text: '$feePaidNow');
     String paymentMode = 'UPI';
-    final deskNoteCtrl = TextEditingController();
-    final selectedAmenities = <String>{};
     bool sendWhatsAppNotification = false;
 
     showModalBottomSheet(
@@ -322,7 +320,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.textNavy),
                                       ),
                                       Text(
-                                        'Phone: ${selectedStudent!.phone}',
+                                        'Phone: ${selectedStudent!.phone} • Shift: ${selectedStudent!.shift}',
                                         style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                                       ),
                                     ],
@@ -537,232 +535,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       const SizedBox(height: 14),
                     ],
 
-                  // SEAT & SHIFT ALLOCATION OVERVIEW (Clean modern design, no raw dropdowns)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.event_seat_rounded, size: 16, color: Color(0xFF0D766E)),
-                                SizedBox(width: 6),
-                                Text(
-                                  'SEAT ALLOCATION & SHIFT',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.6,
-                                    color: AppColors.textNavy,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE6FFFA),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFF99F6E4)),
-                              ),
-                              child: Text(
-                                'Seat S-${seat.seatNumber} • $selectedSection',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0D766E),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Assign Shift',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: availableShifts.map((s) {
-                            final isSelected = selectedShift.toLowerCase() == s.toLowerCase();
-                            return InkWell(
-                              borderRadius: BorderRadius.circular(10),
-                              onTap: () {
-                                setModalState(() => selectedShift = s);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? const Color(0xFF0D766E) : Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: isSelected ? const Color(0xFF0D766E) : const Color(0xFFCBD5E1),
-                                    width: isSelected ? 1.5 : 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  s,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: isSelected ? Colors.white : AppColors.textNavy,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 10),
 
-                        // Shift Availability & Seat Sharing Check
-                        Builder(
-                          builder: (context) {
-                            final isOccupiedForShift = _service.isSeatOccupied(
-                              seat.seatNumber,
-                              shift: selectedShift,
-                              excludeStudentId: selectedStudent?.id,
-                            );
-                            final occInShift = isOccupiedForShift
-                                ? _service.getStudentForSeat(seat.seatNumber, shift: selectedShift)
-                                : null;
-                            final allSeatOccupants = _service.getStudentsForSeat(seat.seatNumber);
-                            final otherShiftOccupants = allSeatOccupants
-                                .where((st) => st.id != selectedStudent?.id && st.shift.toLowerCase() != selectedShift.toLowerCase())
-                                .toList();
-
-                            if (isOccupiedForShift) {
-                              return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF2F2),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFFECDD3)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 16),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Seat S-${seat.seatNumber} is occupied for "$selectedShift"${occInShift != null ? " by ${occInShift.name}" : ""}. Please select another shift.',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF0FDF4),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFBBF7D0)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      otherShiftOccupants.isNotEmpty
-                                          ? 'Available for "$selectedShift" • Shared seat (Occupied by ${otherShiftOccupants.map((o) => "${o.name} in ${o.shift}").join(", ")})'
-                                          : 'Available for "$selectedShift" • Exclusive space allocation',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF166534)),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // SEAT AMENITIES & PREFERENCES (New useful feature)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.stars_rounded, size: 16, color: Color(0xFFD97706)),
-                            SizedBox(width: 6),
-                            Text(
-                              'DESK AMENITIES & NOTES',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.6,
-                                color: AppColors.textNavy,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: ['⚡ Power Socket', '❄️ Near AC', '🤫 Quiet Zone', '🪟 Window Desk', '💡 Reading Lamp'].map((amenity) {
-                            final isChecked = selectedAmenities.contains(amenity);
-                            return FilterChip(
-                              label: Text(amenity, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isChecked ? Colors.white : AppColors.textNavy)),
-                              selected: isChecked,
-                              selectedColor: const Color(0xFF0D766E),
-                              backgroundColor: Colors.white,
-                              checkmarkColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              side: BorderSide(color: isChecked ? const Color(0xFF0D766E) : const Color(0xFFCBD5E1)),
-                              onSelected: (val) {
-                                setModalState(() {
-                                  if (val) {
-                                    selectedAmenities.add(amenity);
-                                  } else {
-                                    selectedAmenities.remove(amenity);
-                                  }
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: deskNoteCtrl,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            hintText: 'Desk note / Locker number (e.g. Locker L-12, Front row)',
-                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
 
                   // DUE SETTLEMENT (Streamlined, only shown if student has dues)
                   if (selectedStudent != null && selectedStudent!.hasDues) ...[
@@ -959,11 +732,13 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           );
                           return;
                         }
-                        if (_service.isSeatOccupied(seat.seatNumber, shift: selectedShift, excludeStudentId: selectedStudent!.id)) {
-                          final occ = _service.getStudentForSeat(seat.seatNumber, shift: selectedShift);
+                        final studentToAssign = selectedStudent!;
+                        final chosenShift = studentToAssign.shift.isNotEmpty ? studentToAssign.shift : selectedShift;
+                        if (_service.isSeatOccupied(seat.seatNumber, shift: chosenShift, excludeStudentId: studentToAssign.id)) {
+                          final occ = _service.getStudentForSeat(seat.seatNumber, shift: chosenShift);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Seat S-${seat.seatNumber} is already occupied for "$selectedShift"${occ != null ? " by ${occ.name}" : ""}.'),
+                              content: Text('Seat S-${seat.seatNumber} is already occupied for "$chosenShift"${occ != null ? " by ${occ.name}" : ""}.'),
                               backgroundColor: const Color(0xFFE11D48),
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -972,10 +747,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         }
 
                         final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, 999999);
-                        final studentToAssign = selectedStudent!;
-                        final chosenShift = selectedShift;
-                        final deskNote = deskNoteCtrl.text.trim();
-                        final amenitiesList = selectedAmenities.toList();
                         final bool notifyWhatsApp = sendWhatsAppNotification;
 
                         Navigator.pop(ctx);
@@ -987,27 +758,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           feePaidNow: effectiveFeePaid,
                           paymentMode: paymentMode,
                         );
-
-                        // Attach desk notes / amenities if provided
-                        final extraParts = [
-                          if (amenitiesList.isNotEmpty) 'Amenities: ${amenitiesList.join(", ")}',
-                          if (deskNote.isNotEmpty) deskNote,
-                        ].join(' • ');
-
-                        if (extraParts.isNotEmpty) {
-                          final existingNote = studentToAssign.note;
-                          final newNote = existingNote.isEmpty
-                              ? 'Seat S-${seat.seatNumber}: $extraParts'
-                              : '$existingNote\n• Seat S-${seat.seatNumber}: $extraParts';
-                          await _service.updateStudent(
-                            studentId: studentToAssign.id,
-                            name: studentToAssign.name,
-                            phone: studentToAssign.phone,
-                            shift: chosenShift,
-                            seatNumber: seat.seatNumber,
-                            note: newNote,
-                          );
-                        }
 
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
