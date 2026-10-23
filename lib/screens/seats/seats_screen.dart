@@ -77,16 +77,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
       return;
     }
 
-    // Fee plans
-    final feePlans = [300, 400, 500, 600, 700, 800, 1000, 1200];
-    int selectedFeePlan = selectedStudent != null && feePlans.contains(selectedStudent.monthlyFee)
-        ? selectedStudent.monthlyFee
-        : 500;
-
-    // Payment collection
-    int feePaidNow = selectedStudent?.hasDues == true ? selectedStudent!.effectiveDues : 0;
-    final feePaidCtrl = TextEditingController(text: '$feePaidNow');
-    String paymentMode = 'UPI';
     bool sendWhatsAppNotification = false;
 
     showModalBottomSheet(
@@ -267,9 +257,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                 if (!availableShifts.contains(selectedShift)) {
                                   selectedShift = availableShifts.first;
                                 }
-                                selectedFeePlan = feePlans.contains(val.monthlyFee) ? val.monthlyFee : 500;
-                                feePaidNow = val.hasDues ? val.effectiveDues : 0;
-                                feePaidCtrl.text = '$feePaidNow';
                               });
                             }
                           },
@@ -535,141 +522,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       const SizedBox(height: 14),
                     ],
 
-
-
-                  // DUE SETTLEMENT (Streamlined, only shown if student has dues)
-                  if (selectedStudent != null && selectedStudent!.hasDues) ...[
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF1F2),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFFECDD3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.payment_rounded, size: 16, color: Color(0xFFE11D48)),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'COLLECT PENDING DUE',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.6,
-                                      color: Color(0xFFE11D48),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                'Due: ₹${selectedStudent!.effectiveDues}',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFE11D48)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  height: 40,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                                  ),
-                                  child: TextField(
-                                    controller: feePaidCtrl,
-                                    keyboardType: TextInputType.number,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                                    decoration: const InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(vertical: 9),
-                                      border: InputBorder.none,
-                                      prefixIcon: Icon(Icons.currency_rupee, size: 14, color: Color(0xFF0D766E)),
-                                      hintText: 'Enter amount',
-                                    ),
-                                    onChanged: (val) {
-                                      setModalState(() {
-                                        feePaidNow = (int.tryParse(val.trim()) ?? 0).clamp(0, selectedStudent!.effectiveDues);
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              InkWell(
-                                onTap: () {
-                                  setModalState(() {
-                                    feePaidNow = selectedStudent!.effectiveDues;
-                                    feePaidCtrl.text = '$feePaidNow';
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: feePaidNow == selectedStudent!.effectiveDues ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: feePaidNow == selectedStudent!.effectiveDues ? const Color(0xFF10B981) : const Color(0xFFCBD5E1)),
-                                  ),
-                                  child: const Text('Pay All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0D766E))),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              InkWell(
-                                onTap: () {
-                                  setModalState(() {
-                                    feePaidNow = 0;
-                                    feePaidCtrl.text = '0';
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: feePaidNow == 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: feePaidNow == 0 ? const Color(0xFFEF4444) : const Color(0xFFCBD5E1)),
-                                  ),
-                                  child: const Text('Defer (₹0)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (feePaidNow > 0) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: ['UPI', 'Cash', 'Card'].map((m) {
-                                final isM = paymentMode == m;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: InkWell(
-                                    onTap: () => setModalState(() => paymentMode = m),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: isM ? const Color(0xFF0D766E) : Colors.white,
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: isM ? const Color(0xFF0D766E) : const Color(0xFFCBD5E1)),
-                                      ),
-                                      child: Text(m, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isM ? Colors.white : AppColors.textNavy)),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
                   // WHATSAPP NOTIFICATION TOGGLE (New useful feature)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -746,7 +598,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           return;
                         }
 
-                        final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, 999999);
                         final bool notifyWhatsApp = sendWhatsAppNotification;
 
                         Navigator.pop(ctx);
@@ -755,8 +606,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           studentId: studentToAssign.id,
                           shift: chosenShift,
                           sectionName: selectedSection,
-                          feePaidNow: effectiveFeePaid,
-                          paymentMode: paymentMode,
                         );
 
                         if (mounted) {
