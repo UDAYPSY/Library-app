@@ -49,6 +49,22 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int get _fixedMonthlyFee => _selectedShift.monthlyFee > 0 ? _selectedShift.monthlyFee : 500;
   int get _calculatedTotalFee => _fixedMonthlyFee * _selectedDurationMonths;
 
+  // Fixed / Non-editable Already Paid for existing students (Requirement 4)
+  int get _alreadyPaidAmount {
+    if (widget.studentToEdit == null) return 0;
+    final s = widget.studentToEdit!;
+    if (s.duesAmount > 0) {
+      return (_fixedMonthlyFee - s.duesAmount).clamp(0, _fixedMonthlyFee);
+    }
+    return 0;
+  }
+
+  // Auto-calculated Due Amount
+  int get _dueAmount {
+    if (widget.studentToEdit == null) return _calculatedTotalFee;
+    return (_calculatedTotalFee - _alreadyPaidAmount).clamp(0, _calculatedTotalFee);
+  }
+
   // Step 3: Review Options
   bool _saveToContacts = true;
   String? _photoBase64;
@@ -98,8 +114,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         _selectedShift = shiftMatch.first;
       }
       _feeCtrl.text = '$_fixedMonthlyFee';
-      final paidAmt = s.hasDues ? (_fixedMonthlyFee - s.effectiveDues).clamp(0, _fixedMonthlyFee) : _fixedMonthlyFee;
-      _amountPaidCtrl.text = '$paidAmt';
+      final initialDue = _dueAmount;
+      _amountPaidCtrl.text = '$initialDue';
     }
   }
 
@@ -300,8 +316,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       }
     }
     _feeCtrl.text = '$_fixedMonthlyFee';
-    final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? _calculatedTotalFee;
-    _amountPaidCtrl.text = '${parsedPaid.clamp(0, _calculatedTotalFee)}';
+    final maxPayable = widget.studentToEdit != null ? _dueAmount : _calculatedTotalFee;
+    final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? maxPayable;
+    _amountPaidCtrl.text = '${parsedPaid.clamp(0, maxPayable)}';
     setState(() => _currentStep = 2);
   }
 
@@ -377,6 +394,36 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
 
     try {
       if (widget.studentToEdit != null) {
+        final alreadyPaid = _alreadyPaidAmount;
+        final dueAmount = (totalCalculatedFee - alreadyPaid).clamp(0, totalCalculatedFee);
+        final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? dueAmount;
+        final collectedNow = parsedPaid.clamp(0, dueAmount);
+        final editDuesAmount = (dueAmount - collectedNow).clamp(0, 999999);
+
+        final String editStatus;
+        if (_isTrial) {
+          editStatus = 'TRIAL';
+        } else if (editDuesAmount == 0) {
+          editStatus = 'ACTIVE';
+        } else {
+          editStatus = 'DUES';
+        }
+
+        // CRITICAL SYNC (Requirement 3): Record payment in financial ledger & transaction stream
+        if (collectedNow > 0) {
+          await _service.recordPayment(
+            studentId: widget.studentToEdit!.id,
+            studentName: name,
+            phone: phone,
+            seatNumber: seatNum,
+            shift: _selectedShift.name,
+            amount: collectedNow,
+            date: _joiningDate,
+            paymentMode: 'UPI',
+            notes: 'Payment collected via Edit Student Details',
+          );
+        }
+
         await _service.updateStudent(
           studentId: widget.studentToEdit!.id,
           name: name,
@@ -385,8 +432,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           seatNumber: seatNum,
           note: _notesCtrl.text.trim(),
           monthlyFee: fixedMonthly,
-          duesAmount: finalDuesAmount,
-          status: finalStatus,
+          duesAmount: editDuesAmount,
+          status: editStatus,
           feeDueDate: _joiningDate.add(Duration(days: 30 * _selectedDurationMonths)),
           fatherName: _fatherNameCtrl.text.trim(),
           address: _addressCtrl.text.trim(),
@@ -400,7 +447,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Student $name profile updated successfully!'),
+              content: Text(collectedNow > 0
+                  ? 'Student $name updated & payment of ₹$collectedNow recorded!'
+                  : 'Student $name profile updated successfully!'),
               backgroundColor: AppColors.primaryTeal,
             ),
           );
@@ -1354,16 +1403,74 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           ),
           const SizedBox(height: 18),
 
-          // Amount Paid Now (Editable, capped at Total Fee)
+          // For existing students: Show Fixed / Non-editable Already Paid card (Requirement 4)
+          if (widget.studentToEdit != null) ...[
+            Row(
+              children: [
+                _fieldLabel('Already Paid (₹)'),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_rounded, size: 10, color: Color(0xFF64748B)),
+                      SizedBox(width: 4),
+                      Text(
+                        'FIXED / LOCKED',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '₹$_alreadyPaidAmount',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                  ),
+                  const Text('Non-editable', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+
+          // Amount Paid Now (Capped at due amount for editing, or total fee for new)
           Builder(
             builder: (context) {
-              final totalFee = _calculatedTotalFee;
-              final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? totalFee;
-              final currentPaid = parsedPaid.clamp(0, totalFee);
-              final remainingDues = (totalFee - currentPaid).clamp(0, 999999);
+              final isEdit = widget.studentToEdit != null;
+              final maxPayable = isEdit ? _dueAmount : _calculatedTotalFee;
+              final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? maxPayable;
+              final currentPaid = parsedPaid.clamp(0, maxPayable);
+              final remainingDues = (maxPayable - currentPaid).clamp(0, 999999);
 
-              final bool isFullyPaid = currentPaid == totalFee && totalFee > 0;
-              final bool isPartiallyPaid = currentPaid > 0 && currentPaid < totalFee;
+              final bool isFullyPaid = currentPaid == maxPayable && maxPayable > 0;
+              final bool isPartiallyPaid = currentPaid > 0 && currentPaid < maxPayable;
               final bool isUnpaid = currentPaid == 0;
 
               return Column(
@@ -1372,7 +1479,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _fieldLabel('Amount Paid Now (₹)', isRequired: true),
+                      _fieldLabel(widget.studentToEdit != null ? 'Due Amount to Accept (₹)' : 'Amount Paid Now (₹)', isRequired: true),
                       // Auto-determined payment status pill
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1405,12 +1512,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   const SizedBox(height: 8),
                   _formTextField(
                     controller: _amountPaidCtrl,
-                    hintText: 'Enter amount paid (max ₹$totalFee)',
+                    hintText: 'Enter amount to collect (max ₹$maxPayable)',
                     keyboardType: TextInputType.number,
                     onChanged: (val) {
                       final p = int.tryParse(val.trim());
-                      if (p != null && p > totalFee) {
-                        _amountPaidCtrl.text = '$totalFee';
+                      if (p != null && p > maxPayable) {
+                        _amountPaidCtrl.text = '$maxPayable';
                         _amountPaidCtrl.selection = TextSelection.fromPosition(TextPosition(offset: _amountPaidCtrl.text.length));
                       }
                       setState(() {});
@@ -1425,7 +1532,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                         borderRadius: BorderRadius.circular(8),
                         onTap: () {
                           setState(() {
-                            _amountPaidCtrl.text = '$totalFee';
+                            _amountPaidCtrl.text = '$maxPayable';
                           });
                         },
                         child: Container(
@@ -1438,7 +1545,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                             ),
                           ),
                           child: Text(
-                            'Full Paid (₹$totalFee)',
+                            widget.studentToEdit != null ? 'Accept Due (₹$maxPayable)' : 'Full Paid (₹$totalFee)',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,

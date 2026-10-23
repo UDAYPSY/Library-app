@@ -23,7 +23,6 @@ class StudentDirectoryScreen extends StatefulWidget {
 class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   final LibraryService _service = LibraryService();
   final TextEditingController _searchCtrl = TextEditingController();
-  final ScrollController _statusScrollCtrl = ScrollController();
   String _selectedShiftFilter = 'ALL SHIFTS';
   String _selectedStatusFilter = 'RECENT'; // Default RECENT (Image 2)
 
@@ -43,7 +42,6 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     super.initState();
     if (widget.initialStatusFilter != null) {
       _selectedStatusFilter = widget.initialStatusFilter!;
-      _maybeScrollToFilter(_selectedStatusFilter);
     }
   }
 
@@ -54,27 +52,11 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
       setState(() {
         _selectedStatusFilter = widget.initialStatusFilter!;
       });
-      _maybeScrollToFilter(_selectedStatusFilter);
     }
-  }
-
-  void _maybeScrollToFilter(String filter) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_statusScrollCtrl.hasClients) return;
-      final idx = _statusFilters.indexWhere((f) => f['label'] == filter);
-      if (idx > 2) {
-        _statusScrollCtrl.animateTo(
-          (idx - 1) * 85.0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
   }
 
   @override
   void dispose() {
-    _statusScrollCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -637,375 +619,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     }
   }
 
-  void _toggleTrialStatus(StudentInfo st) {
-    final isTrial = st.status == 'TRIAL';
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          isTrial ? 'Convert to Regular Active Member' : 'Mark as Trial Student',
-          style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy),
-        ),
-        content: Text(
-          isTrial
-              ? 'Do you want to convert ${st.name} from a Trial student to a regular Active Member?'
-              : 'Do you want to mark ${st.name} as a Trial Student? Trial students are tagged under the TRIAL tab.',
-          style: const TextStyle(fontSize: 14, color: AppColors.textNavy),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isTrial ? AppColors.primaryTeal : const Color(0xFFD97706),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              if (isTrial) {
-                await _service.reactivateStudent(st.id, st.seatNumber);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${st.name} is now a regular Active Member!'), backgroundColor: AppColors.primaryTeal),
-                  );
-                }
-              } else {
-                await _service.markStudentTrial(st.id);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${st.name} marked as Trial Student!'), backgroundColor: const Color(0xFFD97706)),
-                  );
-                }
-              }
-            },
-            child: Text(isTrial ? 'Convert to Active' : 'Mark as Trial', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _openMarkDuesSheet(StudentInfo st) {
-    final maxFee = st.monthlyFee > 0 ? st.monthlyFee : 500;
-    final currentDues = st.effectiveDues;
-    final targetFee = currentDues > 0 ? currentDues : maxFee;
-
-    final duesCtrl = TextEditingController(text: targetFee.toString());
-    final collectCtrl = TextEditingController(text: '0');
-    String paymentMode = 'UPI';
-    DateTime selectedDate = st.feeDueDate ?? DateTime.now().add(const Duration(days: 7));
-    final noteCtrl = TextEditingController(
-      text: 'Fee due for ${DateFormat('MMMM yyyy').format(DateTime.now())}',
-    );
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (sheetContext, setModalState) {
-          final rawDue = int.tryParse(duesCtrl.text.trim()) ?? 0;
-          final rawCollect = int.tryParse(collectCtrl.text.trim()) ?? 0;
-
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-              left: 20,
-              right: 20,
-              top: 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Fee Management - ${st.name}',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Seat: ${st.seatNumber != null ? "S-${st.seatNumber}" : "Unallocated"} • Shift: ${st.shift}',
-                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Summary Banner
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Monthly Fee: ₹$maxFee', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF334155))),
-                        Text('Current Due: ₹$currentDues', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFFE11D48))),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  // Collect Fee Now Field
-                  TextField(
-                    controller: collectCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Collect Fee Now / Paid Amount (₹)',
-                      hintText: 'Enter amount being collected now',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.payment_rounded, color: Color(0xFF0D9488)),
-                    ),
-                    onChanged: (val) {
-                      final paid = int.tryParse(val.trim()) ?? 0;
-                      final clampedPaid = paid.clamp(0, targetFee);
-                      final remaining = (targetFee - clampedPaid).clamp(0, targetFee);
-                      setModalState(() {
-                        duesCtrl.text = '$remaining';
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  // Mark Due Field
-                  TextField(
-                    controller: duesCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Due Amount (₹) [Max ₹$targetFee]',
-                      hintText: 'Enter pending due fee',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.currency_rupee, color: Color(0xFFEF4444)),
-                      helperText: 'Due amount cannot exceed total/monthly fee (₹$targetFee)',
-                    ),
-                    onChanged: (val) {
-                      final due = int.tryParse(val.trim()) ?? 0;
-                      final clampedDue = due.clamp(0, targetFee);
-                      final paid = (targetFee - clampedDue).clamp(0, targetFee);
-                      setModalState(() {
-                        collectCtrl.text = '$paid';
-                      });
-                    },
-                  ),
-                  if (rawCollect > 0) ...[
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: paymentMode,
-                      items: ['UPI', 'Cash', 'Card', 'Net Banking']
-                          .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                          .toList(),
-                      onChanged: (v) => setModalState(() => paymentMode = v ?? paymentMode),
-                      decoration: const InputDecoration(
-                        labelText: 'Payment Mode for Collected Fee',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.account_balance_wallet_outlined),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2035),
-                      );
-                      if (picked != null) {
-                        setModalState(() => selectedDate = picked);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_month_outlined, color: Color(0xFF0284C7), size: 20),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Payment Due Date', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-                              Text(DateFormat('dd MMM yyyy').format(selectedDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-                            ],
-                          ),
-                          const Spacer(),
-                          const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: noteCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Reason / Note',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.edit_note_rounded),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFE2E8F0)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: () => setModalState(() {
-                            duesCtrl.text = '$targetFee';
-                            collectCtrl.text = '0';
-                          }),
-                          child: Text('Full Due (₹$targetFee)', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF10B981),
-                            side: const BorderSide(color: Color(0xFFA7F3D0)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: () => setModalState(() {
-                            collectCtrl.text = '$targetFee';
-                            duesCtrl.text = '0';
-                          }),
-                          child: Text('Collect All (₹$targetFee)', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF64748B),
-                            side: const BorderSide(color: Color(0xFFE2E8F0)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: () => setModalState(() {
-                            collectCtrl.text = '0';
-                            duesCtrl.text = '0';
-                          }),
-                          child: const Text('Clear (₹0)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: rawDue > 0 ? const Color(0xFFE11D48) : const Color(0xFF0D9488),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () async {
-                        final paid = (int.tryParse(collectCtrl.text.trim()) ?? 0).clamp(0, targetFee);
-                        final dues = (int.tryParse(duesCtrl.text.trim()) ?? 0).clamp(0, targetFee);
-                        Navigator.pop(ctx);
-
-                        if (paid > 0) {
-                          await _service.recordPayment(
-                            studentId: st.id,
-                            studentName: st.name,
-                            phone: st.phone,
-                            seatNumber: st.seatNumber,
-                            shift: st.shift,
-                            amount: paid,
-                            paymentMode: paymentMode,
-                            notes: noteCtrl.text.trim().isNotEmpty ? noteCtrl.text.trim() : 'Fee collection',
-                          );
-                        }
-
-                        if (dues <= 0) {
-                          await _service.updateStudent(
-                            studentId: st.id,
-                            name: st.name,
-                            phone: st.phone,
-                            shift: st.shift,
-                            seatNumber: st.seatNumber,
-                            duesAmount: 0,
-                            status: st.status == 'DUES' ? 'ACTIVE' : st.status,
-                            feeDueDate: selectedDate,
-                          );
-                          if (mounted) {
-                            setState(() {});
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(paid > 0
-                                    ? 'Collected ₹$paid & cleared all dues for ${st.name}!'
-                                    : 'Cleared all dues for ${st.name}!'),
-                                backgroundColor: const Color(0xFF10B981),
-                              ),
-                            );
-                          }
-                        } else {
-                          await _service.markStudentDues(st.id, dues, selectedDate);
-                          await _service.updateStudent(
-                            studentId: st.id,
-                            name: st.name,
-                            phone: st.phone,
-                            shift: st.shift,
-                            seatNumber: st.seatNumber,
-                            duesAmount: dues,
-                            status: 'DUES',
-                            feeDueDate: selectedDate,
-                          );
-                          if (mounted) {
-                            setState(() {});
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(paid > 0
-                                    ? 'Collected ₹$paid and marked ₹$dues due for ${st.name}!'
-                                    : 'Marked ₹$dues due for ${st.name}!'),
-                                backgroundColor: const Color(0xFFE11D48),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      child: Text(
-                        rawCollect > 0
-                            ? (rawDue > 0 ? 'Collect ₹$rawCollect & Mark ₹$rawDue Due' : 'Collect ₹$rawCollect (Full Paid)')
-                            : (rawDue > 0 ? 'Save Due Fee (₹$rawDue)' : 'Clear Dues (₹0)'),
-                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _openNoteSheet(StudentInfo st) {
+    void _openNoteSheet(StudentInfo st) {
     final noteCtrl = TextEditingController(text: st.note);
     showModalBottomSheet(
       context: context,
@@ -1096,30 +711,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     });
   }
 
-  void _openEditStudentSheet(StudentInfo st) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (ctx) => AddStudentWizardScreen(
-          studentToEdit: st,
-        ),
-      ),
-    ).then((_) {
-      if (mounted) setState(() {});
-    });
-  }
 
-  void _openPaySheet(StudentInfo st) {
-    showCollectPaymentModal(
-      context,
-      st,
-      onPaymentRecorded: () {
-        if (mounted) setState(() {});
-      },
-    );
-  }
-
-  @override
+    @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<StudentInfo>>(
       stream: _service.streamStudents(),
@@ -1325,80 +918,145 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Shift Filter Chips Row: ALL SHIFTS, FULL DAY, etc. (only active shifts)
+                    // Shift & Status Dropdown Filters Row (Requirement 1)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _shiftChip('ALL SHIFTS', null),
-                            ..._service.shifts.where((sh) => sh.isActive).map((sh) {
-                              return Padding(
-                                padding: const EdgeInsets.only(left: 8.0),
-                                child: _shiftChip(sh.name.toUpperCase(), Icons.wb_cloudy_rounded),
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Status Filter Chips Row: RECENT, PAID, DUES, REMAINING, TRIAL, ACTIVE, etc. (Images 2, 3, 4)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: SizedBox(
-                        height: 38,
-                        child: ListView.builder(
-                          controller: _statusScrollCtrl,
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _statusFilters.length,
-                          itemBuilder: (ctx, i) {
-                            final item = _statusFilters[i];
-                            final label = item['label'] as String;
-                            final icon = item['icon'] as IconData;
-                            final isSelected = _selectedStatusFilter == label;
-
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () => setState(() => _selectedStatusFilter = label),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? AppColors.primaryTeal : Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isSelected ? AppColors.primaryTeal : const Color(0xFFE2E8F0),
+                      child: Row(
+                        children: [
+                          // Shift Dropdown
+                          Expanded(
+                            child: Container(
+                              height: 46,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.card(context),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.cardBorderColor(context)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: (['ALL SHIFTS', ..._service.shifts.where((sh) => sh.isActive).map((sh) => sh.name.toUpperCase())].contains(_selectedShiftFilter))
+                                      ? _selectedShiftFilter
+                                      : 'ALL SHIFTS',
+                                  isExpanded: true,
+                                  icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMutedColor(context), size: 20),
+                                  dropdownColor: AppColors.card(context),
+                                  borderRadius: BorderRadius.circular(16),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.text(context),
+                                  ),
+                                  items: [
+                                    DropdownMenuItem<String>(
+                                      value: 'ALL SHIFTS',
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.schedule_rounded, size: 14, color: AppColors.primaryTeal),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'All Shifts',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppColors.text(context),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        icon,
-                                        size: 14,
-                                        color: isSelected ? Colors.white : AppColors.textNavy,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        label,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.6,
-                                          color: isSelected ? Colors.white : AppColors.textNavy,
+                                    ..._service.shifts.where((sh) => sh.isActive).map((sh) {
+                                      return DropdownMenuItem<String>(
+                                        value: sh.name.toUpperCase(),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.wb_cloudy_rounded, size: 14, color: AppColors.primaryTeal),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                sh.name,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: AppColors.text(context),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                      );
+                                    }),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _selectedShiftFilter = val);
+                                  },
                                 ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+
+                          // Status Dropdown
+                          Expanded(
+                            child: Container(
+                              height: 46,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.card(context),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.cardBorderColor(context)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _statusFilters.any((f) => f['label'] == _selectedStatusFilter)
+                                      ? _selectedStatusFilter
+                                      : 'RECENT',
+                                  isExpanded: true,
+                                  icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMutedColor(context), size: 20),
+                                  dropdownColor: AppColors.card(context),
+                                  borderRadius: BorderRadius.circular(16),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.text(context),
+                                  ),
+                                  items: _statusFilters.map((item) {
+                                    final label = item['label'] as String;
+                                    final icon = item['icon'] as IconData;
+                                    return DropdownMenuItem<String>(
+                                      value: label,
+                                      child: Row(
+                                        children: [
+                                          Icon(icon, size: 14, color: AppColors.primaryTeal),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              label,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.5,
+                                                color: AppColors.text(context),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _selectedStatusFilter = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1553,23 +1211,20 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               if (st.effectiveDues > 0)
-                                                InkWell(
-                                                  onTap: () => _openMarkDuesSheet(st),
-                                                  child: Container(
-                                                    margin: const EdgeInsets.only(right: 4),
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFFEF2F2),
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      border: Border.all(color: const Color(0xFFFECACA)),
-                                                    ),
-                                                    child: Text(
-                                                      '₹${st.effectiveDues}',
-                                                      style: const TextStyle(
-                                                        color: Color(0xFFEF4444),
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w900,
-                                                      ),
+                                                Container(
+                                                  margin: const EdgeInsets.only(right: 4),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFFEF2F2),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: const Color(0xFFFECACA)),
+                                                  ),
+                                                  child: Text(
+                                                    '₹${st.effectiveDues}',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFFEF4444),
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w900,
                                                     ),
                                                   ),
                                                 ),
@@ -1584,43 +1239,10 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                               PopupMenuButton<String>(
                                                 icon: const Icon(Icons.more_vert, color: AppColors.textMuted, size: 20),
                                                 onSelected: (val) {
-                                                  if (val == 'dues') _openMarkDuesSheet(st);
-                                                  if (val == 'trial') _toggleTrialStatus(st);
-                                                  if (val == 'edit') _openEditStudentSheet(st);
                                                   if (val == 'delete') _confirmDeleteStudent(st);
                                                   if (val == 'restore') _restoreStudent(st);
                                                 },
                                                 itemBuilder: (ctx) => [
-                                                  const PopupMenuItem(
-                                                    value: 'dues',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(Icons.currency_rupee, size: 18, color: Color(0xFFE11D48)),
-                                                        SizedBox(width: 8),
-                                                        Text('Mark Due Fees'),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  PopupMenuItem(
-                                                    value: 'trial',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(Icons.science_outlined, size: 18, color: Color(0xFFD97706)),
-                                                        SizedBox(width: 8),
-                                                        Text(st.status == 'TRIAL' ? 'Convert to Active' : 'Mark as Trial'),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  const PopupMenuItem(
-                                                    value: 'edit',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(Icons.edit_outlined, size: 18, color: AppColors.textNavy),
-                                                        SizedBox(width: 8),
-                                                        Text('Edit Student'),
-                                                      ],
-                                                    ),
-                                                  ),
                                                   if (st.status == 'INACTIVE')
                                                     const PopupMenuItem(
                                                       value: 'restore',
@@ -2046,51 +1668,12 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                            ],
                                          ),
                                        ] else ...[
-                                         // Row 1: View | Edit | Pay (Image 1)
                                          Row(
                                            children: [
                                              Expanded(
-                                               child: OutlinedButton.icon(
-                                                 style: OutlinedButton.styleFrom(
-                                                   foregroundColor: AppColors.text(context),
-                                                   side: BorderSide(color: AppColors.cardBorderColor(context)),
-                                                   padding: const EdgeInsets.symmetric(vertical: 12),
-                                                   shape: RoundedRectangleBorder(
-                                                     borderRadius: BorderRadius.circular(14),
-                                                   ),
-                                                 ),
-                                                 icon: const Icon(Icons.visibility_outlined, size: 18),
-                                                 label: const Text(
-                                                   'View',
-                                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                                 ),
-                                                 onPressed: () => _openViewStudentSheet(st, memberId),
-                                               ),
-                                             ),
-                                             const SizedBox(width: 8),
-                                             Expanded(
-                                               child: OutlinedButton.icon(
-                                                 style: OutlinedButton.styleFrom(
-                                                   foregroundColor: AppColors.text(context),
-                                                   side: BorderSide(color: AppColors.cardBorderColor(context)),
-                                                   padding: const EdgeInsets.symmetric(vertical: 12),
-                                                   shape: RoundedRectangleBorder(
-                                                     borderRadius: BorderRadius.circular(14),
-                                                   ),
-                                                 ),
-                                                 icon: const Icon(Icons.edit_outlined, size: 18),
-                                                 label: const Text(
-                                                   'Edit',
-                                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                                 ),
-                                                 onPressed: () => _openEditStudentSheet(st),
-                                               ),
-                                             ),
-                                             const SizedBox(width: 8),
-                                             Expanded(
                                                child: ElevatedButton.icon(
                                                  style: ElevatedButton.styleFrom(
-                                                   backgroundColor: const Color(0xFF0D6E66),
+                                                   backgroundColor: AppColors.primaryTeal,
                                                    foregroundColor: Colors.white,
                                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                                    elevation: 0,
@@ -2098,80 +1681,40 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                      borderRadius: BorderRadius.circular(14),
                                                    ),
                                                  ),
-                                                 icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
+                                                 icon: const Icon(Icons.visibility_outlined, size: 18, color: Colors.white),
                                                  label: const Text(
-                                                   'Pay',
+                                                   'View Profile',
                                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
                                                  ),
-                                                 onPressed: () => _openPaySheet(st),
-                                               ),
-                                             ),
-                                           ],
-                                         ),
-                                         const SizedBox(height: 10),
-
-                                         // Row 2: WhatsApp | SMS Reminder | Delete
-                                         Row(
-                                           children: [
-                                             Expanded(
-                                               flex: 5,
-                                               child: InkWell(
-                                                 borderRadius: BorderRadius.circular(14),
-                                                 onTap: () => _sendWhatsApp(st),
-                                                 child: Container(
-                                                   padding: const EdgeInsets.symmetric(vertical: 11),
-                                                   decoration: BoxDecoration(
-                                                     color: const Color(0xFFECFDF5),
-                                                     borderRadius: BorderRadius.circular(14),
-                                                     border: Border.all(color: const Color(0xFFA7F3D0)),
-                                                   ),
-                                                   child: const Row(
-                                                     mainAxisAlignment: MainAxisAlignment.center,
-                                                     children: [
-                                                       Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF10B981), size: 16),
-                                                       SizedBox(width: 6),
-                                                       Text(
-                                                         'WhatsApp',
-                                                         style: TextStyle(
-                                                           color: Color(0xFF059669),
-                                                           fontSize: 13,
-                                                           fontWeight: FontWeight.w800,
-                                                         ),
-                                                       ),
-                                                     ],
-                                                   ),
-                                                 ),
+                                                 onPressed: () => _openViewStudentSheet(st, memberId),
                                                ),
                                              ),
                                              const SizedBox(width: 8),
-                                             Expanded(
-                                               flex: 6,
-                                               child: InkWell(
-                                                 borderRadius: BorderRadius.circular(14),
-                                                 onTap: () => _sendSmsReminder(st),
-                                                 child: Container(
-                                                   padding: const EdgeInsets.symmetric(vertical: 11),
-                                                   decoration: BoxDecoration(
-                                                     color: const Color(0xFFF0F9FF),
-                                                     borderRadius: BorderRadius.circular(14),
-                                                     border: Border.all(color: const Color(0xFFBAE6FD)),
-                                                   ),
-                                                   child: const Row(
-                                                     mainAxisAlignment: MainAxisAlignment.center,
-                                                     children: [
-                                                       Icon(Icons.message_outlined, color: Color(0xFF0284C7), size: 16),
-                                                       SizedBox(width: 6),
-                                                       Text(
-                                                         'SMS Reminder',
-                                                         style: TextStyle(
-                                                           color: Color(0xFF0284C7),
-                                                           fontSize: 13,
-                                                           fontWeight: FontWeight.w800,
-                                                         ),
-                                                       ),
-                                                     ],
-                                                   ),
+                                             InkWell(
+                                               borderRadius: BorderRadius.circular(14),
+                                               onTap: () => _sendWhatsApp(st),
+                                               child: Container(
+                                                 padding: const EdgeInsets.all(12),
+                                                 decoration: BoxDecoration(
+                                                   color: const Color(0xFFECFDF5),
+                                                   borderRadius: BorderRadius.circular(14),
+                                                   border: Border.all(color: const Color(0xFFA7F3D0)),
                                                  ),
+                                                 child: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF10B981), size: 18),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             InkWell(
+                                               borderRadius: BorderRadius.circular(14),
+                                               onTap: () => _sendSmsReminder(st),
+                                               child: Container(
+                                                 padding: const EdgeInsets.all(12),
+                                                 decoration: BoxDecoration(
+                                                   color: const Color(0xFFF0F9FF),
+                                                   borderRadius: BorderRadius.circular(14),
+                                                   border: Border.all(color: const Color(0xFFBAE6FD)),
+                                                 ),
+                                                 child: const Icon(Icons.message_outlined, color: Color(0xFF0284C7), size: 18),
                                                ),
                                              ),
                                              const SizedBox(width: 8),
@@ -2179,93 +1722,13 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                borderRadius: BorderRadius.circular(14),
                                                onTap: () => _confirmDeleteStudent(st),
                                                child: Container(
-                                                 padding: const EdgeInsets.all(11),
+                                                 padding: const EdgeInsets.all(12),
                                                  decoration: BoxDecoration(
                                                    color: const Color(0xFFFEF2F2),
                                                    borderRadius: BorderRadius.circular(14),
                                                    border: Border.all(color: const Color(0xFFFECACA)),
                                                  ),
-                                                 child: const Icon(
-                                                   Icons.delete_outline_rounded,
-                                                   color: Color(0xFFEF4444),
-                                                   size: 20,
-                                                 ),
-                                               ),
-                                             ),
-                                           ],
-                                         ),
-                                         const SizedBox(height: 10),
-
-                                         // Row 3: Quick Action Chips: Mark Due & Trial
-                                         Row(
-                                           children: [
-                                             Expanded(
-                                               child: InkWell(
-                                                 borderRadius: BorderRadius.circular(12),
-                                                 onTap: () => _openMarkDuesSheet(st),
-                                                 child: Container(
-                                                   padding: const EdgeInsets.symmetric(vertical: 8),
-                                                   decoration: BoxDecoration(
-                                                     color: const Color(0xFFFFF1F2),
-                                                     borderRadius: BorderRadius.circular(12),
-                                                     border: Border.all(color: const Color(0xFFFECDD3)),
-                                                   ),
-                                                   child: const Row(
-                                                     mainAxisAlignment: MainAxisAlignment.center,
-                                                     children: [
-                                                       Icon(Icons.currency_rupee, size: 14, color: Color(0xFFE11D48)),
-                                                       SizedBox(width: 4),
-                                                       Text(
-                                                         'Mark Due',
-                                                         style: TextStyle(
-                                                           color: Color(0xFFE11D48),
-                                                           fontSize: 12,
-                                                           fontWeight: FontWeight.w800,
-                                                         ),
-                                                       ),
-                                                     ],
-                                                   ),
-                                                 ),
-                                               ),
-                                             ),
-                                             const SizedBox(width: 8),
-                                             Expanded(
-                                               child: InkWell(
-                                                 borderRadius: BorderRadius.circular(12),
-                                                 onTap: () => _toggleTrialStatus(st),
-                                                 child: Container(
-                                                   padding: const EdgeInsets.symmetric(vertical: 8),
-                                                   decoration: BoxDecoration(
-                                                     color: st.status == 'TRIAL'
-                                                         ? const Color(0xFFECFDF5)
-                                                         : const Color(0xFFFFFBEB),
-                                                     borderRadius: BorderRadius.circular(12),
-                                                     border: Border.all(
-                                                       color: st.status == 'TRIAL'
-                                                           ? const Color(0xFFA7F3D0)
-                                                           : const Color(0xFFFDE68A),
-                                                     ),
-                                                   ),
-                                                   child: Row(
-                                                     mainAxisAlignment: MainAxisAlignment.center,
-                                                     children: [
-                                                       Icon(
-                                                         st.status == 'TRIAL' ? Icons.check_circle_outline : Icons.science_outlined,
-                                                         size: 14,
-                                                         color: st.status == 'TRIAL' ? const Color(0xFF059669) : const Color(0xFFD97706),
-                                                       ),
-                                                       const SizedBox(width: 4),
-                                                       Text(
-                                                         st.status == 'TRIAL' ? 'Active Member' : 'Mark Trial',
-                                                         style: TextStyle(
-                                                           color: st.status == 'TRIAL' ? const Color(0xFF059669) : const Color(0xFFD97706),
-                                                           fontSize: 12,
-                                                           fontWeight: FontWeight.w800,
-                                                         ),
-                                                       ),
-                                                     ],
-                                                   ),
-                                                 ),
+                                                 child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
                                                ),
                                              ),
                                            ],
@@ -2371,51 +1834,4 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     );
   }
 
-  Widget _shiftChip(String label, IconData? icon) {
-    final isSelected = _selectedShiftFilter == label;
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => setState(() => _selectedShiftFilter = label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? (AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal)
-              : AppColors.card(context),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? (AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal)
-                : AppColors.cardBorderColor(context),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: 13,
-                color: isSelected
-                    ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
-                    : AppColors.text(context),
-              ),
-              const SizedBox(width: 5),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-                color: isSelected
-                    ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
-                    : AppColors.text(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

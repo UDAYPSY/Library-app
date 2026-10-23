@@ -15,17 +15,22 @@ Future<void> showCollectPaymentModal(
 }) async {
   final service = LibraryService();
   final defaultMonthly = student.monthlyFee > 0 ? student.monthlyFee : 500;
-  final initialPaid = student.duesAmount > 0 ? student.duesAmount : defaultMonthly;
+  // Fixed / Non-editable Already Paid:
+  final alreadyPaid = student.duesAmount > 0
+      ? (defaultMonthly - student.duesAmount).clamp(0, defaultMonthly)
+      : 0;
 
-  final amountPaidCtrl = TextEditingController(text: '$initialPaid');
-  final remainingDuesCtrl = TextEditingController(text: '0');
+  int selectedAdvanceMonths = 1; // 1, 2, 3, 5, 6, 12, or 0 (custom)
+  final initialTotalFee = defaultMonthly * selectedAdvanceMonths;
+  final initialDue = (initialTotalFee - alreadyPaid).clamp(0, initialTotalFee);
+
+  final dueAmountCtrl = TextEditingController(text: '$initialDue');
   final notesCtrl = TextEditingController();
 
   DateTime fromDate = student.feeDueDate ?? DateTime.now();
   DateTime untilDate = DateTime(fromDate.year, fromDate.month + 1, fromDate.day);
   DateTime paymentDate = DateTime.now();
   String selectedMethod = 'UPI';
-  int selectedAdvanceMonths = 1; // 1, 2, 3, 5, 6, 12, or 0 (custom)
 
   await showModalBottomSheet(
     context: context,
@@ -43,8 +48,8 @@ Future<void> showCollectPaymentModal(
             selectedAdvanceMonths = months;
             if (months > 0) {
               final total = defaultMonthly * months;
-              amountPaidCtrl.text = '$total';
-              remainingDuesCtrl.text = '0';
+              final due = (total - alreadyPaid).clamp(0, total);
+              dueAmountCtrl.text = '$due';
               untilDate = DateTime(fromDate.year, fromDate.month + months, fromDate.day);
               if (months > 1) {
                 notesCtrl.text = '$months Months Advance Fees Paid';
@@ -308,94 +313,228 @@ Future<void> showCollectPaymentModal(
                 ),
                 const SizedBox(height: 16),
 
-                // Amount Paid (₹)
-                Text(
-                  'Amount Paid (₹)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.text(sheetContext),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: amountPaidCtrl,
-                    keyboardType: TextInputType.number,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.text(sheetContext),
-                    ),
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      border: InputBorder.none,
-                      prefixIcon: Icon(Icons.currency_rupee, color: Color(0xFF0D9488), size: 20),
-                    ),
-                    onChanged: (val) {
-                      final paid = int.tryParse(val.trim()) ?? 0;
-                      final totalOwed = selectedAdvanceMonths > 0
-                          ? defaultMonthly * selectedAdvanceMonths
-                          : (student.duesAmount > 0 ? student.duesAmount : defaultMonthly);
-                      final clampedPaid = paid.clamp(0, totalOwed);
-                      final remaining = (totalOwed - clampedPaid).clamp(0, totalOwed);
-                      setModalState(() {
-                        remainingDuesCtrl.text = '$remaining';
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
+                // Total Period Fee & Fixed Already Paid & Due Amount to Accept (Requirement 4)
+                Builder(
+                  builder: (ctx) {
+                    final totalPeriodFee = selectedAdvanceMonths > 0
+                        ? defaultMonthly * selectedAdvanceMonths
+                        : defaultMonthly;
+                    final calculatedDue = (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee);
+                    final enteredPaid = int.tryParse(dueAmountCtrl.text.trim()) ?? calculatedDue;
+                    final currentCollect = enteredPaid.clamp(0, calculatedDue);
+                    final remainingAfter = (calculatedDue - currentCollect).clamp(0, calculatedDue);
 
-                // Remaining Fees / Due (₹)
-                Text(
-                  'Remaining Fees / Due (₹)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.text(sheetContext),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: remainingDuesCtrl,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFEF4444),
-                    ),
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      border: InputBorder.none,
-                      prefixIcon: Icon(Icons.currency_rupee, color: Color(0xFFEF4444), size: 20),
-                    ),
-                    onChanged: (val) {
-                      final due = int.tryParse(val.trim()) ?? 0;
-                      final totalOwed = selectedAdvanceMonths > 0
-                          ? defaultMonthly * selectedAdvanceMonths
-                          : (student.duesAmount > 0 ? student.duesAmount : defaultMonthly);
-                      final clampedDue = due.clamp(0, totalOwed);
-                      final paid = (totalOwed - clampedDue).clamp(0, totalOwed);
-                      setModalState(() {
-                        amountPaidCtrl.text = '$paid';
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Total Period Fee
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF134E4A).withOpacity(0.4) : const Color(0xFFE6F4F1),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Total Fee (${selectedAdvanceMonths > 0 ? "$selectedAdvanceMonths mo" : "Custom"}):',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0F766E),
+                                ),
+                              ),
+                              Text(
+                                '₹$totalPeriodFee',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0D9488),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
 
+                        // Already Paid (Fixed / Non-editable)
+                        Row(
+                          children: [
+                            Text(
+                              'Already Paid (₹)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.text(sheetContext),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.lock_rounded, size: 10, color: Color(0xFF64748B)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'FIXED / LOCKED',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.currency_rupee, color: Color(0xFF0D9488), size: 18),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$alreadyPaid',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.text(sheetContext),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Text(
+                                'Non-editable',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Due Amount to Accept (Only Due Amount accepted, auto-calculated)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Due Amount to Accept (₹)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.text(sheetContext),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF1F2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFFECDD3)),
+                              ),
+                              child: Text(
+                                'Max Payable: ₹$calculatedDue',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFE11D48),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF0D9488)),
+                          ),
+                          child: TextField(
+                            controller: dueAmountCtrl,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.text(sheetContext),
+                            ),
+                            decoration: const InputDecoration(
+                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              border: InputBorder.none,
+                              prefixIcon: Icon(Icons.currency_rupee, color: Color(0xFF0D9488), size: 20),
+                              hintText: 'Enter amount to collect',
+                            ),
+                            onChanged: (val) {
+                              final p = int.tryParse(val.trim());
+                              if (p != null && p > calculatedDue) {
+                                dueAmountCtrl.text = '$calculatedDue';
+                                dueAmountCtrl.selection = TextSelection.fromPosition(TextPosition(offset: dueAmountCtrl.text.length));
+                              }
+                              setModalState(() {});
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Status pill under Due input
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: remainingAfter == 0
+                                    ? const Color(0xFFDCFCE7)
+                                    : const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: remainingAfter == 0
+                                      ? const Color(0xFF86EFAC)
+                                      : const Color(0xFFFDE68A),
+                                ),
+                              ),
+                              child: Text(
+                                remainingAfter == 0
+                                    ? '✓ Full Due Cleared (₹0 Due)'
+                                    : 'Remaining Due: ₹$remainingAfter',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: remainingAfter == 0
+                                      ? const Color(0xFF15803D)
+                                      : const Color(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    );
+                  },
+                ),
                 // From & Until (Membership Validity Date) (Feature 5)
                 Row(
                   children: [
@@ -674,13 +813,13 @@ Future<void> showCollectPaymentModal(
                           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         onPressed: () async {
-                          final totalOwed = selectedAdvanceMonths > 0
+                          final totalPeriodFee = selectedAdvanceMonths > 0
                               ? defaultMonthly * selectedAdvanceMonths
-                              : (student.duesAmount > 0 ? student.duesAmount : defaultMonthly);
-                          final rawPaid = int.tryParse(amountPaidCtrl.text.trim()) ?? 0;
-                          final rawDues = int.tryParse(remainingDuesCtrl.text.trim()) ?? 0;
-                          final paid = rawPaid.clamp(0, totalOwed);
-                          final dues = rawDues.clamp(0, totalOwed);
+                              : defaultMonthly;
+                          final calculatedDue = (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee);
+                          final rawPaid = int.tryParse(dueAmountCtrl.text.trim()) ?? calculatedDue;
+                          final paid = rawPaid.clamp(0, calculatedDue);
+                          final remainingDues = (calculatedDue - paid).clamp(0, 999999);
                           Navigator.pop(ctx);
 
                           if (paid > 0) {
@@ -703,8 +842,8 @@ Future<void> showCollectPaymentModal(
                             phone: student.phone,
                             shift: student.shift,
                             seatNumber: student.seatNumber,
-                            duesAmount: dues,
-                            status: dues > 0 ? 'DUES' : 'ACTIVE',
+                            duesAmount: remainingDues,
+                            status: remainingDues > 0 ? 'DUES' : 'ACTIVE',
                             feeDueDate: untilDate,
                           );
 
