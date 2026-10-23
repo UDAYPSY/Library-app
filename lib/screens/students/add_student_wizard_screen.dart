@@ -1407,7 +1407,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           if (widget.studentToEdit != null) ...[
             Row(
               children: [
-                _fieldLabel('Already Paid (₹)'),
+                _fieldLabel('Already Paid (₹)', isRequired: false),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1464,7 +1464,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           Builder(
             builder: (context) {
               final isEdit = widget.studentToEdit != null;
-              final maxPayable = isEdit ? _dueAmount : _calculatedTotalFee;
+              final totalFee = _calculatedTotalFee;
+              final maxPayable = isEdit ? _dueAmount : totalFee;
               final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? maxPayable;
               final currentPaid = parsedPaid.clamp(0, maxPayable);
               final remainingDues = (maxPayable - currentPaid).clamp(0, 999999);

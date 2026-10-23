@@ -852,11 +852,11 @@ Future<void> showCollectPaymentModal(
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                dues > 0
-                                    ? 'Payment of ₹$paid recorded. Remaining ₹$dues due. Valid until ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
+                                remainingDues > 0
+                                    ? 'Payment of ₹$paid recorded. Remaining ₹$remainingDues due. Valid until ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
                                     : 'Payment of ₹$paid recorded! Active until ${DateFormat('dd-MMM-yyyy').format(untilDate)}',
                               ),
-                              backgroundColor: dues > 0 ? const Color(0xFFE11D48) : const Color(0xFF0D9488),
+                              backgroundColor: remainingDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF0D9488),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
