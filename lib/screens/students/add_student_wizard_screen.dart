@@ -62,8 +62,18 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final hasPendingCurrentDue = s.duesAmount > 0 &&
         s.feeDueDate != null &&
         s.feeDueDate!.isAfter(DateTime.now());
+    final isPaidActive = s.duesAmount == 0 &&
+        s.feeDueDate != null &&
+        s.feeDueDate!.isAfter(DateTime.now());
+    final isShiftChanged = _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+
+    final prevMonthly = s.monthlyFee > 0 ? s.monthlyFee : _fixedMonthlyFee;
     if (hasPendingCurrentDue) {
-      return (_fixedMonthlyFee - s.duesAmount).clamp(0, _fixedMonthlyFee);
+      return (prevMonthly - s.duesAmount).clamp(0, prevMonthly);
+    }
+    // If student was already paid for current active month and changes shift, what they paid for previous shift is counted as already paid
+    if (isPaidActive && isShiftChanged) {
+      return prevMonthly;
     }
     return 0;
   }
@@ -75,8 +85,16 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final hasPendingCurrentDue = s.duesAmount > 0 &&
         s.feeDueDate != null &&
         s.feeDueDate!.isAfter(DateTime.now());
-    if (hasPendingCurrentDue && _selectedDurationMonths == 1) {
+    final isPaidActive = s.duesAmount == 0 &&
+        s.feeDueDate != null &&
+        s.feeDueDate!.isAfter(DateTime.now());
+    final isShiftChanged = _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+
+    if (hasPendingCurrentDue && _selectedDurationMonths == 1 && !isShiftChanged) {
       return s.duesAmount;
+    }
+    if (isPaidActive && !isShiftChanged) {
+      return _calculatedTotalFee;
     }
     return (_calculatedTotalFee - _alreadyPaidAmount).clamp(0, _calculatedTotalFee);
   }
@@ -89,7 +107,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         final hasPendingCurrentDue = s.duesAmount > 0 &&
             s.feeDueDate != null &&
             s.feeDueDate!.isAfter(DateTime.now());
-        if (hasPendingCurrentDue) {
+        final isPaidActive = s.duesAmount == 0 &&
+            s.feeDueDate != null &&
+            s.feeDueDate!.isAfter(DateTime.now());
+        final isShiftChanged = _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+
+        if (hasPendingCurrentDue || (isPaidActive && isShiftChanged)) {
           if (months == 1) {
             _validUntilDate = s.feeDueDate!;
           } else {
@@ -375,7 +398,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
 
   void _goToStep3() {
     if (_selectedSeat != null) {
-      final isCurrent = widget.studentToEdit != null && widget.studentToEdit!.seatNumber == _selectedSeat;
+      final isCurrent = widget.studentToEdit != null &&
+          widget.studentToEdit!.seatNumber == _selectedSeat &&
+          widget.studentToEdit!.shift.toLowerCase() == _selectedShift.name.toLowerCase();
       if (!isCurrent && _service.isSeatOccupied(_selectedSeat!, shift: _selectedShift.name, excludeStudentId: widget.studentToEdit?.id)) {
         final occ = _service.getStudentForSeat(_selectedSeat!, shift: _selectedShift.name);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -388,6 +413,24 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         return;
       }
     }
+
+    // Overlap prevention: If student is active with 0 dues and shift NOT changed, period cannot start before feeDueDate!
+    if (widget.studentToEdit != null) {
+      final s = widget.studentToEdit!;
+      final isPaidActive = s.duesAmount == 0 && s.feeDueDate != null && s.feeDueDate!.isAfter(DateTime.now());
+      final isShiftChanged = s.shift.toLowerCase() != _selectedShift.name.toLowerCase();
+      if (isPaidActive && !isShiftChanged && _fromDate.isBefore(s.feeDueDate!)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance payments starting from ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)} are allowed.'),
+            backgroundColor: const Color(0xFFE11D48),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
     _feeCtrl.text = '$_fixedMonthlyFee';
     final maxPayable = widget.studentToEdit != null ? _dueAmount : _calculatedTotalFee;
     final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? maxPayable;
@@ -424,7 +467,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     }
 
     if (seatNum != null) {
-      final isCurrent = widget.studentToEdit != null && widget.studentToEdit!.seatNumber == seatNum;
+      final isCurrent = widget.studentToEdit != null &&
+          widget.studentToEdit!.seatNumber == seatNum &&
+          widget.studentToEdit!.shift.toLowerCase() == _selectedShift.name.toLowerCase();
       if (!isCurrent && _service.isSeatOccupied(seatNum, shift: _selectedShift.name, excludeStudentId: widget.studentToEdit?.id)) {
         final occ = _service.getStudentForSeat(seatNum, shift: _selectedShift.name);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -467,6 +512,24 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
 
     try {
       if (widget.studentToEdit != null) {
+        final s = widget.studentToEdit!;
+        final isPaidActive = s.duesAmount == 0 && s.feeDueDate != null && s.feeDueDate!.isAfter(DateTime.now());
+        final oldShift = s.shift;
+        final isShiftChanged = oldShift.toLowerCase() != _selectedShift.name.toLowerCase();
+        final oldMonthly = s.monthlyFee;
+
+        // Overlap prevention: If active and shift NOT changed, user cannot pay for an already paid period
+        if (isPaidActive && !isShiftChanged && _fromDate.isBefore(s.feeDueDate!)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance payments are allowed.'),
+              backgroundColor: const Color(0xFFE11D48),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+
         final alreadyPaid = _alreadyPaidAmount;
         final dueAmount = (totalCalculatedFee - alreadyPaid).clamp(0, totalCalculatedFee);
         final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? dueAmount;
@@ -482,10 +545,28 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           editStatus = 'DUES';
         }
 
-        // CRITICAL SYNC (Requirement 3): Record payment in financial ledger & transaction stream
+        // Record shift change in notes if shift changed
+        String shiftLog = '';
+        if (isShiftChanged) {
+          shiftLog = 'Shift changed: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())}';
+        }
+
+        String finalNotes = _notesCtrl.text.trim();
+        if (isShiftChanged) {
+          if (finalNotes.isEmpty) {
+            finalNotes = shiftLog;
+          } else if (!finalNotes.contains(shiftLog)) {
+            finalNotes = '$finalNotes\n• $shiftLog';
+          }
+        }
+
+        // CRITICAL SYNC: Record payment in financial ledger & transaction stream
         if (collectedNow > 0) {
+          final paymentNotes = isShiftChanged
+              ? 'Shift upgrade: $oldShift → ${_selectedShift.name} • ₹$collectedNow collected'
+              : 'Payment collected via Edit Student Details ($_selectedDurationMonths mo)';
           await _service.recordPayment(
-            studentId: widget.studentToEdit!.id,
+            studentId: s.id,
             studentName: name,
             phone: phone,
             seatNumber: seatNum,
@@ -493,17 +574,17 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
             amount: collectedNow,
             date: _paymentDate,
             paymentMode: _selectedPaymentMethod,
-            notes: 'Payment collected via Edit Student Details ($_selectedDurationMonths mo)',
+            notes: paymentNotes,
           );
         }
 
         await _service.updateStudent(
-          studentId: widget.studentToEdit!.id,
+          studentId: s.id,
           name: name,
           phone: phone,
           shift: _selectedShift.name,
           seatNumber: seatNum,
-          note: _notesCtrl.text.trim(),
+          note: finalNotes,
           monthlyFee: fixedMonthly,
           duesAmount: editDuesAmount,
           status: editStatus,
@@ -520,9 +601,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(collectedNow > 0
-                  ? 'Student $name updated & payment of ₹$collectedNow recorded!'
-                  : 'Student $name profile updated successfully!'),
+              content: Text(isShiftChanged
+                  ? 'Shift updated to ${_selectedShift.name}${collectedNow > 0 ? " & payment of ₹$collectedNow recorded" : ""}!'
+                  : (collectedNow > 0
+                      ? 'Student $name updated & payment of ₹$collectedNow recorded!'
+                      : 'Student $name profile updated successfully!')),
               backgroundColor: AppColors.primaryTeal,
             ),
           );
@@ -1238,7 +1321,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                             _selectedShift = sh;
                             sh.isActive = true;
                             _feeCtrl.text = '$_fixedMonthlyFee';
-                            _amountPaidCtrl.text = '$_calculatedTotalFee';
+                            _updateDuration(_selectedDurationMonths);
                           });
                         },
                         child: AnimatedContainer(
@@ -1325,6 +1408,43 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               );
             },
           ),
+
+          // Seat conflict warning if seat is occupied in newly selected shift
+          Builder(
+            builder: (context) {
+              if (_selectedSeat == null) return const SizedBox.shrink();
+              final isOcc = _service.isSeatOccupied(
+                _selectedSeat!,
+                shift: _selectedShift.name,
+                excludeStudentId: widget.studentToEdit?.id,
+              );
+              final occStudent = isOcc ? _service.getStudentForSeat(_selectedSeat!, shift: _selectedShift.name) : null;
+              if (occStudent != null && occStudent.id != widget.studentToEdit?.id) {
+                return Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFECDD3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Seat S-$_selectedSeat is occupied in "${_selectedShift.name}" by ${occStudent.name}. Please select an available seat in the Seat Allocation dropdown above.',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB91C1C)),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           const SizedBox(height: 18),
 
           // Month Selection (Payment Duration / Advance Period)
@@ -1353,28 +1473,42 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           const SizedBox(height: 8),
           Builder(
             builder: (context) {
-              final hasPendingCurrentDue = widget.studentToEdit != null &&
-                  widget.studentToEdit!.duesAmount > 0 &&
-                  widget.studentToEdit!.feeDueDate != null &&
-                  widget.studentToEdit!.feeDueDate!.isAfter(DateTime.now());
+              final s = widget.studentToEdit;
+              final hasPendingCurrentDue = s != null &&
+                  s.duesAmount > 0 &&
+                  s.feeDueDate != null &&
+                  s.feeDueDate!.isAfter(DateTime.now());
+              final isPaidActive = s != null &&
+                  s.duesAmount == 0 &&
+                  s.feeDueDate != null &&
+                  s.feeDueDate!.isAfter(DateTime.now());
+              final isShiftChanged = s != null &&
+                  _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+
+              String firstChipLabel = '1 Month';
+              if (hasPendingCurrentDue) {
+                firstChipLabel = 'Clear Due (₹${s.duesAmount})';
+              } else if (isPaidActive && isShiftChanged) {
+                final diff = (_fixedMonthlyFee - s.monthlyFee).clamp(0, 99999);
+                firstChipLabel = diff > 0 ? 'Shift Upgrade (₹$diff)' : 'Shift Change (1 Mo)';
+              }
+
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
                     _durationChip(
-                      label: hasPendingCurrentDue
-                          ? 'Clear Due (₹${widget.studentToEdit!.duesAmount})'
-                          : '1 Month',
+                      label: firstChipLabel,
                       months: 1,
                     ),
                     const SizedBox(width: 8),
                     _durationChip(
-                      label: hasPendingCurrentDue ? '2 Mo (+1 Adv)' : '2 Months',
+                      label: (hasPendingCurrentDue || (isPaidActive && isShiftChanged)) ? '2 Mo (+1 Adv)' : '2 Months',
                       months: 2,
                     ),
                     const SizedBox(width: 8),
                     _durationChip(
-                      label: hasPendingCurrentDue ? '3 Mo (+2 Adv)' : '3 Months',
+                      label: (hasPendingCurrentDue || (isPaidActive && isShiftChanged)) ? '3 Mo (+2 Adv)' : '3 Months',
                       months: 3,
                     ),
                     const SizedBox(width: 8),
@@ -1785,119 +1919,170 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // From Date & Valid Until Date Row
-                Row(
-                  children: [
-                    // From Date Picker
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _fieldLabel('From Date', isRequired: false),
-                          const SizedBox(height: 6),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _fromDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2035),
-                              );
-                              if (picked != null) {
-                                setState(() {
-                                  _fromDate = picked;
-                                  _validUntilDate = DateTime(
-                                    _fromDate.year,
-                                    _fromDate.month + _selectedDurationMonths,
-                                    _fromDate.day,
-                                  );
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    DateFormat('dd-MMM-yyyy').format(_fromDate),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textNavy,
-                                    ),
-                                  ),
-                                  const Icon(Icons.calendar_month_outlined, size: 16, color: Color(0xFF64748B)),
-                                ],
+                // Active Membership Informational Banner (Prevent Overlap)
+                Builder(
+                  builder: (context) {
+                    final s = widget.studentToEdit;
+                    final isShiftChanged = s != null && _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+                    final isPaidActive = s != null &&
+                        s.duesAmount == 0 &&
+                        s.feeDueDate != null &&
+                        s.feeDueDate!.isAfter(DateTime.now());
+                    if (isPaidActive && !isShiftChanged && s?.feeDueDate != null) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6F4F1),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF0F766E)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Active plan paid until ${DateFormat('dd-MMM-yyyy').format(s!.feeDueDate!)}. Any new payment is strictly an Advance Renewal starting from this date (overlapping periods not allowed).',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0F766E),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
 
-                    // Valid Until Date Picker (editable)
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                // From Date & Valid Until Date Row
+                Builder(
+                  builder: (context) {
+                    final s = widget.studentToEdit;
+                    final isShiftChanged = s != null && _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+                    final isPaidActive = s != null &&
+                        s.duesAmount == 0 &&
+                        s.feeDueDate != null &&
+                        s.feeDueDate!.isAfter(DateTime.now());
+                    final minDate = (isPaidActive && !isShiftChanged) ? s!.feeDueDate! : DateTime(2020);
+
+                    return Row(
+                      children: [
+                        // From Date Picker
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _fieldLabel('Valid Until Date', isRequired: false),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.edit_calendar_rounded, size: 12, color: AppColors.primaryTeal),
+                              _fieldLabel('From Date', isRequired: false),
+                              const SizedBox(height: 6),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () async {
+                                  final initialD = _fromDate.isBefore(minDate) ? minDate : _fromDate;
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: initialD,
+                                    firstDate: minDate,
+                                    lastDate: DateTime(2035),
+                                  );
+                                  if (picked != null) {
+                                    setState(() {
+                                      _fromDate = picked;
+                                      _validUntilDate = DateTime(
+                                        _fromDate.year,
+                                        _fromDate.month + _selectedDurationMonths,
+                                        _fromDate.day,
+                                      );
+                                    });
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        DateFormat('dd-MMM-yyyy').format(_fromDate),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.textNavy,
+                                        ),
+                                      ),
+                                      const Icon(Icons.calendar_month_outlined, size: 16, color: Color(0xFF64748B)),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 6),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _validUntilDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2035),
-                              );
-                              if (picked != null) {
-                                setState(() {
-                                  _validUntilDate = picked;
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.primaryTeal, width: 1.5),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        ),
+                        const SizedBox(width: 10),
+
+                        // Valid Until Date (LOCKED / AUTO-POPULATED NON-EDITABLE)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Text(
-                                    DateFormat('dd-MMM-yyyy').format(_validUntilDate),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.primaryTeal,
+                                  _fieldLabel('Valid Until Date', isRequired: false),
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFCCFBF1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'Auto',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF0F766E),
+                                      ),
                                     ),
                                   ),
-                                  const Icon(Icons.calendar_month_outlined, size: 16, color: AppColors.primaryTeal),
                                 ],
                               ),
-                            ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      DateFormat('dd-MMM-yyyy').format(_validUntilDate),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0D9488),
+                                      ),
+                                    ),
+                                    const Icon(Icons.lock_clock_rounded, size: 16, color: Color(0xFF0D9488)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
 
@@ -2066,6 +2251,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? totalFee;
     final reviewPaid = parsedPaid.clamp(0, totalFee);
     final reviewDues = (totalFee - reviewPaid).clamp(0, 999999);
+    final s = widget.studentToEdit;
+    final isShiftChanged = s != null && s.shift.toLowerCase() != _selectedShift.name.toLowerCase();
 
     return Column(
       children: [
@@ -2156,7 +2343,13 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                           : (reviewDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF059669)),
                     ),
                   ),
-                  Expanded(child: _reviewItem('SHIFTS', _selectedShift.name)),
+                  Expanded(
+                    child: _reviewItem(
+                      'SHIFTS',
+                      isShiftChanged ? '${_selectedShift.name} (Changed from ${s.shift})' : _selectedShift.name,
+                      valueColor: isShiftChanged ? const Color(0xFFD97706) : null,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),

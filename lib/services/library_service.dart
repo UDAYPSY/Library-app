@@ -1913,7 +1913,7 @@ class LibraryService {
         // Resync all seats to correctly reflect shift-wise occupants after student update
         _syncSeatsWithStudents();
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
-        _saveLocalState();
+        await _saveLocalState();
       }
     }
   }

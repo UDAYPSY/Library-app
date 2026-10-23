@@ -579,6 +579,34 @@ Future<void> showCollectPaymentModal(
                     );
                   },
                 ),
+                // Active Membership Informational Banner (Prevent Overlap)
+                if (!isExpired && !hasUnexpiredDue && student.feeDueDate != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF134E4A).withOpacity(0.4) : const Color(0xFFE6F4F1),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF0F766E)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Active plan paid until ${DateFormat('dd-MMM-yyyy').format(student.feeDueDate!)}. Any new payment is strictly an Advance Renewal starting from this date (overlapping periods not allowed).',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F766E),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // From & Until (Membership Validity Date) (Feature 5)
                 Row(
                   children: [
@@ -598,10 +626,13 @@ Future<void> showCollectPaymentModal(
                           InkWell(
                             borderRadius: BorderRadius.circular(16),
                             onTap: () async {
+                              final isPaidActive = !isExpired && !hasUnexpiredDue && student.feeDueDate != null;
+                              final minDate = isPaidActive ? student.feeDueDate! : DateTime(2020);
+                              final initialD = fromDate.isBefore(minDate) ? minDate : fromDate;
                               final picked = await showDatePicker(
                                 context: sheetContext,
-                                initialDate: fromDate,
-                                firstDate: DateTime(2020),
+                                initialDate: initialD,
+                                firstDate: minDate,
                                 lastDate: DateTime(2035),
                               );
                               if (picked != null) {
@@ -654,49 +685,47 @@ Future<void> showCollectPaymentModal(
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              const Icon(Icons.edit_calendar_rounded, size: 14, color: AppColors.primaryTeal),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFCCFBF1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'Auto',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F766E),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: sheetContext,
-                                initialDate: untilDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2035),
-                              );
-                              if (picked != null) {
-                                setModalState(() {
-                                  untilDate = picked;
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFF0D9488),
-                                  width: 1.5,
-                                ),
+                          // Locked / Non-editable Valid Until Date Container
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    DateFormat('dd-MMM-yyyy').format(untilDate),
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF0D9488),
-                                    ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  DateFormat('dd-MMM-yyyy').format(untilDate),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0D9488),
                                   ),
-                                  const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF0D9488)),
-                                ],
-                              ),
+                                ),
+                                const Icon(Icons.lock_clock_rounded, size: 18, color: Color(0xFF0D9488)),
+                              ],
                             ),
                           ),
                         ],
@@ -857,6 +886,21 @@ Future<void> showCollectPaymentModal(
                           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         onPressed: () async {
+                          // Prevent duplicate/overlapping payments for an already paid active period
+                          final isPaidActive = !isExpired && !hasUnexpiredDue && student.feeDueDate != null;
+                          if (isPaidActive && fromDate.isBefore(student.feeDueDate!)) {
+                            ScaffoldMessenger.of(sheetContext).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(student.feeDueDate!)}. Only advance payments are allowed.',
+                                ),
+                                backgroundColor: const Color(0xFFE11D48),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+
                           final totalPeriodFee = hasUnexpiredDue
                               ? (selectedAdvanceMonths == 1 ? defaultMonthly : defaultMonthly * selectedAdvanceMonths)
                               : (selectedAdvanceMonths > 0 ? defaultMonthly * selectedAdvanceMonths : defaultMonthly);
