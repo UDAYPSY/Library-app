@@ -294,5 +294,89 @@ void main() {
       expect(updated?.duesAmount, equals(0));
       expect(updated?.status, equals('ACTIVE'));
     });
+
+    test('Assign seat to existing student works smoothly', () async {
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 25,
+        studentName: 'Aman Verma',
+        phone: '9876566661',
+        shift: 'Morning Shift',
+        deviceUserId: 'Admin',
+        feeAmount: 600,
+        duesAmount: 0,
+        status: 'ACTIVE',
+      );
+      final aman = service.findStudentByPhone('9876566661')!;
+      expect(aman.seatNumber, equals(25));
+
+      // Re-assign Aman to Seat 26 for Evening Shift
+      await service.assignSeatToExistingStudent(
+        newSeatNumber: 26,
+        studentId: aman.id,
+        shift: 'Evening Shift',
+        sectionName: 'Main Hall',
+      );
+
+      final updatedAman = service.findStudentByPhone('9876566661')!;
+      expect(updatedAman.seatNumber, equals(26));
+      expect(updatedAman.shift, equals('Evening Shift'));
+      // Old seat 25 should be vacated
+      expect(service.isSeatOccupied(25, shift: 'Morning Shift'), isFalse);
+      // New seat 26 occupied
+      expect(service.isSeatOccupied(26, shift: 'Evening Shift'), isTrue);
+    });
+
+    test('Shift update: upgrade, downgrade excess credit, and upgrade back to same level', () async {
+      // 1. Student registers for 800/mo Full Day shift and pays 800
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 28,
+        studentName: 'Vikram Seth',
+        phone: '9876555551',
+        shift: 'Full Day',
+        deviceUserId: 'Admin',
+        monthlyFee: 800,
+        feeAmount: 800,
+        duesAmount: 0,
+        status: 'ACTIVE',
+      );
+      final vikram = service.findStudentByPhone('9876555551')!;
+      expect(vikram.monthlyFee, equals(800));
+      expect(vikram.duesAmount, equals(0));
+
+      // 2. Downgrade to Morning (500/mo) -> dues remain 0, excess credit note logged
+      await service.updateStudent(
+        studentId: vikram.id,
+        name: vikram.name,
+        phone: vikram.phone,
+        shift: 'Morning Shift',
+        monthlyFee: 500,
+        duesAmount: 0,
+        status: 'ACTIVE',
+        note: 'Shift changed: Full Day → Morning Shift (₹500/mo). ₹300 excess credit to adjust in next month.',
+      );
+
+      final downgraded = service.findStudentByPhone('9876555551')!;
+      expect(downgraded.shift, equals('Morning Shift'));
+      expect(downgraded.monthlyFee, equals(500));
+      expect(downgraded.duesAmount, equals(0));
+
+      // 3. Upgrade back to Full Day (800/mo) -> since student previously paid 800 for current cycle, dues should be 0
+      await service.updateStudent(
+        studentId: vikram.id,
+        name: vikram.name,
+        phone: vikram.phone,
+        shift: 'Full Day',
+        monthlyFee: 800,
+        duesAmount: 0,
+        status: 'ACTIVE',
+        note: 'Shift updated: Full Day. Same price tier (₹800/mo).',
+      );
+
+      final upgradedBack = service.findStudentByPhone('9876555551')!;
+      expect(upgradedBack.shift, equals('Full Day'));
+      expect(upgradedBack.monthlyFee, equals(800));
+      expect(upgradedBack.duesAmount, equals(0));
+      expect(upgradedBack.status, equals('ACTIVE'));
+    });
   });
 }

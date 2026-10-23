@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
@@ -83,9 +84,12 @@ class _SeatsScreenState extends State<SeatsScreen> {
         : 500;
 
     // Payment collection
-    int feePaidNow = 0;
-    final feePaidCtrl = TextEditingController(text: '0');
+    int feePaidNow = selectedStudent?.hasDues == true ? selectedStudent!.effectiveDues : 0;
+    final feePaidCtrl = TextEditingController(text: '$feePaidNow');
     String paymentMode = 'UPI';
+    final deskNoteCtrl = TextEditingController();
+    final selectedAmenities = <String>{};
+    bool sendWhatsAppNotification = false;
 
     showModalBottomSheet(
       context: context,
@@ -266,6 +270,8 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                   selectedShift = availableShifts.first;
                                 }
                                 selectedFeePlan = feePlans.contains(val.monthlyFee) ? val.monthlyFee : 500;
+                                feePaidNow = val.hasDues ? val.effectiveDues : 0;
+                                feePaidCtrl.text = '$feePaidNow';
                               });
                             }
                           },
@@ -531,223 +537,409 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       const SizedBox(height: 14),
                     ],
 
-                  // ALL OTHER DETAILS IN DROPDOWNS (Shift, Section, Plan, Mode, Collect)
-                  const Text(
-                    'ASSIGNMENT SETTINGS (DROPDOWNS)',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Shift & Section Dropdowns
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  // SEAT & SHIFT ALLOCATION OVERVIEW (Clean modern design, no raw dropdowns)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Shift', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: selectedShift,
-                                  isExpanded: true,
-                                  items: availableShifts
-                                      .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
-                                      .toList(),
-                                  onChanged: (val) {
-                                    if (val != null) setModalState(() => selectedShift = val);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Section', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: selectedSection,
-                                  isExpanded: true,
-                                  items: availableSections
-                                      .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
-                                      .toList(),
-                                  onChanged: (val) {
-                                    if (val != null) setModalState(() => selectedSection = val);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Monthly Fee Plan & Payment Collection Dropdowns
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Monthly Fee Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: selectedFeePlan,
-                                  isExpanded: true,
-                                  items: feePlans
-                                      .map((fee) => DropdownMenuItem(value: fee, child: Text('₹$fee / mo', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
-                                      .toList(),
-                                  onChanged: (val) {
-                                    if (val != null) setModalState(() => selectedFeePlan = val);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Collect Fee Now (₹)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-                            const SizedBox(height: 6),
-                            Container(
-                              height: 44,
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: TextField(
-                                controller: feePaidCtrl,
-                                keyboardType: TextInputType.number,
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                                decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(vertical: 11),
-                                  border: InputBorder.none,
-                                  prefixIcon: Icon(Icons.currency_rupee, size: 16, color: Color(0xFF0D766E)),
-                                ),
-                                onChanged: (val) {
-                                  final parsed = int.tryParse(val.trim()) ?? 0;
-                                  if (parsed > selectedFeePlan) {
-                                    feePaidCtrl.text = '$selectedFeePlan';
-                                    feePaidCtrl.selection = TextSelection.fromPosition(TextPosition(offset: feePaidCtrl.text.length));
-                                  }
-                                  setModalState(() {
-                                    feePaidNow = (int.tryParse(feePaidCtrl.text.trim()) ?? 0).clamp(0, selectedFeePlan);
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
+                            const Row(
                               children: [
-                                InkWell(
-                                  onTap: () {
-                                    setModalState(() {
-                                      feePaidNow = selectedFeePlan;
-                                      feePaidCtrl.text = '$selectedFeePlan';
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: feePaidNow == selectedFeePlan ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: feePaidNow == selectedFeePlan ? const Color(0xFF10B981) : const Color(0xFFCBD5E1)),
-                                    ),
-                                    child: Text('Full (₹$selectedFeePlan)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: feePaidNow == selectedFeePlan ? const Color(0xFF059669) : const Color(0xFF64748B))),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                InkWell(
-                                  onTap: () {
-                                    setModalState(() {
-                                      feePaidNow = 0;
-                                      feePaidCtrl.text = '0';
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: feePaidNow == 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: feePaidNow == 0 ? const Color(0xFFEF4444) : const Color(0xFFCBD5E1)),
-                                    ),
-                                    child: Text('₹0 Due', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: feePaidNow == 0 ? const Color(0xFFDC2626) : const Color(0xFF64748B))),
+                                Icon(Icons.event_seat_rounded, size: 16, color: Color(0xFF0D766E)),
+                                SizedBox(width: 6),
+                                Text(
+                                  'SEAT ALLOCATION & SHIFT',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.6,
+                                    color: AppColors.textNavy,
                                   ),
                                 ),
                               ],
                             ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE6FFFA),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF99F6E4)),
+                              ),
+                              child: Text(
+                                'Seat S-${seat.seatNumber} • $selectedSection',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0D766E),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Payment Mode Dropdown
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Payment Mode', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Assign Shift',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
                         ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: paymentMode,
-                            isExpanded: true,
-                            items: ['UPI', 'Cash', 'Card', 'Net Banking']
-                                .map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))))
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) setModalState(() => paymentMode = val);
-                            },
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: availableShifts.map((s) {
+                            final isSelected = selectedShift.toLowerCase() == s.toLowerCase();
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(10),
+                              onTap: () {
+                                setModalState(() => selectedShift = s);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? const Color(0xFF0D766E) : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isSelected ? const Color(0xFF0D766E) : const Color(0xFFCBD5E1),
+                                    width: isSelected ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  s,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: isSelected ? Colors.white : AppColors.textNavy,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Shift Availability & Seat Sharing Check
+                        Builder(
+                          builder: (context) {
+                            final isOccupiedForShift = _service.isSeatOccupied(
+                              seat.seatNumber,
+                              shift: selectedShift,
+                              excludeStudentId: selectedStudent?.id,
+                            );
+                            final occInShift = isOccupiedForShift
+                                ? _service.getStudentForSeat(seat.seatNumber, shift: selectedShift)
+                                : null;
+                            final allSeatOccupants = _service.getStudentsForSeat(seat.seatNumber);
+                            final otherShiftOccupants = allSeatOccupants
+                                .where((st) => st.id != selectedStudent?.id && st.shift.toLowerCase() != selectedShift.toLowerCase())
+                                .toList();
+
+                            if (isOccupiedForShift) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFFECDD3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 16),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Seat S-${seat.seatNumber} is occupied for "$selectedShift"${occInShift != null ? " by ${occInShift.name}" : ""}. Please select another shift.',
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0FDF4),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFBBF7D0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      otherShiftOccupants.isNotEmpty
+                                          ? 'Available for "$selectedShift" • Shared seat (Occupied by ${otherShiftOccupants.map((o) => "${o.name} in ${o.shift}").join(", ")})'
+                                          : 'Available for "$selectedShift" • Exclusive space allocation',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF166534)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // SEAT AMENITIES & PREFERENCES (New useful feature)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.stars_rounded, size: 16, color: Color(0xFFD97706)),
+                            SizedBox(width: 6),
+                            Text(
+                              'DESK AMENITIES & NOTES',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.6,
+                                color: AppColors.textNavy,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: ['⚡ Power Socket', '❄️ Near AC', '🤫 Quiet Zone', '🪟 Window Desk', '💡 Reading Lamp'].map((amenity) {
+                            final isChecked = selectedAmenities.contains(amenity);
+                            return FilterChip(
+                              label: Text(amenity, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isChecked ? Colors.white : AppColors.textNavy)),
+                              selected: isChecked,
+                              selectedColor: const Color(0xFF0D766E),
+                              backgroundColor: Colors.white,
+                              checkmarkColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              side: BorderSide(color: isChecked ? const Color(0xFF0D766E) : const Color(0xFFCBD5E1)),
+                              onSelected: (val) {
+                                setModalState(() {
+                                  if (val) {
+                                    selectedAmenities.add(amenity);
+                                  } else {
+                                    selectedAmenities.remove(amenity);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: deskNoteCtrl,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Desk note / Locker number (e.g. Locker L-12, Front row)',
+                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
+
+                  // DUE SETTLEMENT (Streamlined, only shown if student has dues)
+                  if (selectedStudent != null && selectedStudent!.hasDues) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1F2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFECDD3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.payment_rounded, size: 16, color: Color(0xFFE11D48)),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'COLLECT PENDING DUE',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.6,
+                                      color: Color(0xFFE11D48),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                'Due: ₹${selectedStudent!.effectiveDues}',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFE11D48)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 40,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  child: TextField(
+                                    controller: feePaidCtrl,
+                                    keyboardType: TextInputType.number,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                    decoration: const InputDecoration(
+                                      contentPadding: EdgeInsets.symmetric(vertical: 9),
+                                      border: InputBorder.none,
+                                      prefixIcon: Icon(Icons.currency_rupee, size: 14, color: Color(0xFF0D766E)),
+                                      hintText: 'Enter amount',
+                                    ),
+                                    onChanged: (val) {
+                                      setModalState(() {
+                                        feePaidNow = (int.tryParse(val.trim()) ?? 0).clamp(0, selectedStudent!.effectiveDues);
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () {
+                                  setModalState(() {
+                                    feePaidNow = selectedStudent!.effectiveDues;
+                                    feePaidCtrl.text = '$feePaidNow';
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: feePaidNow == selectedStudent!.effectiveDues ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: feePaidNow == selectedStudent!.effectiveDues ? const Color(0xFF10B981) : const Color(0xFFCBD5E1)),
+                                  ),
+                                  child: const Text('Pay All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0D766E))),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () {
+                                  setModalState(() {
+                                    feePaidNow = 0;
+                                    feePaidCtrl.text = '0';
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: feePaidNow == 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: feePaidNow == 0 ? const Color(0xFFEF4444) : const Color(0xFFCBD5E1)),
+                                  ),
+                                  child: const Text('Defer (₹0)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (feePaidNow > 0) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: ['UPI', 'Cash', 'Card'].map((m) {
+                                final isM = paymentMode == m;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: InkWell(
+                                    onTap: () => setModalState(() => paymentMode = m),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isM ? const Color(0xFF0D766E) : Colors.white,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: isM ? const Color(0xFF0D766E) : const Color(0xFFCBD5E1)),
+                                      ),
+                                      child: Text(m, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isM ? Colors.white : AppColors.textNavy)),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // WHATSAPP NOTIFICATION TOGGLE (New useful feature)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFDCFCE7),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.chat_rounded, color: Color(0xFF16A34A), size: 16),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Notify student on WhatsApp',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
+                              ),
+                              Text(
+                                'Send seat allocation confirmation & details',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: sendWhatsAppNotification,
+                          activeColor: const Color(0xFF16A34A),
+                          onChanged: (v) => setModalState(() => sendWhatsAppNotification = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
 
                   // SUBMIT BUTTON
                   SizedBox(
@@ -778,24 +970,63 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           );
                           return;
                         }
-                        final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, selectedFeePlan);
+
+                        final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, 999999);
+                        final studentToAssign = selectedStudent!;
+                        final chosenShift = selectedShift;
+                        final deskNote = deskNoteCtrl.text.trim();
+                        final amenitiesList = selectedAmenities.toList();
+                        final bool notifyWhatsApp = sendWhatsAppNotification;
+
                         Navigator.pop(ctx);
                         await _service.assignSeatToExistingStudent(
                           newSeatNumber: seat.seatNumber,
-                          studentId: selectedStudent!.id,
-                          shift: selectedShift,
+                          studentId: studentToAssign.id,
+                          shift: chosenShift,
                           sectionName: selectedSection,
                           feePaidNow: effectiveFeePaid,
                           paymentMode: paymentMode,
                         );
+
+                        // Attach desk notes / amenities if provided
+                        final extraParts = [
+                          if (amenitiesList.isNotEmpty) 'Amenities: ${amenitiesList.join(", ")}',
+                          if (deskNote.isNotEmpty) deskNote,
+                        ].join(' • ');
+
+                        if (extraParts.isNotEmpty) {
+                          final existingNote = studentToAssign.note;
+                          final newNote = existingNote.isEmpty
+                              ? 'Seat S-${seat.seatNumber}: $extraParts'
+                              : '$existingNote\n• Seat S-${seat.seatNumber}: $extraParts';
+                          await _service.updateStudent(
+                            studentId: studentToAssign.id,
+                            name: studentToAssign.name,
+                            phone: studentToAssign.phone,
+                            shift: chosenShift,
+                            seatNumber: seat.seatNumber,
+                            note: newNote,
+                          );
+                        }
+
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Seat S-${seat.seatNumber} successfully assigned to ${selectedStudent!.name}!'),
+                              content: Text('Seat S-${seat.seatNumber} successfully assigned to ${studentToAssign.name}!'),
                               backgroundColor: const Color(0xFF0D766E),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
+                        }
+
+                        // Send WhatsApp notification if enabled
+                        if (notifyWhatsApp && studentToAssign.phone.isNotEmpty) {
+                          final cleanPhone = LibraryService.normalizePhone(studentToAssign.phone);
+                          final msg = 'Hello ${studentToAssign.name}, Seat S-${seat.seatNumber} ($chosenShift) in $selectedSection has been allocated to you at ${_service.profile.libraryName}.';
+                          final uri = Uri.parse('https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(msg)}');
+                          try {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          } catch (_) {}
                         }
                       },
                       child: Text(
