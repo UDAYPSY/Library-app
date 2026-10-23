@@ -1108,13 +1108,19 @@ class LibraryService {
           if (studentDoc.exists) {
             final data = studentDoc.data() ?? {};
             final curDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
-            if (curDues > 0) {
-              final newDues = (curDues - amount).clamp(0, 999999);
-              await _tenantCol('students').doc(studentId).update({
-                'dues_amount': newDues,
-                'status': newDues == 0 ? 'ACTIVE' : 'DUES',
-              });
+            final dueDateRaw = data['fee_due_date'];
+            DateTime? currentDueDate;
+            if (dueDateRaw is Timestamp) currentDueDate = dueDateRaw.toDate();
+
+            final newDues = curDues > 0 ? (curDues - amount).clamp(0, 999999) : 0;
+            final updates = <String, dynamic>{
+              'dues_amount': newDues,
+              'status': newDues == 0 ? 'ACTIVE' : 'DUES',
+            };
+            if (currentDueDate != null && currentDueDate.isBefore(payDate) && newDues == 0) {
+              updates['fee_due_date'] = Timestamp.fromDate(DateTime(payDate.year, payDate.month + 1, payDate.day));
             }
+            await _tenantCol('students').doc(studentId).update(updates);
           }
         } catch (_) {}
       }
@@ -1147,9 +1153,14 @@ class LibraryService {
         final currentDues = s.effectiveDues;
         if (currentDues > 0) {
           final newDues = (currentDues - amount).clamp(0, 999999);
+          DateTime? updatedDueDate = s.feeDueDate;
+          if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
+            updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
+          }
           _mockStudents[matchIdx] = s.copyWith(
             duesAmount: newDues,
             status: newDues == 0 ? 'ACTIVE' : 'DUES',
+            feeDueDate: updatedDueDate,
           );
           _mockStudentsController.add(List.unmodifiable(_mockStudents));
         }
@@ -1362,6 +1373,8 @@ class LibraryService {
     String paymentMode = 'UPI',
     String status = 'ACTIVE',
     DateTime? joiningDate,
+    DateTime? validUntil,
+    DateTime? paymentDate,
     String note = '',
     int duesAmount = 0,
     String fatherName = '',
@@ -1374,7 +1387,21 @@ class LibraryService {
   }) async {
     ensureInitialized();
 
-    // Prevent duplicate student creation: if phone exists, re-assign existing student!
+    final now = joiningDate ?? DateTime.now();
+    final payDate = paymentDate ?? DateTime.now();
+    final totalFee = feeAmount + duesAmount;
+    final effectiveMonths = durationMonths > 0 ? durationMonths : 1;
+    final effectiveMonthly = (monthlyFee != null && monthlyFee > 0)
+        ? monthlyFee
+        : (totalFee > 0
+            ? (totalFee ~/ effectiveMonths > 0 ? totalFee ~/ effectiveMonths : totalFee)
+            : 500);
+    final effectiveValidUntil = validUntil ??
+        ((duesAmount > 0 && feeAmount == 0)
+            ? now // Due immediately if no initial fee was paid
+            : DateTime(now.year, now.month + effectiveMonths, now.day));
+
+    // Prevent duplicate student creation: if phone exists, update existing student!
     final existingStudent = findStudentByPhone(phone);
     if (existingStudent != null) {
       if (seatNumber != null) {
@@ -1382,9 +1409,42 @@ class LibraryService {
           newSeatNumber: seatNumber,
           studentId: existingStudent.id,
           shift: shift,
-          feePaidNow: feeAmount,
+          feePaidNow: 0,
           paymentMode: paymentMode,
           deviceUserId: deviceUserId,
+        );
+      }
+      await updateStudent(
+        studentId: existingStudent.id,
+        name: studentName,
+        phone: phone,
+        shift: shift,
+        seatNumber: seatNumber,
+        note: note,
+        monthlyFee: effectiveMonthly,
+        duesAmount: duesAmount,
+        status: status,
+        feeDueDate: effectiveValidUntil,
+        fatherName: fatherName,
+        address: address,
+        aadhaarNumber: aadhaarNumber,
+        preparationFor: preparationFor,
+        gender: gender,
+        photoBase64: photoBase64,
+      );
+      if (status != 'TRIAL' && feeAmount > 0) {
+        await recordPayment(
+          studentId: existingStudent.id,
+          studentName: studentName,
+          phone: phone,
+          seatNumber: seatNumber,
+          shift: shift,
+          amount: feeAmount,
+          date: payDate,
+          paymentMode: paymentMode,
+          notes: durationMonths > 1
+              ? '$durationMonths Months Advance Fees'
+              : 'Initial registration fee',
         );
       }
       return;
@@ -1397,18 +1457,6 @@ class LibraryService {
         throw Exception('Seat S-$seatNumber is already occupied for shift "$shift" by ${occ.name}. It cannot be assigned.');
       }
     }
-
-    final now = joiningDate ?? DateTime.now();
-    final totalFee = feeAmount + duesAmount;
-    final effectiveMonths = durationMonths > 0 ? durationMonths : 1;
-    final effectiveMonthly = (monthlyFee != null && monthlyFee > 0)
-        ? monthlyFee
-        : (totalFee > 0
-            ? (totalFee ~/ effectiveMonths > 0 ? totalFee ~/ effectiveMonths : totalFee)
-            : 500);
-    final validUntil = (duesAmount > 0 && feeAmount == 0)
-        ? now // Due immediately if no initial fee was paid
-        : now.add(Duration(days: 30 * effectiveMonths));
 
     if (isFirebaseConnected) {
       final studentDocRef = (studentId != null && studentId.isNotEmpty)
@@ -1449,7 +1497,7 @@ class LibraryService {
           'phone': phone,
           'seat_number': seatNumber,
           'shift': shift,
-          'fee_due_date': Timestamp.fromDate(validUntil),
+          'fee_due_date': Timestamp.fromDate(effectiveValidUntil),
           'status': status,
           'joined_at': Timestamp.fromDate(now),
           'monthly_fee': effectiveMonthly,
@@ -1470,11 +1518,17 @@ class LibraryService {
             'payment_id': paymentDocRef.id,
             'student_id': studentDocRef.id,
             'student_name': studentName,
+            'student_phone': phone,
+            'seat_number': seatNumber,
+            'shift': shift,
             'amount': feeAmount,
-            'date': Timestamp.fromDate(now),
-            'valid_until': Timestamp.fromDate(validUntil),
+            'date': Timestamp.fromDate(payDate),
+            'valid_until': Timestamp.fromDate(effectiveValidUntil),
             'collected_by': deviceUserId,
             'payment_mode': paymentMode,
+            'notes': durationMonths > 1
+                ? '$durationMonths Months Advance Fees'
+                : 'Initial registration fee',
           });
         }
       });
@@ -1502,7 +1556,7 @@ class LibraryService {
           seatNumber: seatNumber,
           shift: shift,
           status: status,
-          feeDueDate: validUntil,
+          feeDueDate: effectiveValidUntil,
           joinedAt: now,
           monthlyFee: effectiveMonthly,
           paymentMode: paymentMode,
@@ -1528,9 +1582,11 @@ class LibraryService {
             seatNumber: seatNumber,
             shift: shift,
             amount: feeAmount,
-            date: now,
+            date: payDate,
             paymentMode: paymentMode,
-            notes: 'Registration fee',
+            notes: durationMonths > 1
+                ? '$durationMonths Months Advance Fees'
+                : 'Initial registration fee',
           ),
         );
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));

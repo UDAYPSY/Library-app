@@ -46,6 +46,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int _selectedDurationMonths = 1; // 1, 2, 3, 5, 6, 12 months
   bool _isTrial = false;
 
+  // Timeline & Payment Variables (unified with Record Payment modal)
+  DateTime _fromDate = DateTime.now();
+  DateTime _validUntilDate = DateTime.now().add(const Duration(days: 30));
+  DateTime _paymentDate = DateTime.now();
+  String _selectedPaymentMethod = 'UPI';
+
   int get _fixedMonthlyFee => _selectedShift.monthlyFee > 0 ? _selectedShift.monthlyFee : 500;
   int get _calculatedTotalFee => _fixedMonthlyFee * _selectedDurationMonths;
 
@@ -53,7 +59,10 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int get _alreadyPaidAmount {
     if (widget.studentToEdit == null) return 0;
     final s = widget.studentToEdit!;
-    if (s.duesAmount > 0) {
+    final hasPendingCurrentDue = s.duesAmount > 0 &&
+        s.feeDueDate != null &&
+        s.feeDueDate!.isAfter(DateTime.now());
+    if (hasPendingCurrentDue) {
       return (_fixedMonthlyFee - s.duesAmount).clamp(0, _fixedMonthlyFee);
     }
     return 0;
@@ -62,7 +71,41 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   // Auto-calculated Due Amount
   int get _dueAmount {
     if (widget.studentToEdit == null) return _calculatedTotalFee;
+    final s = widget.studentToEdit!;
+    final hasPendingCurrentDue = s.duesAmount > 0 &&
+        s.feeDueDate != null &&
+        s.feeDueDate!.isAfter(DateTime.now());
+    if (hasPendingCurrentDue && _selectedDurationMonths == 1) {
+      return s.duesAmount;
+    }
     return (_calculatedTotalFee - _alreadyPaidAmount).clamp(0, _calculatedTotalFee);
+  }
+
+  void _updateDuration(int months) {
+    setState(() {
+      _selectedDurationMonths = months;
+      if (widget.studentToEdit != null) {
+        final s = widget.studentToEdit!;
+        final hasPendingCurrentDue = s.duesAmount > 0 &&
+            s.feeDueDate != null &&
+            s.feeDueDate!.isAfter(DateTime.now());
+        if (hasPendingCurrentDue) {
+          if (months == 1) {
+            _validUntilDate = s.feeDueDate!;
+          } else {
+            final base = s.feeDueDate!;
+            _validUntilDate = DateTime(base.year, base.month + (months - 1), base.day);
+          }
+        } else {
+          _validUntilDate = DateTime(_fromDate.year, _fromDate.month + months, _fromDate.day);
+        }
+        final due = _dueAmount;
+        _amountPaidCtrl.text = '$due';
+      } else {
+        _validUntilDate = DateTime(_fromDate.year, _fromDate.month + months, _fromDate.day);
+        _amountPaidCtrl.text = '$_calculatedTotalFee';
+      }
+    });
   }
 
   // Step 3: Review Options
@@ -72,6 +115,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _paymentDate = now;
+
     final activeShifts = _service.shifts.where((s) => s.isActive).toList();
     if (activeShifts.isNotEmpty) {
       _selectedShift = activeShifts.first;
@@ -108,14 +154,35 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       _selectedSeat = s.seatNumber;
       _photoBase64 = s.photoBase64;
       _isTrial = s.status == 'TRIAL';
+      if (s.paymentMode.isNotEmpty) _selectedPaymentMethod = s.paymentMode;
 
       final shiftMatch = _service.shifts.where((sh) => sh.name.toLowerCase() == s.shift.toLowerCase());
       if (shiftMatch.isNotEmpty) {
         _selectedShift = shiftMatch.first;
       }
       _feeCtrl.text = '$_fixedMonthlyFee';
+
+      final hasPendingCurrentDue = s.duesAmount > 0 &&
+          s.feeDueDate != null &&
+          s.feeDueDate!.isAfter(now);
+      final isExpired = s.feeDueDate == null || s.feeDueDate!.isBefore(now);
+
+      if (hasPendingCurrentDue) {
+        _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(const Duration(days: 30));
+        _validUntilDate = s.feeDueDate!;
+      } else if (isExpired) {
+        _fromDate = now;
+        _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
+      } else {
+        _fromDate = s.feeDueDate!;
+        _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
+      }
+
       final initialDue = _dueAmount;
       _amountPaidCtrl.text = '$initialDue';
+    } else {
+      _fromDate = _joiningDate;
+      _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
     }
   }
 
@@ -247,7 +314,13 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       },
     );
     if (picked != null) {
-      setState(() => _joiningDate = picked);
+      setState(() {
+        _joiningDate = picked;
+        if (widget.studentToEdit == null) {
+          _fromDate = _joiningDate;
+          _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
+        }
+      });
     }
   }
 
@@ -418,9 +491,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
             seatNumber: seatNum,
             shift: _selectedShift.name,
             amount: collectedNow,
-            date: _joiningDate,
-            paymentMode: 'UPI',
-            notes: 'Payment collected via Edit Student Details',
+            date: _paymentDate,
+            paymentMode: _selectedPaymentMethod,
+            notes: 'Payment collected via Edit Student Details ($_selectedDurationMonths mo)',
           );
         }
 
@@ -434,7 +507,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           monthlyFee: fixedMonthly,
           duesAmount: editDuesAmount,
           status: editStatus,
-          feeDueDate: _joiningDate.add(Duration(days: 30 * _selectedDurationMonths)),
+          feeDueDate: _validUntilDate,
           fatherName: _fatherNameCtrl.text.trim(),
           address: _addressCtrl.text.trim(),
           aadhaarNumber: _aadhaarCtrl.text.trim(),
@@ -468,9 +541,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         monthlyFee: fixedMonthly,
         duesAmount: finalDuesAmount,
         durationMonths: _selectedDurationMonths,
-        paymentMode: 'UPI',
+        paymentMode: _selectedPaymentMethod,
         status: finalStatus,
         joiningDate: _joiningDate,
+        validUntil: _validUntilDate,
+        paymentDate: _paymentDate,
         note: _notesCtrl.text.trim(),
         fatherName: _fatherNameCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
@@ -939,12 +1014,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final isSelected = _selectedDurationMonths == months;
     return InkWell(
       borderRadius: BorderRadius.circular(10),
-      onTap: () {
-        setState(() {
-          _selectedDurationMonths = months;
-          _amountPaidCtrl.text = '$_calculatedTotalFee';
-        });
-      },
+      onTap: () => _updateDuration(months),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -1281,23 +1351,42 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _durationChip(label: '1 Month', months: 1),
-                const SizedBox(width: 8),
-                _durationChip(label: '2 Months', months: 2),
-                const SizedBox(width: 8),
-                _durationChip(label: '3 Months', months: 3),
-                const SizedBox(width: 8),
-                _durationChip(label: '5 Months ⭐', months: 5),
-                const SizedBox(width: 8),
-                _durationChip(label: '6 Months', months: 6),
-                const SizedBox(width: 8),
-                _durationChip(label: '1 Year (12M)', months: 12),
-              ],
-            ),
+          Builder(
+            builder: (context) {
+              final hasPendingCurrentDue = widget.studentToEdit != null &&
+                  widget.studentToEdit!.duesAmount > 0 &&
+                  widget.studentToEdit!.feeDueDate != null &&
+                  widget.studentToEdit!.feeDueDate!.isAfter(DateTime.now());
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _durationChip(
+                      label: hasPendingCurrentDue
+                          ? 'Clear Due (₹${widget.studentToEdit!.duesAmount})'
+                          : '1 Month',
+                      months: 1,
+                    ),
+                    const SizedBox(width: 8),
+                    _durationChip(
+                      label: hasPendingCurrentDue ? '2 Mo (+1 Adv)' : '2 Months',
+                      months: 2,
+                    ),
+                    const SizedBox(width: 8),
+                    _durationChip(
+                      label: hasPendingCurrentDue ? '3 Mo (+2 Adv)' : '3 Months',
+                      months: 3,
+                    ),
+                    const SizedBox(width: 8),
+                    _durationChip(label: '5 Months ⭐', months: 5),
+                    const SizedBox(width: 8),
+                    _durationChip(label: '6 Months', months: 6),
+                    const SizedBox(width: 8),
+                    _durationChip(label: '1 Year (12M)', months: 12),
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 18),
 
@@ -1661,6 +1750,239 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           ),
           const SizedBox(height: 18),
 
+          // Membership Validity & Payment Timeline Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCCFBF1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.date_range_rounded, size: 16, color: Color(0xFF0D9488)),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Membership Validity & Payment Timeline',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textNavy,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // From Date & Valid Until Date Row
+                Row(
+                  children: [
+                    // From Date Picker
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _fieldLabel('From Date', isRequired: false),
+                          const SizedBox(height: 6),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _fromDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2035),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _fromDate = picked;
+                                  _validUntilDate = DateTime(
+                                    _fromDate.year,
+                                    _fromDate.month + _selectedDurationMonths,
+                                    _fromDate.day,
+                                  );
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    DateFormat('dd-MMM-yyyy').format(_fromDate),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textNavy,
+                                    ),
+                                  ),
+                                  const Icon(Icons.calendar_month_outlined, size: 16, color: Color(0xFF64748B)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Valid Until Date Picker (editable)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              _fieldLabel('Valid Until Date', isRequired: false),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.edit_calendar_rounded, size: 12, color: AppColors.primaryTeal),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _validUntilDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2035),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _validUntilDate = picked;
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.primaryTeal, width: 1.5),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    DateFormat('dd-MMM-yyyy').format(_validUntilDate),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primaryTeal,
+                                    ),
+                                  ),
+                                  const Icon(Icons.calendar_month_outlined, size: 16, color: AppColors.primaryTeal),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Payment Date
+                _fieldLabel('Payment Date', isRequired: false),
+                const SizedBox(height: 6),
+                InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _paymentDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2035),
+                    );
+                    if (picked != null) {
+                      setState(() => _paymentDate = picked);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('dd-MMM-yyyy').format(_paymentDate),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textNavy,
+                          ),
+                        ),
+                        const Icon(Icons.today_rounded, size: 18, color: Color(0xFF64748B)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Payment Method Selector
+                _fieldLabel('Payment Method', isRequired: false),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    for (final method in ['UPI', 'Cash', 'Card', 'Online'])
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () => setState(() => _selectedPaymentMethod = method),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _selectedPaymentMethod == method ? AppColors.primaryTeal : Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _selectedPaymentMethod == method ? AppColors.primaryTeal : const Color(0xFFCBD5E1),
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                method,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: _selectedPaymentMethod == method ? Colors.white : AppColors.textNavy,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
           // Trial Student Registration Option
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1857,6 +2179,28 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                       valueColor: reviewDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF059669),
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _reviewItem('FROM DATE', DateFormat('dd-MMM-yyyy').format(_fromDate))),
+                  Expanded(
+                    child: _reviewItem(
+                      'VALID UNTIL',
+                      DateFormat('dd-MMM-yyyy').format(_validUntilDate),
+                      valueColor: const Color(0xFF0D9488),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _reviewItem('PAYMENT DATE', DateFormat('dd-MMM-yyyy').format(_paymentDate))),
+                  Expanded(child: _reviewItem('PAYMENT MODE', _selectedPaymentMethod)),
                 ],
               ),
               const SizedBox(height: 16),
