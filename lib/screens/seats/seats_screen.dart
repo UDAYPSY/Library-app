@@ -5,6 +5,7 @@ import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
 import '../students/member_profile_screen.dart';
+import '../students/add_student_wizard_screen.dart';
 
 class SeatsScreen extends StatefulWidget {
   const SeatsScreen({super.key});
@@ -28,15 +29,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
   }
 
   void _showAssignSeatModal(SeatInfo seat, List<StudentInfo> students) {
-    bool isNewStudentMode = students.isEmpty;
-    StudentInfo? selectedStudent = students.where((s) => s.seatNumber == null).isNotEmpty
-        ? students.firstWhere((s) => s.seatNumber == null)
-        : (students.isNotEmpty ? students.first : null);
-
-    final newNameCtrl = TextEditingController();
-    final newPhoneCtrl = TextEditingController();
-    String? phoneError;
-
     // Available shifts from library - exclude shifts conflicting with current active occupants of this seat
     final seatOccupants = students.where((s) => s.seatNumber == seat.seatNumber && s.status != 'INACTIVE').toList();
     final allLibraryShifts = _service.shifts.isNotEmpty
@@ -47,6 +39,18 @@ class _SeatsScreenState extends State<SeatsScreen> {
     }).toList();
     final availableShifts = nonConflictingShifts.isNotEmpty ? nonConflictingShifts : allLibraryShifts;
 
+    // Available sections
+    final availableSections = _service.sections.isNotEmpty
+        ? _service.sections.map((s) => s.name).toSet().toList()
+        : ['Main Hall'];
+    String selectedSection = seat.sectionName.isNotEmpty && availableSections.contains(seat.sectionName)
+        ? seat.sectionName
+        : availableSections.first;
+
+    StudentInfo? selectedStudent = students.where((s) => s.seatNumber == null).isNotEmpty
+        ? students.firstWhere((s) => s.seatNumber == null)
+        : (students.isNotEmpty ? students.first : null);
+
     String selectedShift = selectedStudent?.shift ??
         (_selectedShift.toUpperCase() != 'ALL' && availableShifts.contains(_selectedShift)
             ? _selectedShift
@@ -55,13 +59,22 @@ class _SeatsScreenState extends State<SeatsScreen> {
       selectedShift = availableShifts.first;
     }
 
-    // Available sections
-    final availableSections = _service.sections.isNotEmpty
-        ? _service.sections.map((s) => s.name).toSet().toList()
-        : ['Main Hall'];
-    String selectedSection = seat.sectionName.isNotEmpty && availableSections.contains(seat.sectionName)
-        ? seat.sectionName
-        : availableSections.first;
+    // Direct redirect to AddStudentWizardScreen if no enrolled students exist
+    if (students.isEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AddStudentWizardScreen(
+            initialSeatNumber: seat.seatNumber,
+            initialSectionName: selectedSection,
+            initialShift: selectedShift,
+          ),
+        ),
+      ).then((_) {
+        if (mounted) setState(() {});
+      });
+      return;
+    }
 
     // Fee plans
     final feePlans = [300, 400, 500, 600, 700, 800, 1000, 1200];
@@ -148,36 +161,20 @@ class _SeatsScreenState extends State<SeatsScreen> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              setModalState(() {
-                                isNewStudentMode = false;
-                                if (selectedStudent != null) {
-                                  selectedShift = selectedStudent!.shift;
-                                  if (!availableShifts.contains(selectedShift)) {
-                                    selectedShift = availableShifts.first;
-                                  }
-                                }
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: !isNewStudentMode ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: !isNewStudentMode
-                                    ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4)]
-                                    : null,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Enrolled Student',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: !isNewStudentMode ? AppColors.textNavy : const Color(0xFF64748B),
-                                  ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 4)],
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Enrolled Student',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textNavy,
                                 ),
                               ),
                             ),
@@ -185,26 +182,42 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         ),
                         Expanded(
                           child: InkWell(
-                            onTap: () => setModalState(() => isNewStudentMode = true),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AddStudentWizardScreen(
+                                    initialSeatNumber: seat.seatNumber,
+                                    initialSectionName: selectedSection,
+                                    initialShift: selectedShift,
+                                  ),
+                                ),
+                              ).then((_) {
+                                if (mounted) setState(() {});
+                              });
+                            },
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: isNewStudentMode ? Colors.white : Colors.transparent,
+                                color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
-                                boxShadow: isNewStudentMode
-                                    ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4)]
-                                    : null,
                               ),
-                              child: Center(
-                                child: Text(
-                                  '+ Register New',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: isNewStudentMode ? AppColors.textNavy : const Color(0xFF64748B),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.person_add_rounded, size: 14, color: Color(0xFF0D9488)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '+ Register New',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0D9488),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           ),
@@ -213,8 +226,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  if (!isNewStudentMode) ...[
                     // SELECT STUDENT DROPDOWN
                     const Text(
                       'Select Student',
@@ -519,79 +530,6 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       ),
                       const SizedBox(height: 14),
                     ],
-                  ] else ...[
-                    // REGISTER NEW STUDENT FORM (WITH DUPLICATE VALIDATION)
-                    const Text(
-                      'Student Name',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: TextField(
-                        controller: newNameCtrl,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. Rahul Sharma',
-                          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    const Text(
-                      'Phone Number (No Duplicates Allowed)',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: phoneError != null ? const Color(0xFFE11D48) : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: TextField(
-                        controller: newPhoneCtrl,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(10),
-                        ],
-                        onChanged: (val) {
-                          if (_service.isDuplicateStudentPhone(val.trim())) {
-                            final dup = _service.findStudentByPhone(val.trim());
-                            setModalState(() => phoneError = 'Duplicate: Already enrolled as "${dup?.name}"');
-                          } else {
-                            setModalState(() => phoneError = null);
-                          }
-                        },
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textNavy),
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. 9876543210',
-                          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
-                      ),
-                    ),
-                    if (phoneError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, left: 4),
-                        child: Text(
-                          phoneError!,
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFE11D48)),
-                        ),
-                      ),
-                    const SizedBox(height: 14),
-                  ],
 
                   // ALL OTHER DETAILS IN DROPDOWNS (Shift, Section, Plan, Mode, Collect)
                   const Text(
@@ -823,120 +761,75 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () async {
-                        if (!isNewStudentMode) {
-                          if (selectedStudent == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please select a student from the dropdown')),
-                            );
-                            return;
-                          }
-                          if (_service.isSeatOccupied(seat.seatNumber, shift: selectedShift, excludeStudentId: selectedStudent!.id)) {
-                            final occ = _service.getStudentForSeat(seat.seatNumber, shift: selectedShift);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Seat S-${seat.seatNumber} is already occupied for "$selectedShift"${occ != null ? " by ${occ.name}" : ""}.'),
-                                backgroundColor: const Color(0xFFE11D48),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            return;
-                          }
-                          final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, selectedFeePlan);
-                          Navigator.pop(ctx);
-                          await _service.assignSeatToExistingStudent(
-                            newSeatNumber: seat.seatNumber,
-                            studentId: selectedStudent!.id,
-                            shift: selectedShift,
-                            sectionName: selectedSection,
-                            feePaidNow: effectiveFeePaid,
-                            paymentMode: paymentMode,
+                        if (selectedStudent == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please select a student from the dropdown')),
                           );
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Seat S-${seat.seatNumber} successfully assigned to ${selectedStudent!.name}!'),
-                                backgroundColor: const Color(0xFF0D766E),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        } else {
-                          final name = newNameCtrl.text.trim();
-                          final phone = newPhoneCtrl.text.trim();
-                          if (name.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please enter student name')),
-                            );
-                            return;
-                          }
-                          if (phone.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please enter phone number')),
-                            );
-                            return;
-                          }
-                          if (phone.length != 10) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Mobile number must be exactly 10 digits.'),
-                                backgroundColor: Color(0xFFE11D48),
-                              ),
-                            );
-                            return;
-                          }
-                          if (_service.isDuplicateStudentPhone(phone)) {
-                            final dup = _service.findStudentByPhone(phone);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Duplicate: Student "${dup?.name}" already exists with this phone! No duplicate entry allowed.'),
-                                backgroundColor: const Color(0xFFE11D48),
-                              ),
-                            );
-                            return;
-                          }
-                          if (_service.isSeatOccupied(seat.seatNumber, shift: selectedShift)) {
-                            final occ = _service.getStudentForSeat(seat.seatNumber, shift: selectedShift);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Seat S-${seat.seatNumber} is already occupied for "$selectedShift"${occ != null ? " by ${occ.name}" : ""}.'),
-                                backgroundColor: const Color(0xFFE11D48),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            return;
-                          }
-
-                          final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, selectedFeePlan);
-                          final effectiveDues = (selectedFeePlan - effectiveFeePaid).clamp(0, 999999);
-                          final effectiveStatus = (effectiveFeePaid == selectedFeePlan && effectiveFeePaid > 0) ? 'ACTIVE' : 'DUES';
-
-                          Navigator.pop(ctx);
-                          await _service.assignSeatAndRegisterStudent(
-                            seatNumber: seat.seatNumber,
-                            studentName: name,
-                            phone: phone,
-                            shift: selectedShift,
-                            deviceUserId: _service.profile.adminName,
-                            feeAmount: effectiveFeePaid,
-                            monthlyFee: selectedFeePlan,
-                            duesAmount: effectiveDues,
-                            paymentMode: paymentMode,
-                            status: effectiveStatus,
+                          return;
+                        }
+                        if (_service.isSeatOccupied(seat.seatNumber, shift: selectedShift, excludeStudentId: selectedStudent!.id)) {
+                          final occ = _service.getStudentForSeat(seat.seatNumber, shift: selectedShift);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Seat S-${seat.seatNumber} is already occupied for "$selectedShift"${occ != null ? " by ${occ.name}" : ""}.'),
+                              backgroundColor: const Color(0xFFE11D48),
+                              behavior: SnackBarBehavior.floating,
+                            ),
                           );
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('New student $name registered & assigned to Seat S-${seat.seatNumber}!'),
-                                backgroundColor: const Color(0xFF0D766E),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
+                          return;
+                        }
+                        final effectiveFeePaid = (int.tryParse(feePaidCtrl.text.trim()) ?? feePaidNow).clamp(0, selectedFeePlan);
+                        Navigator.pop(ctx);
+                        await _service.assignSeatToExistingStudent(
+                          newSeatNumber: seat.seatNumber,
+                          studentId: selectedStudent!.id,
+                          shift: selectedShift,
+                          sectionName: selectedSection,
+                          feePaidNow: effectiveFeePaid,
+                          paymentMode: paymentMode,
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Seat S-${seat.seatNumber} successfully assigned to ${selectedStudent!.name}!'),
+                              backgroundColor: const Color(0xFF0D766E),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
                         }
                       },
                       child: Text(
-                        !isNewStudentMode ? 'Confirm Seat S-${seat.seatNumber} Assignment' : 'Register & Assign Seat S-${seat.seatNumber}',
+                        'Confirm Seat S-${seat.seatNumber} Assignment',
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddStudentWizardScreen(
+                              initialSeatNumber: seat.seatNumber,
+                              initialSectionName: selectedSection,
+                              initialShift: selectedShift,
+                            ),
+                          ),
+                        ).then((_) {
+                          if (mounted) setState(() {});
+                        });
+                      },
+                      icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: Color(0xFF0D9488)),
+                      label: Text(
+                        'Register a new student for Seat S-${seat.seatNumber} →',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0D9488),
+                        ),
                       ),
                     ),
                   ),

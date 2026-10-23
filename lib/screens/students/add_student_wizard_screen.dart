@@ -11,8 +11,17 @@ import '../shifts/shift_system_screen.dart';
 
 class AddStudentWizardScreen extends StatefulWidget {
   final StudentInfo? studentToEdit;
+  final int? initialSeatNumber;
+  final String? initialSectionName;
+  final String? initialShift;
 
-  const AddStudentWizardScreen({super.key, this.studentToEdit});
+  const AddStudentWizardScreen({
+    super.key,
+    this.studentToEdit,
+    this.initialSeatNumber,
+    this.initialSectionName,
+    this.initialShift,
+  });
 
   @override
   State<AddStudentWizardScreen> createState() => _AddStudentWizardScreenState();
@@ -55,25 +64,54 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int get _fixedMonthlyFee => _selectedShift.monthlyFee > 0 ? _selectedShift.monthlyFee : 500;
   int get _calculatedTotalFee => _fixedMonthlyFee * _selectedDurationMonths;
 
-  // Fixed / Non-editable Already Paid for existing students (Requirement 4)
+  int get _studentCurrentShiftMonthlyFee {
+    if (widget.studentToEdit == null) return _fixedMonthlyFee;
+    final s = widget.studentToEdit!;
+    if (s.monthlyFee > 0) return s.monthlyFee;
+    final match = _service.shifts.where((sh) => sh.name.toLowerCase() == s.shift.toLowerCase());
+    if (match.isNotEmpty && match.first.monthlyFee > 0) {
+      return match.first.monthlyFee;
+    }
+    return 500;
+  }
+
+  bool get _isStudentInPaidActiveTenure {
+    if (widget.studentToEdit == null) return false;
+    final s = widget.studentToEdit!;
+    if (s.status == 'INACTIVE' || s.status == 'TRIAL') return false;
+    if (s.duesAmount > 0) return false;
+    if (s.feeDueDate != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final dueDay = DateTime(s.feeDueDate!.year, s.feeDueDate!.month, s.feeDueDate!.day);
+      return !dueDay.isBefore(today);
+    }
+    return s.status == 'ACTIVE';
+  }
+
+  // Shift upgrade difference in ongoing cycle (₹0 if same/lower price, >0 if higher price)
+  int get _shiftUpgradeDifference {
+    if (!_isStudentInPaidActiveTenure) return 0;
+    final s = widget.studentToEdit!;
+    final isShiftChanged = _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+    if (!isShiftChanged) return 0;
+    final diff = _fixedMonthlyFee - _studentCurrentShiftMonthlyFee;
+    return diff > 0 ? diff : 0;
+  }
+
+  // Fixed / Non-editable Already Paid for existing students
   int get _alreadyPaidAmount {
     if (widget.studentToEdit == null) return 0;
     final s = widget.studentToEdit!;
-    final hasPendingCurrentDue = s.duesAmount > 0 &&
-        s.feeDueDate != null &&
-        s.feeDueDate!.isAfter(DateTime.now());
-    final isPaidActive = s.duesAmount == 0 &&
-        s.feeDueDate != null &&
-        s.feeDueDate!.isAfter(DateTime.now());
-    final isShiftChanged = _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final isDueActive = s.feeDueDate != null && !s.feeDueDate!.isBefore(today);
 
-    final prevMonthly = s.monthlyFee > 0 ? s.monthlyFee : _fixedMonthlyFee;
-    if (hasPendingCurrentDue) {
-      return (prevMonthly - s.duesAmount).clamp(0, prevMonthly);
+    if (_isStudentInPaidActiveTenure) {
+      return _studentCurrentShiftMonthlyFee;
     }
-    // If student was already paid for current active month and changes shift, what they paid for previous shift is counted as already paid
-    if (isPaidActive && isShiftChanged) {
-      return prevMonthly;
+    if (s.duesAmount > 0 && isDueActive) {
+      return (_studentCurrentShiftMonthlyFee - s.duesAmount).clamp(0, _studentCurrentShiftMonthlyFee);
     }
     return 0;
   }
@@ -82,21 +120,33 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int get _dueAmount {
     if (widget.studentToEdit == null) return _calculatedTotalFee;
     final s = widget.studentToEdit!;
-    final hasPendingCurrentDue = s.duesAmount > 0 &&
-        s.feeDueDate != null &&
-        s.feeDueDate!.isAfter(DateTime.now());
-    final isPaidActive = s.duesAmount == 0 &&
-        s.feeDueDate != null &&
-        s.feeDueDate!.isAfter(DateTime.now());
     final isShiftChanged = _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final isDueActive = s.feeDueDate != null && !s.feeDueDate!.isBefore(today);
 
-    if (hasPendingCurrentDue && _selectedDurationMonths == 1 && !isShiftChanged) {
-      return s.duesAmount;
+    if (_isStudentInPaidActiveTenure) {
+      if (_selectedDurationMonths == 1) {
+        // Current cycle: if shift changed, only the upgrade difference (>0 if higher price, 0 if same price);
+        // if shift not changed, due is 0.
+        return _shiftUpgradeDifference;
+      } else {
+        final advanceMonths = _selectedDurationMonths - 1;
+        return _shiftUpgradeDifference + (_fixedMonthlyFee * advanceMonths);
+      }
     }
-    if (isPaidActive && !isShiftChanged) {
-      return _calculatedTotalFee;
+
+    if (s.duesAmount > 0 && isDueActive) {
+      final upgradeDiff = isShiftChanged ? (_fixedMonthlyFee - _studentCurrentShiftMonthlyFee).clamp(0, 999999) : 0;
+      if (_selectedDurationMonths == 1) {
+        return s.duesAmount + upgradeDiff;
+      } else {
+        final advanceMonths = _selectedDurationMonths - 1;
+        return s.duesAmount + upgradeDiff + (_fixedMonthlyFee * advanceMonths);
+      }
     }
-    return (_calculatedTotalFee - _alreadyPaidAmount).clamp(0, _calculatedTotalFee);
+
+    return _calculatedTotalFee;
   }
 
   void _updateDuration(int months) {
@@ -104,15 +154,10 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       _selectedDurationMonths = months;
       if (widget.studentToEdit != null) {
         final s = widget.studentToEdit!;
-        final hasPendingCurrentDue = s.duesAmount > 0 &&
-            s.feeDueDate != null &&
-            s.feeDueDate!.isAfter(DateTime.now());
-        final isPaidActive = s.duesAmount == 0 &&
-            s.feeDueDate != null &&
-            s.feeDueDate!.isAfter(DateTime.now());
-        final isShiftChanged = _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+        final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+        final isDueActive = s.feeDueDate != null && !s.feeDueDate!.isBefore(today);
 
-        if (hasPendingCurrentDue || (isPaidActive && isShiftChanged)) {
+        if (isDueActive) {
           if (months == 1) {
             _validUntilDate = s.feeDueDate!;
           } else {
@@ -123,7 +168,14 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           _validUntilDate = DateTime(_fromDate.year, _fromDate.month + months, _fromDate.day);
         }
         final due = _dueAmount;
-        _amountPaidCtrl.text = '$due';
+        if (due == 0) {
+          _amountPaidCtrl.text = '0';
+        } else {
+          final current = int.tryParse(_amountPaidCtrl.text.trim());
+          if (current == null || current > due) {
+            _amountPaidCtrl.text = '0';
+          }
+        }
       } else {
         _validUntilDate = DateTime(_fromDate.year, _fromDate.month + months, _fromDate.day);
         _amountPaidCtrl.text = '$_calculatedTotalFee';
@@ -185,10 +237,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       }
       _feeCtrl.text = '$_fixedMonthlyFee';
 
+      final today = DateTime(now.year, now.month, now.day);
       final hasPendingCurrentDue = s.duesAmount > 0 &&
           s.feeDueDate != null &&
-          s.feeDueDate!.isAfter(now);
-      final isExpired = s.feeDueDate == null || s.feeDueDate!.isBefore(now);
+          !s.feeDueDate!.isBefore(today);
+      final isExpired = s.feeDueDate == null || s.feeDueDate!.isBefore(today);
 
       if (hasPendingCurrentDue) {
         _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(const Duration(days: 30));
@@ -197,15 +250,29 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         _fromDate = now;
         _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
       } else {
-        _fromDate = s.feeDueDate!;
-        _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
+        _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(const Duration(days: 30));
+        _validUntilDate = s.feeDueDate!;
       }
 
       final initialDue = _dueAmount;
-      _amountPaidCtrl.text = '$initialDue';
+      _amountPaidCtrl.text = '0';
     } else {
+      if (widget.initialSeatNumber != null) {
+        _selectedSeat = widget.initialSeatNumber;
+      }
+      if (widget.initialSectionName != null && widget.initialSectionName!.isNotEmpty) {
+        _selectedSection = widget.initialSectionName!;
+      }
+      if (widget.initialShift != null && widget.initialShift!.isNotEmpty) {
+        final shiftMatch = _service.shifts.where((sh) => sh.name.toLowerCase() == widget.initialShift!.toLowerCase());
+        if (shiftMatch.isNotEmpty) {
+          _selectedShift = shiftMatch.first;
+        }
+      }
       _fromDate = _joiningDate;
       _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
+      _feeCtrl.text = '$_fixedMonthlyFee';
+      _amountPaidCtrl.text = '$_calculatedTotalFee';
     }
   }
 
@@ -414,12 +481,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       }
     }
 
-    // Overlap prevention: If student is active with 0 dues and shift NOT changed, period cannot start before feeDueDate!
+    // Overlap prevention: If student is active with 0 dues and shift NOT changed, advance period cannot overlap!
     if (widget.studentToEdit != null) {
       final s = widget.studentToEdit!;
-      final isPaidActive = s.duesAmount == 0 && s.feeDueDate != null && s.feeDueDate!.isAfter(DateTime.now());
       final isShiftChanged = s.shift.toLowerCase() != _selectedShift.name.toLowerCase();
-      if (isPaidActive && !isShiftChanged && _fromDate.isBefore(s.feeDueDate!)) {
+      if (_isStudentInPaidActiveTenure && !isShiftChanged && _selectedDurationMonths > 1 && _fromDate.isBefore(s.feeDueDate!)) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance payments starting from ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)} are allowed.'),
@@ -433,7 +499,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
 
     _feeCtrl.text = '$_fixedMonthlyFee';
     final maxPayable = widget.studentToEdit != null ? _dueAmount : _calculatedTotalFee;
-    final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? maxPayable;
+    final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? (widget.studentToEdit != null ? 0 : maxPayable);
     _amountPaidCtrl.text = '${parsedPaid.clamp(0, maxPayable)}';
     setState(() => _currentStep = 2);
   }
@@ -513,13 +579,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     try {
       if (widget.studentToEdit != null) {
         final s = widget.studentToEdit!;
-        final isPaidActive = s.duesAmount == 0 && s.feeDueDate != null && s.feeDueDate!.isAfter(DateTime.now());
         final oldShift = s.shift;
         final isShiftChanged = oldShift.toLowerCase() != _selectedShift.name.toLowerCase();
-        final oldMonthly = s.monthlyFee;
+        final oldMonthly = _studentCurrentShiftMonthlyFee;
 
-        // Overlap prevention: If active and shift NOT changed, user cannot pay for an already paid period
-        if (isPaidActive && !isShiftChanged && _fromDate.isBefore(s.feeDueDate!)) {
+        // Overlap prevention: Only if student is active, shift NOT changed, and advance months selected
+        if (_isStudentInPaidActiveTenure && !isShiftChanged && _selectedDurationMonths > 1 && _fromDate.isBefore(s.feeDueDate!)) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance payments are allowed.'),
@@ -530,9 +595,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           return;
         }
 
-        final alreadyPaid = _alreadyPaidAmount;
-        final dueAmount = (totalCalculatedFee - alreadyPaid).clamp(0, totalCalculatedFee);
-        final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? dueAmount;
+        final dueAmount = _dueAmount;
+        final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? 0;
         final collectedNow = parsedPaid.clamp(0, dueAmount);
         final editDuesAmount = (dueAmount - collectedNow).clamp(0, 999999);
 
@@ -1474,23 +1538,21 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           Builder(
             builder: (context) {
               final s = widget.studentToEdit;
+              final isShiftChanged = s != null && _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+              final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
               final hasPendingCurrentDue = s != null &&
                   s.duesAmount > 0 &&
                   s.feeDueDate != null &&
-                  s.feeDueDate!.isAfter(DateTime.now());
-              final isPaidActive = s != null &&
-                  s.duesAmount == 0 &&
-                  s.feeDueDate != null &&
-                  s.feeDueDate!.isAfter(DateTime.now());
-              final isShiftChanged = s != null &&
-                  _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+                  !s.feeDueDate!.isBefore(today);
 
               String firstChipLabel = '1 Month';
               if (hasPendingCurrentDue) {
                 firstChipLabel = 'Clear Due (₹${s.duesAmount})';
-              } else if (isPaidActive && isShiftChanged) {
-                final diff = (_fixedMonthlyFee - s.monthlyFee).clamp(0, 99999);
-                firstChipLabel = diff > 0 ? 'Shift Upgrade (₹$diff)' : 'Shift Change (1 Mo)';
+              } else if (_isStudentInPaidActiveTenure && isShiftChanged) {
+                final diff = _shiftUpgradeDifference;
+                firstChipLabel = diff > 0 ? 'Shift Upgrade (₹$diff)' : 'Shift Change (₹0 Due)';
+              } else if (_isStudentInPaidActiveTenure) {
+                firstChipLabel = 'Current Plan (₹0 Due)';
               }
 
               return SingleChildScrollView(
@@ -1503,12 +1565,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                     ),
                     const SizedBox(width: 8),
                     _durationChip(
-                      label: (hasPendingCurrentDue || (isPaidActive && isShiftChanged)) ? '2 Mo (+1 Adv)' : '2 Months',
+                      label: (hasPendingCurrentDue || (_isStudentInPaidActiveTenure && isShiftChanged)) ? '2 Mo (+1 Adv)' : '2 Months',
                       months: 2,
                     ),
                     const SizedBox(width: 8),
                     _durationChip(
-                      label: (hasPendingCurrentDue || (isPaidActive && isShiftChanged)) ? '3 Mo (+2 Adv)' : '3 Months',
+                      label: (hasPendingCurrentDue || (_isStudentInPaidActiveTenure && isShiftChanged)) ? '3 Mo (+2 Adv)' : '3 Months',
                       months: 3,
                     ),
                     const SizedBox(width: 8),
@@ -1689,13 +1751,15 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               final isEdit = widget.studentToEdit != null;
               final totalFee = _calculatedTotalFee;
               final maxPayable = isEdit ? _dueAmount : totalFee;
-              final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? maxPayable;
+              final parsedPaid = int.tryParse(_amountPaidCtrl.text.trim()) ?? (isEdit ? 0 : maxPayable);
               final currentPaid = parsedPaid.clamp(0, maxPayable);
               final remainingDues = (maxPayable - currentPaid).clamp(0, 999999);
 
               final bool isFullyPaid = currentPaid == maxPayable && maxPayable > 0;
               final bool isPartiallyPaid = currentPaid > 0 && currentPaid < maxPayable;
               final bool isUnpaid = currentPaid == 0;
+              final bool isShiftChanged = widget.studentToEdit != null &&
+                  _selectedShift.name.toLowerCase() != widget.studentToEdit!.shift.toLowerCase();
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1721,13 +1785,13 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                         child: Text(
                           isFullyPaid
                               ? '✓ Fully Paid'
-                              : (isPartiallyPaid ? 'Partially Paid' : 'Unpaid'),
+                              : (isPartiallyPaid ? 'Partially Paid' : (maxPayable == 0 ? '✓ No Dues' : 'Unpaid')),
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w900,
                             color: isFullyPaid
                                 ? const Color(0xFF15803D)
-                                : (isPartiallyPaid ? const Color(0xFFB45309) : const Color(0xFFDC2626)),
+                                : (isPartiallyPaid ? const Color(0xFFB45309) : (maxPayable == 0 ? const Color(0xFF15803D) : const Color(0xFFDC2626))),
                           ),
                         ),
                       ),
@@ -1769,7 +1833,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                             ),
                           ),
                           child: Text(
-                            widget.studentToEdit != null ? 'Accept Due (₹$maxPayable)' : 'Full Paid (₹$totalFee)',
+                            widget.studentToEdit != null ? (isShiftChanged ? 'Pay Upgrade (₹$maxPayable)' : 'Accept Due (₹$maxPayable)') : 'Full Paid (₹$totalFee)',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
@@ -1796,7 +1860,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                             ),
                           ),
                           child: Text(
-                            'Unpaid / ₹0 Paid',
+                            widget.studentToEdit != null ? 'Leave as Due (₹0 Paid)' : 'Unpaid / ₹0 Paid',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
@@ -1919,41 +1983,96 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Active Membership Informational Banner (Prevent Overlap)
+                // Active Membership & Shift Update Informational Banner
                 Builder(
                   builder: (context) {
                     final s = widget.studentToEdit;
-                    final isShiftChanged = s != null && _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
-                    final isPaidActive = s != null &&
-                        s.duesAmount == 0 &&
-                        s.feeDueDate != null &&
-                        s.feeDueDate!.isAfter(DateTime.now());
-                    if (isPaidActive && !isShiftChanged && s?.feeDueDate != null) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 14),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE6F4F1),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFA7F3D0)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF0F766E)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Active plan paid until ${DateFormat('dd-MMM-yyyy').format(s!.feeDueDate!)}. Any new payment is strictly an Advance Renewal starting from this date (overlapping periods not allowed).',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0F766E),
+                    if (s == null) return const SizedBox.shrink();
+                    final isShiftChanged = _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
+
+                    if (_isStudentInPaidActiveTenure) {
+                      if (isShiftChanged) {
+                        final diff = _shiftUpgradeDifference;
+                        if (diff > 0) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFFDE68A)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.upgrade_rounded, size: 20, color: Color(0xFFD97706)),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Shift upgraded: ${s.shift} (₹$_studentCurrentShiftMonthlyFee) → ${_selectedShift.name} (₹$_fixedMonthlyFee). Price difference of ₹$diff applies for the current tenure ending ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. If not paid now, it will be added as pending dues.',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        } else {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFA7F3D0)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle_outline_rounded, size: 20, color: Color(0xFF059669)),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Shift updated: ${s.shift} (₹$_studentCurrentShiftMonthlyFee) → ${_selectedShift.name} (₹$_fixedMonthlyFee). Same price range: No extra charge or dues for current tenure ending ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}.',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF047857),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                      } else if (s.feeDueDate != null) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F4F1),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF0F766E)),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Active plan paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Any new payment is strictly an Advance Renewal starting from this date (overlapping periods not allowed).',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F766E),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
+                            ],
+                          ),
+                        );
+                      }
                     }
                     return const SizedBox.shrink();
                   },
@@ -1964,11 +2083,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   builder: (context) {
                     final s = widget.studentToEdit;
                     final isShiftChanged = s != null && _selectedShift.name.toLowerCase() != s.shift.toLowerCase();
-                    final isPaidActive = s != null &&
-                        s.duesAmount == 0 &&
-                        s.feeDueDate != null &&
-                        s.feeDueDate!.isAfter(DateTime.now());
-                    final minDate = (isPaidActive && !isShiftChanged) ? s!.feeDueDate! : DateTime(2020);
+                    final minDate = (_isStudentInPaidActiveTenure && !isShiftChanged && _selectedDurationMonths > 1 && s?.feeDueDate != null)
+                        ? s!.feeDueDate!
+                        : DateTime(2020);
 
                     return Row(
                       children: [
