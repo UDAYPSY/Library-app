@@ -477,6 +477,7 @@ void main() {
         seatNumber: 10,
         shift: 'Full Day',
         joiningDate: DateTime(2026, 1, 1),
+        deviceUserId: 'Admin',
       );
 
       final student = service.findStudentByPhone('9812399999')!;

@@ -1491,7 +1491,7 @@ class LibraryService {
     required String studentName,
     required String phone,
     required String shift,
-    required String deviceUserId,
+    String deviceUserId = 'Admin',
     int feeAmount = 500,
     int? monthlyFee,
     String paymentMode = 'UPI',
