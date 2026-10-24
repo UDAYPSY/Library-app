@@ -16,7 +16,7 @@ void main() {
   group('Authentication & Security (RBAC & Multi-Tenant)', () {
     test('Default admin credentials log in successfully as Admin', () async {
       final res = await service.login(
-        identifier: 'nivi@library.com',
+        identifier: 'manageyourlib@gmail.com',
         password: 'password123',
       );
 
@@ -25,11 +25,17 @@ void main() {
       expect(service.isAuthenticated, isTrue);
       expect(service.isAdmin, isTrue);
       expect(service.isReceptionist, isFalse);
+
+      final legacyRes = await service.login(
+        identifier: 'nivi@library.com',
+        password: 'password123',
+      );
+      expect(legacyRes.success, isTrue);
     });
 
     test('Incorrect admin password fails authentication gracefully', () async {
       final res = await service.login(
-        identifier: 'nivi@library.com',
+        identifier: 'manageyourlib@gmail.com',
         password: 'wrong_password_999',
       );
 
@@ -127,7 +133,7 @@ void main() {
 
     test('Sign out cleanly clears active user session', () async {
       await service.login(
-        identifier: 'nivi@library.com',
+        identifier: 'manageyourlib@gmail.com',
         password: 'password123',
       );
       expect(service.isAuthenticated, isTrue);

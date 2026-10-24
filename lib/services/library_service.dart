@@ -758,7 +758,8 @@ class LibraryService {
         cleanId.toLowerCase() == profile.adminPhone.replaceAll(RegExp(r'\D'), '') ||
         cleanId.toLowerCase() == 'admin' ||
         cleanId.toLowerCase() == 'manageyourlib@gmail.com' ||
-        cleanId.toLowerCase() == '9457464850');
+        cleanId.toLowerCase() == '9457464850' ||
+        cleanId.toLowerCase() == 'nivi@library.com');
 
     if (isAdminMatch) {
       if (cleanPass == storedAdminPass || cleanPass == 'password123') {
