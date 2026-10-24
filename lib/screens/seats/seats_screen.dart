@@ -1706,6 +1706,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                               ),
                                             ),
                                           ],
+                                        ),
                                         Builder(
                                           builder: (context) {
                                             final studentJoin = student.joinedAt ?? DateTime.now();
