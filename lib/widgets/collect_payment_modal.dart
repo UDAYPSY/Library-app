@@ -614,56 +614,55 @@ Future<void> showCollectPaymentModal(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'From Date',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.text(sheetContext),
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                'From Date',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.text(sheetContext),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Fixed',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () async {
-                              final isPaidActive = !isExpired && !hasUnexpiredDue && student.feeDueDate != null;
-                              final minDate = isPaidActive ? student.feeDueDate! : DateTime(2020);
-                              final initialD = fromDate.isBefore(minDate) ? minDate : fromDate;
-                              final picked = await showDatePicker(
-                                context: sheetContext,
-                                initialDate: initialD,
-                                firstDate: minDate,
-                                lastDate: DateTime(2035),
-                              );
-                              if (picked != null) {
-                                setModalState(() {
-                                  fromDate = picked;
-                                  final m = selectedAdvanceMonths > 0 ? selectedAdvanceMonths : 1;
-                                  untilDate = DateTime(fromDate.year, fromDate.month + m, fromDate.day);
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    DateFormat('dd-MMM-yyyy').format(fromDate),
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.text(sheetContext),
-                                    ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  DateFormat('dd-MMM-yyyy').format(fromDate),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.text(sheetContext),
                                   ),
-                                  const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF64748B)),
-                                ],
-                              ),
+                                ),
+                                Icon(Icons.lock_outline_rounded, size: 16, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                              ],
                             ),
                           ),
                         ],
@@ -735,50 +734,56 @@ Future<void> showCollectPaymentModal(
                 ),
                 const SizedBox(height: 16),
 
-                // Payment Date
-                Text(
-                  'Payment Date',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.text(sheetContext),
-                  ),
+                // Payment Date (LOCKED / FIXED WHEN PAYMENT IS HAPPENING)
+                Row(
+                  children: [
+                    Text(
+                      'Payment Date',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.text(sheetContext),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Fixed (Today)',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: sheetContext,
-                      initialDate: paymentDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2035),
-                    );
-                    if (picked != null) {
-                      setModalState(() => paymentDate = picked);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('dd-MMM-yyyy').format(paymentDate),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.text(sheetContext),
-                          ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        DateFormat('dd-MMM-yyyy').format(paymentDate),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.text(sheetContext),
                         ),
-                        const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF64748B)),
-                      ],
-                    ),
+                      ),
+                      Icon(Icons.lock_outline_rounded, size: 16, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -913,6 +918,7 @@ Future<void> showCollectPaymentModal(
                           Navigator.pop(ctx);
 
                           if (paid > 0) {
+                            final m = selectedAdvanceMonths > 0 ? selectedAdvanceMonths : 1;
                             await service.recordPayment(
                               studentId: student.id,
                               studentName: student.name,
@@ -925,6 +931,9 @@ Future<void> showCollectPaymentModal(
                               notes: notesCtrl.text.trim().isNotEmpty
                                   ? notesCtrl.text.trim()
                                   : (remainingDues == 0 ? 'Full payment received' : 'Partial payment received'),
+                              validFrom: fromDate,
+                              validUntil: untilDate,
+                              durationMonths: m,
                             );
                           }
 

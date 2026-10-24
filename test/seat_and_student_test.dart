@@ -378,5 +378,38 @@ void main() {
       expect(upgradedBack.duesAmount, equals(0));
       expect(upgradedBack.status, equals('ACTIVE'));
     });
+
+    test('Payment transaction records multi-month tenure and dates correctly', () async {
+      final fromDate = DateTime(2026, 4, 1);
+      final untilDate = DateTime(2026, 6, 1);
+      await service.recordPayment(
+        studentName: 'Rohan Sharma',
+        studentId: 'std_rohan_1',
+        phone: '9876599999',
+        seatNumber: 15,
+        shift: 'Full Day',
+        amount: 1600,
+        date: DateTime(2026, 4, 1),
+        paymentMode: 'UPI',
+        notes: '2 Months Advance Fees',
+        validFrom: fromDate,
+        validUntil: untilDate,
+        durationMonths: 2,
+      );
+
+      final payments = service.currentPayments;
+      expect(payments.isNotEmpty, isTrue);
+      final p = payments.first;
+      expect(p.studentName, equals('Rohan Sharma'));
+      expect(p.amount, equals(1600));
+      expect(p.durationMonths, equals(2));
+      expect(p.validFrom, equals(fromDate));
+      expect(p.validUntil, equals(untilDate));
+
+      final json = p.toJsonMap();
+      expect(json['duration_months'], equals(2));
+      expect(json['valid_from'], isNotNull);
+      expect(json['valid_until'], isNotNull);
+    });
   });
 }

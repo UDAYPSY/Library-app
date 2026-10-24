@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../services/library_service.dart';
+import '../../services/local_storage_service.dart';
 import 'setup_success_screen.dart';
 
 class ReviewSetupScreen extends StatelessWidget {
@@ -267,11 +268,23 @@ class ReviewSetupScreen extends StatelessWidget {
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SetupSuccessScreen()),
+                  onPressed: () async {
+                    final savedPass = await LocalStorageService.getString('app_admin_password') ?? 'password123';
+                    await service.registerAdminAccount(
+                      email: service.profile.adminEmail.isNotEmpty ? service.profile.adminEmail : 'manageyourlib@gmail.com',
+                      password: savedPass,
+                      adminName: service.profile.adminName.isNotEmpty ? service.profile.adminName : 'Administrator',
+                      libraryName: service.profile.libraryName.isNotEmpty ? service.profile.libraryName : 'My Library',
+                      phone: service.profile.adminPhone.isNotEmpty ? service.profile.adminPhone : '9457464850',
                     );
+                    service.updateSectionsAndRebuildSeats(service.sections);
+                    await service.persistAll();
+                    if (context.mounted) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SetupSuccessScreen()),
+                      );
+                    }
                   },
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,

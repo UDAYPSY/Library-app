@@ -8,7 +8,7 @@ class SetupSuccessScreen extends StatelessWidget {
   const SetupSuccessScreen({super.key});
 
   Future<void> _openWhatsAppGroup(BuildContext context) async {
-    final url = Uri.parse('https://chat.whatsapp.com/demo-library-owners-community');
+    final url = Uri.parse('https://wa.me/919457464850?text=${Uri.encodeComponent("Hello TrackMyLibrary team, I just created my library and want to join the Official Library Owners Community.")}');
     try {
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);

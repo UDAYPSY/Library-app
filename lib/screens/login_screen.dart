@@ -3,6 +3,7 @@ import '../constants/app_colors.dart';
 import '../services/library_service.dart';
 import 'main_hub_screen.dart';
 import 'onboarding/workspace_setup_screen.dart';
+import 'onboarding/welcome_carousel_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,7 +14,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final LibraryService _service = LibraryService();
-  final _emailCtrl = TextEditingController(text: 'nivi@library.com');
+  final _emailCtrl = TextEditingController(text: 'manageyourlib@gmail.com');
   final _passCtrl = TextEditingController(text: 'password123');
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -23,6 +24,17 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _service.ensureInitialized();
+    _checkActiveSession();
+  }
+
+  Future<void> _checkActiveSession() async {
+    await _service.restoreSession();
+    if (_service.isAuthenticated && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainHubScreen()),
+      );
+    }
   }
 
   @override
@@ -36,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _emailCtrl.text = _service.profile.adminEmail.isNotEmpty
           ? _service.profile.adminEmail
-          : 'nivi@library.com';
+          : 'manageyourlib@gmail.com';
       _passCtrl.text = 'password123';
       _errorMessage = null;
     });
@@ -45,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _fillStaffDemo() {
     final staffPhone = _service.staffList.isNotEmpty
         ? _service.staffList.first.phone
-        : '9876543210';
+        : '9457464850';
     setState(() {
       _emailCtrl.text = staffPhone;
       _passCtrl.text = '1234';
@@ -159,15 +171,19 @@ class _LoginScreenState extends State<LoginScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
+            onPressed: () async {
+              final target = resetEmailCtrl.text.trim();
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Recovery link & OTP sent to ${resetEmailCtrl.text.trim()}.'),
-                  backgroundColor: const Color(0xFF0D766E),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              final res = await _service.sendPasswordReset(target);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(res.message ?? 'Recovery link & OTP sent to $target.'),
+                    backgroundColor: res.success ? const Color(0xFF0D766E) : const Color(0xFFEF4444),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
             child: const Text('Send Recovery Link'),
           ),
@@ -379,7 +395,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Navigator.pop(ctx);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const WorkspaceSetupScreen()),
+                        MaterialPageRoute(builder: (_) => const WelcomeCarouselScreen()),
                       );
                     },
                     child: const Text(
@@ -749,7 +765,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       // New here? Create Account
                       Center(
                         child: GestureDetector(
-                          onTap: _showCreateAccountModal,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const WelcomeCarouselScreen()),
+                            );
+                          },
                           child: RichText(
                             text: const TextSpan(
                               style: TextStyle(fontSize: 13, color: AppColors.textNavy),

@@ -87,7 +87,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
   // -------------------------------------------------------------
   Widget _buildHomeTab() {
     final profile = _service.profile;
-    final adminName = profile.adminName.isNotEmpty ? profile.adminName : 'Nivi';
+    final adminName = _service.currentUserName.isNotEmpty
+        ? _service.currentUserName
+        : (profile.adminName.isNotEmpty ? profile.adminName : 'Administrator');
     final avatarLetter = adminName.isNotEmpty ? adminName[0].toUpperCase() : 'N';
 
     final hour = DateTime.now().hour;
@@ -2795,7 +2797,7 @@ Have a productive study session!
             Text('Connect directly with our 24/7 dedicated support team via $type.'),
             const SizedBox(height: 14),
             SelectableText(
-              type == 'WhatsApp' ? '+91 94574 64850' : 'support@trackmylibrary.com',
+              type == 'WhatsApp' ? '+91 94574 64850' : 'manageyourlib@gmail.com',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primaryTeal),
             ),
           ],
@@ -2812,7 +2814,7 @@ Have a productive study session!
               Navigator.pop(ctx);
               final uri = type == 'WhatsApp'
                   ? Uri.parse('https://wa.me/919457464850?text=${Uri.encodeComponent("Hi TrackMyLibrary Support Team, I need assistance with my library management app.")}')
-                  : Uri.parse('mailto:support@trackmylibrary.com?subject=${Uri.encodeComponent("TrackMyLibrary Support Request")}');
+                  : Uri.parse('mailto:manageyourlib@gmail.com?subject=${Uri.encodeComponent("TrackMyLibrary Support Request")}');
               try {
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);

@@ -16,28 +16,41 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
-  final TextEditingController _passCtrl = TextEditingController(text: 'secret123');
+  final TextEditingController _passCtrl = TextEditingController();
 
   bool _obscurePass = true;
+  bool _showErrors = false;
 
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: _service.profile.adminName);
-    _emailCtrl = TextEditingController(text: _service.profile.adminEmail);
-    _phoneCtrl = TextEditingController(text: _service.profile.adminPhone);
+    _nameCtrl = TextEditingController(text: _service.profile.adminName != 'Nivi' ? _service.profile.adminName : '');
+    _emailCtrl = TextEditingController(text: '');
+    _phoneCtrl = TextEditingController(text: '');
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
   }
 
   bool get _isNameValid => _nameCtrl.text.trim().isNotEmpty;
-  bool get _isEmailValid => _emailCtrl.text.trim().contains('@') && _emailCtrl.text.trim().contains('.');
-  bool get _isPhoneValid => _phoneCtrl.text.replaceAll(RegExp(r'\D'), '').length >= 10;
+  bool get _isEmailValid =>
+      _emailCtrl.text.trim().isNotEmpty &&
+      _emailCtrl.text.trim().contains('@') &&
+      _emailCtrl.text.trim().contains('.');
+  bool get _isPhoneValid =>
+      _phoneCtrl.text.replaceAll(RegExp(r'\D'), '').length >= 10;
   bool get _isPassValid => _passCtrl.text.length >= 6;
 
   void _onCreateAccount() {
+    setState(() => _showErrors = true);
+
     if (!_isNameValid || !_isEmailValid || !_isPhoneValid || !_isPassValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete all fields correctly.')),
-      );
       return;
     }
 
@@ -140,7 +153,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header with back arrow
+                      // Header with back arrow (Image 3 & 4)
                       Stack(
                         alignment: Alignment.center,
                         children: [
@@ -164,129 +177,56 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                       const SizedBox(height: 16),
 
                       // Input 1: Full Name
-                      const Text(
-                        'FULL NAME',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: AppColors.textNavy),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
+                      _buildField(
+                        label: 'FULL NAME',
                         controller: _nameCtrl,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'John Doe',
-                          prefixIcon: const Icon(Icons.person_outline_rounded, color: AppColors.textMuted, size: 20),
-                          suffixIcon: _isNameValid
-                              ? const Icon(Icons.check_circle_rounded, color: AppColors.primaryTeal, size: 20)
-                              : null,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          filled: true,
-                          fillColor: const Color(0xFFFBFDFF),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.inputBorder),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.primaryTeal, width: 1.5),
-                          ),
-                        ),
+                        hintText: 'John Doe',
+                        prefixIcon: Icons.person_outline_rounded,
+                        isError: _showErrors && !_isNameValid,
+                        errorMessage: 'Name is required',
                       ),
                       const SizedBox(height: 14),
 
                       // Input 2: Email Address
-                      const Text(
-                        'EMAIL ADDRESS',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: AppColors.textNavy),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
+                      _buildField(
+                        label: 'EMAIL ADDRESS',
                         controller: _emailCtrl,
+                        hintText: 'manageyourlib@gmail.com',
+                        prefixIcon: Icons.mail_outline_rounded,
                         keyboardType: TextInputType.emailAddress,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'john@example.com',
-                          prefixIcon: const Icon(Icons.mail_outline_rounded, color: AppColors.textMuted, size: 20),
-                          suffixIcon: _isEmailValid
-                              ? const Icon(Icons.check_circle_rounded, color: AppColors.primaryTeal, size: 20)
-                              : null,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          filled: true,
-                          fillColor: const Color(0xFFFBFDFF),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.inputBorder),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.primaryTeal, width: 1.5),
-                          ),
-                        ),
+                        isError: _showErrors && !_isEmailValid,
+                        errorMessage: 'Enter a valid email address',
                       ),
                       const SizedBox(height: 14),
 
                       // Input 3: Phone Number
-                      const Text(
-                        'PHONE NUMBER',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: AppColors.textNavy),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
+                      _buildField(
+                        label: 'PHONE NUMBER',
                         controller: _phoneCtrl,
+                        hintText: '9457464850',
+                        prefixIcon: Icons.phone_outlined,
                         keyboardType: TextInputType.phone,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: '98765 43210',
-                          prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.textMuted, size: 20),
-                          suffixIcon: _isPhoneValid
-                              ? const Icon(Icons.check_circle_rounded, color: AppColors.primaryTeal, size: 20)
-                              : null,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          filled: true,
-                          fillColor: const Color(0xFFFBFDFF),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.inputBorder),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.primaryTeal, width: 1.5),
-                          ),
-                        ),
+                        isError: _showErrors && !_isPhoneValid,
+                        errorMessage: 'Phone number is required',
                       ),
                       const SizedBox(height: 14),
 
                       // Input 4: Password
-                      const Text(
-                        'PASSWORD',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: AppColors.textNavy),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
+                      _buildField(
+                        label: 'PASSWORD',
                         controller: _passCtrl,
+                        hintText: 'Min. 6 characters',
+                        prefixIcon: Icons.lock_outline_rounded,
                         obscureText: _obscurePass,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Min. 6 characters',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted, size: 20),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                              color: AppColors.textMuted,
-                              size: 20,
-                            ),
-                            onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                        isError: _showErrors && !_isPassValid,
+                        errorMessage: 'Password must be at least 6 characters',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            color: AppColors.textMuted,
+                            size: 20,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          filled: true,
-                          fillColor: const Color(0xFFFBFDFF),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.inputBorder),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.primaryTeal, width: 1.5),
-                          ),
+                          onPressed: () => setState(() => _obscurePass = !_obscurePass),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -374,6 +314,75 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildField({
+    required String label,
+    required TextEditingController controller,
+    required String hintText,
+    required IconData prefixIcon,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    bool isError = false,
+    required String errorMessage,
+    Widget? suffixIcon,
+  }) {
+    const errorColor = Color(0xFFEF4444);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+            color: AppColors.textNavy,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          onChanged: (_) {
+            if (_showErrors) setState(() {});
+          },
+          decoration: InputDecoration(
+            hintText: hintText,
+            prefixIcon: Icon(prefixIcon, color: isError ? errorColor : AppColors.textMuted, size: 20),
+            suffixIcon: suffixIcon,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            filled: true,
+            fillColor: const Color(0xFFFBFDFF),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: isError ? errorColor : AppColors.inputBorder, width: isError ? 1.5 : 1.0),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: isError ? errorColor : AppColors.inputBorder, width: isError ? 1.5 : 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: isError ? errorColor : AppColors.primaryTeal, width: 1.5),
+            ),
+          ),
+        ),
+        if (isError) ...[
+          const SizedBox(height: 4),
+          Text(
+            errorMessage,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: errorColor,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -47,8 +47,8 @@ class LibraryProfile {
     this.libraryName = 'Patna Central Library',
     this.city = 'City Center, Main St',
     this.adminName = 'Nivi',
-    this.adminEmail = 'udaypratapsi2022@gmail.com',
-    this.adminPhone = '94574 64850',
+    this.adminEmail = 'manageyourlib@gmail.com',
+    this.adminPhone = '9457464850',
     this.logoEmblem = 'Book & Torch',
     this.logoBase64,
     this.logoUrl,
@@ -475,6 +475,9 @@ class PaymentTransaction {
   final DateTime date;
   final String paymentMode;
   final String notes;
+  final DateTime? validFrom;
+  final DateTime? validUntil;
+  final int? durationMonths;
 
   const PaymentTransaction({
     required this.id,
@@ -487,6 +490,9 @@ class PaymentTransaction {
     required this.date,
     this.paymentMode = 'UPI',
     this.notes = '',
+    this.validFrom,
+    this.validUntil,
+    this.durationMonths,
   });
 
   Map<String, dynamic> toMap() {
@@ -501,6 +507,9 @@ class PaymentTransaction {
       'date': Timestamp.fromDate(date),
       'payment_mode': paymentMode,
       'notes': notes,
+      if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom!),
+      if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil!),
+      if (durationMonths != null) 'duration_months': durationMonths,
     };
   }
 
@@ -516,6 +525,9 @@ class PaymentTransaction {
       'date': date.toIso8601String(),
       'payment_mode': paymentMode,
       'notes': notes,
+      if (validFrom != null) 'valid_from': validFrom!.toIso8601String(),
+      if (validUntil != null) 'valid_until': validUntil!.toIso8601String(),
+      if (durationMonths != null) 'duration_months': durationMonths,
     };
   }
 
@@ -524,6 +536,13 @@ class PaymentTransaction {
       if (val is Timestamp) return val.toDate();
       if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
       return DateTime.now();
+    }
+
+    DateTime? parseOptionalDate(dynamic val) {
+      if (val == null) return null;
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val);
+      return null;
     }
 
     return PaymentTransaction(
@@ -537,6 +556,9 @@ class PaymentTransaction {
       date: parseDate(data['date']),
       paymentMode: (data['payment_mode'] as String?) ?? 'UPI',
       notes: (data['notes'] as String?) ?? (data['note'] as String?) ?? '',
+      validFrom: parseOptionalDate(data['valid_from']),
+      validUntil: parseOptionalDate(data['valid_until']),
+      durationMonths: (data['duration_months'] as num?)?.toInt(),
     );
   }
 }

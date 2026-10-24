@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'constants/app_colors.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding/welcome_carousel_screen.dart';
 import 'screens/tools/student_live_portal_screen.dart';
 import 'services/library_service.dart';
 
@@ -97,6 +98,7 @@ class TrackMyLibraryApp extends StatelessWidget {
           initialRoute: '/',
           routes: {
             '/': (context) => const LoginScreen(),
+            '/onboarding': (context) => const WelcomeCarouselScreen(),
             '/portal': (context) => const StudentLivePortalScreen(),
           },
         );

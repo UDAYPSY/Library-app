@@ -693,6 +693,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
             date: _paymentDate,
             paymentMode: _selectedPaymentMethod,
             notes: paymentNotes,
+            validFrom: _fromDate,
+            validUntil: _validUntilDate,
+            durationMonths: _selectedDurationMonths,
           );
         }
 
@@ -2174,55 +2177,53 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
 
                     return Row(
                       children: [
-                        // From Date Picker
+                        // From Date (LOCKED / FIXED TO JOINING DATE)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _fieldLabel('From Date', isRequired: false),
-                              const SizedBox(height: 6),
-                              InkWell(
-                                borderRadius: BorderRadius.circular(14),
-                                onTap: () async {
-                                  final initialD = _fromDate.isBefore(minDate) ? minDate : _fromDate;
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: initialD,
-                                    firstDate: minDate,
-                                    lastDate: DateTime(2035),
-                                  );
-                                  if (picked != null) {
-                                    setState(() {
-                                      _fromDate = picked;
-                                      _validUntilDate = DateTime(
-                                        _fromDate.year,
-                                        _fromDate.month + _selectedDurationMonths,
-                                        _fromDate.day,
-                                      );
-                                    });
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        DateFormat('dd-MMM-yyyy').format(_fromDate),
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.textNavy,
-                                        ),
+                              Row(
+                                children: [
+                                  _fieldLabel('From Date', isRequired: false),
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'Fixed',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF64748B),
                                       ),
-                                      const Icon(Icons.calendar_month_outlined, size: 16, color: Color(0xFF64748B)),
-                                    ],
+                                    ),
                                   ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      DateFormat('dd-MMM-yyyy').format(_fromDate),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.textNavy,
+                                      ),
+                                    ),
+                                    const Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                                  ],
                                 ),
                               ),
                             ],
@@ -2288,43 +2289,49 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Payment Date
-                _fieldLabel('Payment Date', isRequired: false),
-                const SizedBox(height: 6),
-                InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _paymentDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2035),
-                    );
-                    if (picked != null) {
-                      setState(() => _paymentDate = picked);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('dd-MMM-yyyy').format(_paymentDate),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textNavy,
-                          ),
+                // Payment Date (LOCKED / FIXED TO CURRENT PAYMENT MOMENT)
+                Row(
+                  children: [
+                    _fieldLabel('Payment Date', isRequired: false),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Fixed (Today)',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF64748B),
                         ),
-                        const Icon(Icons.today_rounded, size: 18, color: Color(0xFF64748B)),
-                      ],
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        DateFormat('dd-MMM-yyyy').format(_paymentDate),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textNavy,
+                        ),
+                      ),
+                      const Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 14),

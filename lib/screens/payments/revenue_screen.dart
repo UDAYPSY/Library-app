@@ -369,66 +369,95 @@ class _RevenueScreenState extends State<RevenueScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // Payment Method Filter Chips
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: _paymentMethods.map((method) {
-                              final isSelected = _selectedPaymentMethod == method;
-                              IconData icon;
-                              if (method == 'UPI') {
-                                icon = Icons.qr_code_2_rounded;
-                              } else if (method == 'Cash') {
-                                icon = Icons.payments_rounded;
-                              } else if (method == 'Card') {
-                                icon = Icons.credit_card_rounded;
-                              } else if (method == 'Net Banking / Cheque') {
-                                icon = Icons.account_balance_rounded;
-                              } else {
-                                icon = Icons.tune_rounded;
-                              }
-
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(10),
-                                  onTap: () => setState(() => _selectedPaymentMethod = method),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? (AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFE6F4F1))
-                                          : AppColors.subSurface(context),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isSelected ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
-                                        width: isSelected ? 1.5 : 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          icon,
-                                          size: 14,
-                                          color: isSelected ? AppColors.primaryTeal : AppColors.textMutedColor(context),
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Text(
-                                          method,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                            color: isSelected ? AppColors.primaryTeal : AppColors.text(context),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                        // Payment Method Dropdown
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 60,
+                              child: Text(
+                                'METHOD',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                  color: AppColors.textMutedColor(context),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Container(
+                                height: 38,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.subSurface(context),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _selectedPaymentMethod != 'All Methods'
+                                        ? AppColors.primaryTeal
+                                        : AppColors.cardBorderColor(context),
+                                    width: _selectedPaymentMethod != 'All Methods' ? 1.5 : 1.0,
                                   ),
                                 ),
-                              );
-                            }).toList(),
-                          ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: _paymentMethods.contains(_selectedPaymentMethod)
+                                        ? _selectedPaymentMethod
+                                        : 'All Methods',
+                                    isExpanded: true,
+                                    icon: const Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      color: AppColors.primaryTeal,
+                                      size: 20,
+                                    ),
+                                    dropdownColor: AppColors.card(context),
+                                    borderRadius: BorderRadius.circular(12),
+                                    items: _paymentMethods.map((method) {
+                                      final isSelected = _selectedPaymentMethod == method;
+                                      IconData icon;
+                                      if (method == 'UPI') {
+                                        icon = Icons.qr_code_2_rounded;
+                                      } else if (method == 'Cash') {
+                                        icon = Icons.payments_rounded;
+                                      } else if (method == 'Card') {
+                                        icon = Icons.credit_card_rounded;
+                                      } else if (method == 'Net Banking / Cheque') {
+                                        icon = Icons.account_balance_rounded;
+                                      } else {
+                                        icon = Icons.tune_rounded;
+                                      }
+
+                                      return DropdownMenuItem<String>(
+                                        value: method,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              icon,
+                                              size: 15,
+                                              color: isSelected ? AppColors.primaryTeal : AppColors.textMutedColor(context),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              method,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                                color: isSelected ? AppColors.primaryTeal : AppColors.text(context),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setState(() => _selectedPaymentMethod = val);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -521,7 +550,38 @@ class _RevenueScreenState extends State<RevenueScreen> {
                             final seatStr = p.seatNumber != null ? 'S-${p.seatNumber}' : 'Unallocated';
 
                             final formattedPaidDate = DateFormat('dd-MMM-yyyy').format(p.date);
-                            final validUntilDate = DateFormat('dd-MMM-yyyy').format(p.date.add(const Duration(days: 30)));
+
+                            // Tenure dates and duration calculation
+                            final DateTime tenureStart = p.validFrom ?? p.date;
+                            final DateTime tenureEnd;
+                            final int tenureMonths;
+
+                            if (p.validUntil != null) {
+                              tenureEnd = p.validUntil!;
+                              tenureMonths = p.durationMonths ??
+                                  (((tenureEnd.year - tenureStart.year) * 12 + (tenureEnd.month - tenureStart.month)).clamp(1, 120));
+                            } else if (p.durationMonths != null && p.durationMonths! > 0) {
+                              tenureMonths = p.durationMonths!;
+                              tenureEnd = DateTime(tenureStart.year, tenureStart.month + tenureMonths, tenureStart.day);
+                            } else {
+                              // Extract duration from notes if available (e.g., "2 Months Advance Fees" or "3 mo")
+                              final match = RegExp(r'(\d+)\s*(?:month|mo)', caseSensitive: false).firstMatch(p.notes);
+                              if (match != null) {
+                                tenureMonths = int.tryParse(match.group(1) ?? '1') ?? 1;
+                                tenureEnd = DateTime(tenureStart.year, tenureStart.month + tenureMonths, tenureStart.day);
+                              } else {
+                                tenureMonths = 1;
+                                tenureEnd = DateTime(tenureStart.year, tenureStart.month + 1, tenureStart.day);
+                              }
+                            }
+
+                            final formattedStart = DateFormat('dd-MMM-yyyy').format(tenureStart);
+                            final formattedEnd = DateFormat('dd-MMM-yyyy').format(tenureEnd);
+                            final tenureLabel = tenureMonths == 1
+                                ? '1 Month'
+                                : (tenureMonths % 12 == 0
+                                    ? '${tenureMonths ~/ 12} Year${tenureMonths ~/ 12 > 1 ? "s" : ""}'
+                                    : '$tenureMonths Months');
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -608,7 +668,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                   ),
                                   const SizedBox(height: 12),
 
-                                  // Third Row: Validity Period Box (Image 3)
+                                  // Third Row: Validity Period Box with Accurate Multi-Month / Multi-Year Tenure
                                   Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -625,12 +685,29 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                           color: AppColors.textSubtleColor(context),
                                         ),
                                         const SizedBox(width: 8),
-                                        Text(
-                                          '$formattedPaidDate — $validUntilDate',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.text(context),
+                                        Expanded(
+                                          child: Text(
+                                            '$formattedStart — $formattedEnd',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.text(context),
+                                            ),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.isDark(context) ? const Color(0xFF134E4A) : const Color(0xFFCCFBF1),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            tenureLabel,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w900,
+                                              color: AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0F766E),
+                                            ),
                                           ),
                                         ),
                                       ],

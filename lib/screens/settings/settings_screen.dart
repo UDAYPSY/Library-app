@@ -459,17 +459,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     p.adminName = nameCtrl.text.trim();
                     p.adminEmail = emailCtrl.text.trim();
                     p.adminPhone = phoneCtrl.text.trim();
                     p.libraryName = libCtrl.text.trim();
                     p.city = cityCtrl.text.trim();
+                    await _service.persistAll();
                     setState(() {});
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Color(0xFF0D766E)),
-                    );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Color(0xFF0D766E)),
+                      );
+                    }
                   },
                   child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
@@ -1541,7 +1544,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         : (profile.adminName.isNotEmpty ? profile.adminName : 'Nivi');
     final displayEmail = _service.currentUserEmail.isNotEmpty
         ? _service.currentUserEmail
-        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : 'udaypratapsi2022@gmail.com');
+        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : 'manageyourlib@gmail.com');
     final avatarLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'N';
 
     return Scaffold(
@@ -1979,16 +1982,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   iconBg: const Color(0xFFECFDF5),
                   iconColor: const Color(0xFF10B981),
                   title: 'Contact on WhatsApp',
-                  subtitle: '+91 73483 35273',
-                  onTap: () => _launchUrl('https://wa.me/917348335273'),
+                  subtitle: '+91 94574 64850',
+                  onTap: () => _launchUrl('https://wa.me/919457464850'),
                 ),
                 _settingsTile(
                   icon: Icons.email_outlined,
                   iconBg: const Color(0xFFE0F2FE),
                   iconColor: const Color(0xFF0284C7),
                   title: 'Email Support',
-                  subtitle: 'md.alishanali88@gmail.com',
-                  onTap: () => _launchUrl('mailto:md.alishanali88@gmail.com'),
+                  subtitle: 'manageyourlib@gmail.com',
+                  onTap: () => _launchUrl('mailto:manageyourlib@gmail.com'),
                 ),
                 _settingsTile(
                   icon: Icons.star_outline_rounded,

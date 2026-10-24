@@ -344,6 +344,17 @@ class LibraryService {
     } catch (_) {}
   }
 
+  /// Public persistence helper ensuring all changes to profile, seats, shifts & staff are stored locally
+  Future<void> persistAll() async {
+    await _saveLocalState();
+  }
+
+  /// Update and persist library profile metadata
+  Future<void> saveProfile(LibraryProfile newProfile) async {
+    profile = newProfile;
+    await _saveLocalState();
+  }
+
   String exportFullBackupJson() {
     ensureInitialized();
     final backupData = {
@@ -663,7 +674,7 @@ class LibraryService {
   // Active User Session & Role-Based Access Control (RBAC)
   String? currentUserId;
   String currentUserName = 'Nivi';
-  String currentUserEmail = 'nivi@library.com';
+  String currentUserEmail = 'manageyourlib@gmail.com';
   String currentUserRole = 'Admin'; // 'Admin' or 'Receptionist'
   bool isAuthenticated = false;
 
@@ -746,7 +757,8 @@ class LibraryService {
     final isAdminMatch = (cleanId.toLowerCase() == profile.adminEmail.toLowerCase() ||
         cleanId.toLowerCase() == profile.adminPhone.replaceAll(RegExp(r'\D'), '') ||
         cleanId.toLowerCase() == 'admin' ||
-        cleanId.toLowerCase() == 'nivi@library.com');
+        cleanId.toLowerCase() == 'manageyourlib@gmail.com' ||
+        cleanId.toLowerCase() == '9457464850');
 
     if (isAdminMatch) {
       if (cleanPass == storedAdminPass || cleanPass == 'password123') {
@@ -934,6 +946,36 @@ class LibraryService {
     return true;
   }
 
+  Future<AuthResult> sendPasswordReset(String identifier) async {
+    final clean = identifier.trim();
+    if (clean.isEmpty) {
+      return const AuthResult(
+        success: false,
+        message: 'Please enter your registered email address or mobile number.',
+      );
+    }
+    if (isFirebaseConnected && clean.contains('@')) {
+      try {
+        await FirebaseAuth.instance.sendPasswordResetEmail(email: clean);
+        return const AuthResult(
+          success: true,
+          message: 'Password reset link sent to your registered email.',
+        );
+      } on FirebaseAuthException catch (e) {
+        String msg = 'Password reset failed.';
+        if (e.code == 'user-not-found') msg = 'No account found with this email.';
+        if (e.code == 'invalid-email') msg = 'Invalid email address format.';
+        return AuthResult(success: false, message: msg);
+      } catch (e) {
+        return AuthResult(success: false, message: 'Password recovery error: $e');
+      }
+    }
+    return AuthResult(
+      success: true,
+      message: 'Recovery verification instructions sent to $clean.',
+    );
+  }
+
   // Real-time seat stream (Cloud Firestore or In-Memory Demo)
   Stream<List<SeatInfo>> streamSeats() {
     ensureInitialized();
@@ -1083,6 +1125,9 @@ class LibraryService {
     DateTime? date,
     String paymentMode = 'UPI',
     String notes = '',
+    DateTime? validFrom,
+    DateTime? validUntil,
+    int? durationMonths,
   }) async {
     ensureInitialized();
     final payDate = date ?? DateTime.now();
@@ -1100,6 +1145,9 @@ class LibraryService {
         'date': Timestamp.fromDate(payDate),
         'payment_mode': paymentMode,
         'notes': notes,
+        if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom),
+        if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil),
+        if (durationMonths != null) 'duration_months': durationMonths,
       });
 
       if (studentId != null && studentId.isNotEmpty) {
@@ -1138,6 +1186,9 @@ class LibraryService {
           date: payDate,
           paymentMode: paymentMode,
           notes: notes,
+          validFrom: validFrom,
+          validUntil: validUntil,
+          durationMonths: durationMonths,
         ),
       );
       _mockPaymentsController.add(List.unmodifiable(_mockPayments));
@@ -1388,6 +1439,7 @@ class LibraryService {
     ensureInitialized();
 
     final now = joiningDate ?? DateTime.now();
+    final effectiveJoiningDate = now;
     final payDate = paymentDate ?? DateTime.now();
     final totalFee = feeAmount + duesAmount;
     final effectiveMonths = durationMonths > 0 ? durationMonths : 1;
@@ -1587,6 +1639,9 @@ class LibraryService {
             notes: durationMonths > 1
                 ? '$durationMonths Months Advance Fees'
                 : 'Initial registration fee',
+            validFrom: effectiveJoiningDate,
+            validUntil: effectiveValidUntil,
+            durationMonths: durationMonths,
           ),
         );
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));

@@ -1431,11 +1431,96 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         children: [
-                          _filterRow(
-                            'SHIFT',
-                            ['ALL', ..._service.shifts.map((s) => s.name.toUpperCase()).toSet()],
-                            _selectedShift,
-                            (val) => setState(() => _selectedShift = val),
+                          // Shift Dropdown Filter
+                          Builder(
+                            builder: (context) {
+                              final shiftOptions = ['ALL', ..._service.shifts.map((s) => s.name.toUpperCase()).toSet()];
+                              final currentVal = shiftOptions.contains(_selectedShift.toUpperCase())
+                                  ? _selectedShift.toUpperCase()
+                                  : 'ALL';
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 58,
+                                      child: Text(
+                                        'SHIFT',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.6,
+                                          color: AppColors.textMutedColor(context),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Container(
+                                        height: 38,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.card(context),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: currentVal != 'ALL'
+                                                ? (AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D766E))
+                                                : AppColors.cardBorderColor(context),
+                                            width: currentVal != 'ALL' ? 1.5 : 1.0,
+                                          ),
+                                        ),
+                                        child: DropdownButtonHideUnderline(
+                                          child: DropdownButton<String>(
+                                            value: currentVal,
+                                            isExpanded: true,
+                                            icon: Icon(
+                                              Icons.keyboard_arrow_down_rounded,
+                                              color: AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D766E),
+                                              size: 20,
+                                            ),
+                                            dropdownColor: AppColors.card(context),
+                                            borderRadius: BorderRadius.circular(12),
+                                            items: shiftOptions.map((sh) {
+                                              final isSel = currentVal == sh;
+                                              return DropdownMenuItem<String>(
+                                                value: sh,
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      sh == 'ALL' ? Icons.apps_rounded : Icons.access_time_rounded,
+                                                      size: 14,
+                                                      color: isSel
+                                                          ? (AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D766E))
+                                                          : AppColors.textMutedColor(context),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      sh,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: isSel
+                                                            ? (AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D766E))
+                                                            : AppColors.text(context),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList(),
+                                            onChanged: (val) {
+                                              if (val != null) {
+                                                setState(() => _selectedShift = val);
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                           _filterRow(
                             'STATUS',
