@@ -1,5 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'constants/app_colors.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
@@ -13,9 +17,23 @@ import 'services/theme_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Production Error Boundary & Resilient UI Guard
+  // Production Crashlytics & Error Boundary Guard
   FlutterError.onError = (FlutterErrorDetails details) {
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      } catch (_) {}
+    }
     debugPrint('TrackMyLibrary Resilient UI Guard: ${details.exception}');
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      } catch (_) {}
+    }
+    return true;
   };
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
@@ -73,6 +91,28 @@ void main() async {
       } catch (_) {
         debugPrint('Running in high-fidelity preview mode.');
       }
+    }
+
+    // Task 1.6: Firebase App Check activation
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: AndroidProvider.playIntegrity,
+          appleProvider: AppleProvider.deviceCheck,
+          webProvider: ReCaptchaV3Provider('6Ld_placeholder_recaptcha_site_key'),
+        );
+      } catch (e) {
+        debugPrint('Firebase App Check activation note: $e');
+      }
+    }
+
+    // Task 1.2: Check active FirebaseAuth user for auto-login session
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      LibraryService().currentUserId = currentUser.uid;
+      LibraryService().currentUserEmail = currentUser.email ?? '';
+      LibraryService().currentUserRole = 'Admin';
+      LibraryService().isAuthenticated = true;
     }
   } catch (e) {
     debugPrint('Firebase init note: $e');

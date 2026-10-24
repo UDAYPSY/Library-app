@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../services/library_service.dart';
 import 'main_hub_screen.dart';
@@ -15,7 +16,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final LibraryService _service = LibraryService();
   final _emailCtrl = TextEditingController(text: 'manageyourlib@gmail.com');
-  final _passCtrl = TextEditingController(text: 'password123');
+  final _passCtrl = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
@@ -49,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailCtrl.text = _service.profile.adminEmail.isNotEmpty
           ? _service.profile.adminEmail
           : 'manageyourlib@gmail.com';
-      _passCtrl.text = 'password123';
+      _passCtrl.clear();
       _errorMessage = null;
     });
   }
@@ -60,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
         : '9457464850';
     setState(() {
       _emailCtrl.text = staffPhone;
-      _passCtrl.text = '1234';
+      _passCtrl.clear();
       _errorMessage = null;
     });
   }
@@ -807,6 +808,45 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ],
                         ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Legal & Compliance Links
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () => launchUrl(
+                              Uri.parse('https://manageyourlib.com/privacy'),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                            child: const Text(
+                              'Privacy Policy',
+                              style: TextStyle(
+                                color: Color(0xFF0284C7),
+                                decoration: TextDecoration.underline,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const Text(' • ', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          GestureDetector(
+                            onTap: () => launchUrl(
+                              Uri.parse('https://manageyourlib.com/terms'),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                            child: const Text(
+                              'Terms of Service',
+                              style: TextStyle(
+                                color: Color(0xFF0284C7),
+                                decoration: TextDecoration.underline,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

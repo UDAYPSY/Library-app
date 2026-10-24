@@ -1,0 +1,9 @@
+﻿// API Keys Template
+// Copy this file to api_keys.dart and fill in your actual production/test credentials.
+// Never commit api_keys.dart to source control.
+
+class ApiKeys {
+  static const String razorpayKeyId = 'rzp_test_placeholder';
+  static const String recaptchaSiteKey = '6Ld_placeholder_recaptcha_key';
+  static const String sendGridApiKey = 'SG.placeholder';
+}

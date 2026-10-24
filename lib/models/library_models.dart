@@ -41,6 +41,19 @@ class LibraryProfile {
   String welcomeTemplate;
   String reminderTemplate;
   String receiptTemplate;
+  DateTime? trialStartedAt;
+  DateTime? subscriptionExpiresAt;
+
+  bool get isTrialExpired {
+    if (subscriptionExpiresAt != null && subscriptionExpiresAt!.isAfter(DateTime.now())) return false;
+    if (trialStartedAt == null) return false;
+    return DateTime.now().difference(trialStartedAt!).inDays > 30;
+  }
+
+  int get trialDaysRemaining {
+    if (trialStartedAt == null) return 30;
+    return (30 - DateTime.now().difference(trialStartedAt!).inDays).clamp(0, 30);
+  }
 
   LibraryProfile({
     this.libraryId = 'lib_patna_central',
@@ -65,7 +78,63 @@ class LibraryProfile {
     this.welcomeTemplate = 'Hello {student_name}, welcome to {library_name}! Your reserved seat is Seat S-{seat_number} ({shift}). Happy studying!',
     this.reminderTemplate = 'Dear {student_name}, this is a gentle reminder that your seat fee of ₹{due_amount} at {library_name} is due on {due_date}. Thank you!',
     this.receiptTemplate = 'Payment Received! Dear {student_name}, we have received ₹{amount} via {mode} for your seat renewal at {library_name}. Valid until {valid_until}.',
+    this.trialStartedAt,
+    this.subscriptionExpiresAt,
   });
+
+  LibraryProfile copyWith({
+    String? libraryId,
+    String? libraryName,
+    String? city,
+    String? adminName,
+    String? adminEmail,
+    String? adminPhone,
+    String? logoEmblem,
+    String? logoBase64,
+    String? logoUrl,
+    String? tagline,
+    int? whatsappCredits,
+    int? messagesSentCount,
+    bool? whatsappNotifications,
+    bool? autoFeeReminders,
+    bool? autoWelcomeMessage,
+    bool? autoPaymentReceipt,
+    bool? remind3DaysBefore,
+    bool? remindOnExpiry,
+    bool? remindAfterExpiry,
+    String? welcomeTemplate,
+    String? reminderTemplate,
+    String? receiptTemplate,
+    DateTime? trialStartedAt,
+    DateTime? subscriptionExpiresAt,
+  }) {
+    return LibraryProfile(
+      libraryId: libraryId ?? this.libraryId,
+      libraryName: libraryName ?? this.libraryName,
+      city: city ?? this.city,
+      adminName: adminName ?? this.adminName,
+      adminEmail: adminEmail ?? this.adminEmail,
+      adminPhone: adminPhone ?? this.adminPhone,
+      logoEmblem: logoEmblem ?? this.logoEmblem,
+      logoBase64: logoBase64 ?? this.logoBase64,
+      logoUrl: logoUrl ?? this.logoUrl,
+      tagline: tagline ?? this.tagline,
+      whatsappCredits: whatsappCredits ?? this.whatsappCredits,
+      messagesSentCount: messagesSentCount ?? this.messagesSentCount,
+      whatsappNotifications: whatsappNotifications ?? this.whatsappNotifications,
+      autoFeeReminders: autoFeeReminders ?? this.autoFeeReminders,
+      autoWelcomeMessage: autoWelcomeMessage ?? this.autoWelcomeMessage,
+      autoPaymentReceipt: autoPaymentReceipt ?? this.autoPaymentReceipt,
+      remind3DaysBefore: remind3DaysBefore ?? this.remind3DaysBefore,
+      remindOnExpiry: remindOnExpiry ?? this.remindOnExpiry,
+      remindAfterExpiry: remindAfterExpiry ?? this.remindAfterExpiry,
+      welcomeTemplate: welcomeTemplate ?? this.welcomeTemplate,
+      reminderTemplate: reminderTemplate ?? this.reminderTemplate,
+      receiptTemplate: receiptTemplate ?? this.receiptTemplate,
+      trialStartedAt: trialStartedAt ?? this.trialStartedAt,
+      subscriptionExpiresAt: subscriptionExpiresAt ?? this.subscriptionExpiresAt,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -91,6 +160,8 @@ class LibraryProfile {
       'welcome_template': welcomeTemplate,
       'reminder_template': reminderTemplate,
       'receipt_template': receiptTemplate,
+      'trial_started_at': trialStartedAt?.toIso8601String(),
+      'subscription_expires_at': subscriptionExpiresAt?.toIso8601String(),
     };
   }
 
@@ -118,6 +189,8 @@ class LibraryProfile {
       welcomeTemplate: map['welcome_template'] ?? 'Hello {student_name}, welcome to {library_name}! Your reserved seat is Seat S-{seat_number} ({shift}). Happy studying!',
       reminderTemplate: map['reminder_template'] ?? 'Dear {student_name}, this is a gentle reminder that your seat fee of ₹{due_amount} at {library_name} is due on {due_date}. Thank you!',
       receiptTemplate: map['receipt_template'] ?? 'Payment Received! Dear {student_name}, we have received ₹{amount} via {mode} for your seat renewal at {library_name}. Valid until {valid_until}.',
+      trialStartedAt: map['trial_started_at'] != null ? DateTime.tryParse(map['trial_started_at']) : null,
+      subscriptionExpiresAt: map['subscription_expires_at'] != null ? DateTime.tryParse(map['subscription_expires_at']) : null,
     );
   }
 }
@@ -255,6 +328,7 @@ class StudentInfo {
   final String preparationFor;
   final String gender;
   final String? photoBase64;
+  final DateTime? updatedAt;
 
   const StudentInfo({
     required this.id,
@@ -276,6 +350,7 @@ class StudentInfo {
     this.preparationFor = '',
     this.gender = 'Male',
     this.photoBase64,
+    this.updatedAt,
   });
 
   bool get hasPhoto => photoBase64 != null && photoBase64!.isNotEmpty;
@@ -316,6 +391,7 @@ class StudentInfo {
     String? preparationFor,
     String? gender,
     String? photoBase64,
+    DateTime? updatedAt,
   }) {
     return StudentInfo(
       id: id ?? this.id,
@@ -341,6 +417,7 @@ class StudentInfo {
       preparationFor: preparationFor ?? this.preparationFor,
       gender: gender ?? this.gender,
       photoBase64: photoBase64 ?? this.photoBase64,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -365,6 +442,7 @@ class StudentInfo {
       'preparation_for': preparationFor,
       'gender': gender,
       'photo_base64': photoBase64,
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 
@@ -398,6 +476,7 @@ class StudentInfo {
       preparationFor: (data['preparation_for'] as String?) ?? '',
       gender: (data['gender'] as String?) ?? 'Male',
       photoBase64: data['photo_base64'] as String?,
+      updatedAt: parseDate(data['updated_at']),
     );
   }
 }
@@ -571,7 +650,7 @@ class StaffMember {
   final DateTime addedAt;
   final bool isActive;
   final String? email;
-  final String? pin;
+  final String? pinHash;
 
   const StaffMember({
     required this.id,
@@ -581,7 +660,7 @@ class StaffMember {
     required this.addedAt,
     this.isActive = true,
     this.email,
-    this.pin,
+    this.pinHash,
   });
 
   StaffMember copyWith({
@@ -592,7 +671,7 @@ class StaffMember {
     DateTime? addedAt,
     bool? isActive,
     String? email,
-    String? pin,
+    String? pinHash,
   }) {
     return StaffMember(
       id: id ?? this.id,
@@ -602,7 +681,7 @@ class StaffMember {
       addedAt: addedAt ?? this.addedAt,
       isActive: isActive ?? this.isActive,
       email: email ?? this.email,
-      pin: pin ?? this.pin,
+      pinHash: pinHash ?? this.pinHash,
     );
   }
 
@@ -615,7 +694,7 @@ class StaffMember {
       'added_at': addedAt.toIso8601String(),
       'is_active': isActive,
       'email': email,
-      'pin': pin,
+      'pin_hash': pinHash,
     };
   }
 
@@ -628,7 +707,7 @@ class StaffMember {
       addedAt: map['added_at'] != null ? (DateTime.tryParse(map['added_at']) ?? DateTime.now()) : DateTime.now(),
       isActive: map['is_active'] ?? true,
       email: map['email'] as String?,
-      pin: map['pin'] as String?,
+      pinHash: (map['pin_hash'] ?? map['pin']) as String?,
     );
   }
 }

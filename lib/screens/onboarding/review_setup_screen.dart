@@ -269,7 +269,8 @@ class ReviewSetupScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: () async {
-                    final savedPass = await LocalStorageService.getString('app_admin_password') ?? 'password123';
+                    final savedPass = (await LocalStorageService.getString('app_admin_password')) ??
+                        'admin_${DateTime.now().millisecondsSinceEpoch}';
                     await service.registerAdminAccount(
                       email: service.profile.adminEmail.isNotEmpty ? service.profile.adminEmail : 'manageyourlib@gmail.com',
                       password: savedPass,

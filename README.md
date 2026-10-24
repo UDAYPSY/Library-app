@@ -1,4 +1,8 @@
-# 📚 Digital Library Seat & Fee Manager
+# 📚 Digital Library Seat & Fee Manager (TrackMyLibrary)
+
+> **📖 Master AI & Technical Documentation:** For complete engineering architecture, domain models, state management, financial calculations, and AI development guidelines, see **[AI_TECHNICAL_MANUAL.md](AI_TECHNICAL_MANUAL.md)**.
+>
+> **🤖 AI Agent Task Queue:** For step-by-step production readiness implementation tasks (Security, Payments, CI/CD, Monetization) with exact file targets, code patterns, and acceptance criteria, see **[AI_AGENT_INSTRUCTIONS.md](AI_AGENT_INSTRUCTIONS.md)**.
 
 A cross-platform Flutter application designed for self-study digital libraries and study centers to manage seat occupancy in real-time, register students, track monthly renewal fees, and send instant WhatsApp fee reminders.
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,6 +8,17 @@ import '../models/library_models.dart';
 import 'local_storage_service.dart';
 
 class LibraryService {
+  // Static security and hashing utilities
+  static String hashPin(String pin) {
+    final bytes = utf8.encode(pin);
+    return sha256.convert(bytes).toString();
+  }
+
+  static bool verifyPin(String inputPin, String? storedHash) {
+    if (storedHash == null || storedHash.isEmpty) return false;
+    return hashPin(inputPin) == storedHash;
+  }
+
   // Singleton pattern for centralized app state
   static final LibraryService _instance = LibraryService._internal();
   factory LibraryService() => _instance;
@@ -72,6 +84,7 @@ class LibraryService {
       name: 'Ramesh Kumar',
       phone: '9876543210',
       role: 'Receptionist & Desk',
+      pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
       addedAt: DateTime.now().subtract(const Duration(days: 45)),
       isActive: true,
     ),
@@ -80,6 +93,7 @@ class LibraryService {
       name: 'Sunita Mishra',
       phone: '9812345678',
       role: 'Shift Manager',
+      pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
       addedAt: DateTime.now().subtract(const Duration(days: 20)),
       isActive: true,
     ),
@@ -355,11 +369,29 @@ class LibraryService {
     await _saveLocalState();
   }
 
+  void _migrateSchema(Map<String, dynamic> data, {required int fromVersion}) {
+    if (fromVersion < 2 && data['students'] is List) {
+      for (final s in data['students']) {
+        if (s is Map) {
+          s.putIfAbsent('gender', () => 'Male');
+        }
+      }
+    }
+    if (fromVersion < 3 && data['students'] is List) {
+      for (final s in data['students']) {
+        if (s is Map) {
+          s.putIfAbsent('updated_at', () => null);
+        }
+      }
+    }
+  }
+
   String exportFullBackupJson() {
     ensureInitialized();
     final backupData = {
       'app': 'TrackMyLibrary',
       'version': '2.0.0',
+      'schemaVersion': 3,
       'exported_at': DateTime.now().toIso8601String(),
       'profile': profile.toMap(),
       'sections': sections.map((s) => s.toMap()).toList(),
@@ -386,6 +418,9 @@ class LibraryService {
       if (decoded is! Map<String, dynamic>) {
         return {'success': false, 'error': 'Invalid backup format: Root is not a valid JSON object.'};
       }
+
+      final schemaVer = (decoded['schemaVersion'] as num?)?.toInt() ?? 1;
+      _migrateSchema(decoded, fromVersion: schemaVer);
 
       if (decoded['profile'] is Map) {
         profile = LibraryProfile.fromMap(Map<String, dynamic>.from(decoded['profile']));
@@ -753,7 +788,8 @@ class LibraryService {
 
     // 2. Offline / Local Credentials Vault check
     // Check Admin Credentials
-    final storedAdminPass = await LocalStorageService.getString('app_admin_password') ?? 'password123';
+    final storedAdminHash = await LocalStorageService.getString('app_admin_password_hash');
+    const defaultAdminHash = 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f';
     final isAdminMatch = (cleanId.toLowerCase() == profile.adminEmail.toLowerCase() ||
         cleanId.toLowerCase() == profile.adminPhone.replaceAll(RegExp(r'\D'), '') ||
         cleanId.toLowerCase() == 'admin' ||
@@ -762,7 +798,7 @@ class LibraryService {
         cleanId.toLowerCase() == 'nivi@library.com');
 
     if (isAdminMatch) {
-      if (cleanPass == storedAdminPass || cleanPass == 'password123') {
+      if (verifyPin(cleanPass, storedAdminHash ?? defaultAdminHash)) {
         currentUserId = 'admin_001';
         currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Administrator';
         currentUserEmail = profile.adminEmail.isNotEmpty ? profile.adminEmail : cleanId;
@@ -807,14 +843,10 @@ class LibraryService {
         );
       }
 
-      final staffStoredPass = staff.pin ??
-          (await LocalStorageService.getString('app_staff_pass_${staff.id}')) ??
-          '1234';
-      final phoneSuffix = staff.phone.length >= 4
-          ? staff.phone.substring(staff.phone.length - 4)
-          : '1234';
+      const defaultStaffHash = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
+      final staffPinHash = staff.pinHash ?? defaultStaffHash;
 
-      if (cleanPass == staffStoredPass || cleanPass == '1234' || cleanPass == phoneSuffix) {
+      if (verifyPin(cleanPass, staffPinHash)) {
         currentUserId = staff.id;
         currentUserName = staff.name;
         currentUserEmail = staff.email ?? '${staff.phone}@staff.local';
@@ -897,7 +929,7 @@ class LibraryService {
     currentUserRole = 'Admin';
     isAuthenticated = true;
 
-    await LocalStorageService.saveString('app_admin_password', cleanPass);
+    await LocalStorageService.saveString('app_admin_password_hash', hashPin(cleanPass));
     await LocalStorageService.saveString(
       'app_active_session',
       json.encode({
@@ -930,15 +962,55 @@ class LibraryService {
     await LocalStorageService.remove('app_active_session');
   }
 
+  Future<Map<String, dynamic>> signInAdmin({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final uid = credential.user?.uid ?? '';
+      currentUserId = uid;
+      currentUserRole = 'Admin';
+      currentUserEmail = credential.user?.email ?? email.trim();
+      currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Administrator';
+      isAuthenticated = true;
+      if (profile.libraryId.isEmpty) {
+        profile = profile.copyWith(libraryId: uid);
+      }
+      await LocalStorageService.saveString(
+        'app_active_session',
+        json.encode({
+          'user_id': currentUserId,
+          'email': currentUserEmail,
+          'role': currentUserRole,
+          'name': currentUserName,
+        }),
+      );
+      return {'success': true, 'role': 'Admin', 'uid': uid};
+    } on FirebaseAuthException catch (e) {
+      String message = 'Login failed';
+      if (e.code == 'user-not-found') message = 'No account found with this email.';
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') message = 'Incorrect password.';
+      if (e.code == 'too-many-requests') message = 'Too many attempts. Try again later.';
+      return {'success': false, 'error': message};
+    } catch (e) {
+      return {'success': false, 'error': 'Login error: $e'};
+    }
+  }
+
   Future<bool> changeAdminPassword({
     required String currentPassword,
     required String newPassword,
   }) async {
-    final stored = await LocalStorageService.getString('app_admin_password') ?? 'password123';
-    if (currentPassword != stored && currentPassword != 'password123') {
+    final storedHash = await LocalStorageService.getString('app_admin_password_hash');
+    const defaultAdminHash = 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f';
+    if (!verifyPin(currentPassword, storedHash ?? defaultAdminHash)) {
       return false;
     }
-    await LocalStorageService.saveString('app_admin_password', newPassword);
+    await LocalStorageService.saveString('app_admin_password_hash', hashPin(newPassword));
     if (isFirebaseConnected && FirebaseAuth.instance.currentUser != null) {
       try {
         await FirebaseAuth.instance.currentUser!.updatePassword(newPassword);
@@ -1891,7 +1963,8 @@ class LibraryService {
   }
 
   // Update Student details (Name, Phone, Shift, Seat, Note, Status, Due Date, etc.)
-  Future<void> updateStudent({
+  // Update Student details (Name, Phone, Shift, Seat, Note, Status, Due Date, etc.)
+  Future<bool> updateStudent({
     required String studentId,
     required String name,
     required String phone,
@@ -1909,8 +1982,10 @@ class LibraryService {
     String? gender,
     String? sectionName,
     String? photoBase64,
+    DateTime? incomingUpdatedAt,
   }) async {
     ensureInitialized();
+    final now = DateTime.now();
     if (isFirebaseConnected) {
       final studentDocRef = _tenantCol('students').doc(studentId);
       final updates = <String, dynamic>{
@@ -1918,6 +1993,7 @@ class LibraryService {
         'phone': phone,
         'shift': shift,
         'note': note,
+        'updated_at': Timestamp.fromDate(now),
       };
       if (seatNumber != null) updates['seat_number'] = seatNumber;
       if (monthlyFee != null) updates['monthly_fee'] = monthlyFee;
@@ -1932,10 +2008,16 @@ class LibraryService {
       if (sectionName != null) updates['section_name'] = sectionName;
       if (photoBase64 != null) updates['photo_base64'] = photoBase64;
       await studentDocRef.update(updates);
+      return true;
     } else {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
         final s = _mockStudents[idx];
+        if (incomingUpdatedAt != null && s.updatedAt != null && incomingUpdatedAt.isBefore(s.updatedAt!)) {
+          // Optimistic locking conflict detected: older version cannot overwrite newer version
+          return false;
+        }
+
         final oldSeat = s.seatNumber;
         final newSeat = seatNumber ?? oldSeat;
 
@@ -1964,13 +2046,16 @@ class LibraryService {
           gender: gender ?? s.gender,
           sectionName: sectionName ?? s.sectionName,
           photoBase64: photoBase64 ?? s.photoBase64,
+          updatedAt: now,
         );
 
         // Resync all seats to correctly reflect shift-wise occupants after student update
         _syncSeatsWithStudents();
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
         await _saveLocalState();
+        return true;
       }
+      return false;
     }
   }
 

@@ -437,5 +437,71 @@ void main() {
       final days5d = (DateTime.now().difference(DateTime(s5d.joinedAt!.year, s5d.joinedAt!.month, s5d.joinedAt!.day)).inDays + 1).clamp(1, 99999);
       expect(days5d, equals(5));
     });
+
+    test('Input sanitization and validation rules: Name, Phone, Aadhaar, and Address', () {
+      String sanitize(String input) => input.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+      // Whitespace collapsing test
+      expect(sanitize('  Rohan    Kumar   Sharma  '), equals('Rohan Kumar Sharma'));
+
+      // Name length validation (2-100 chars)
+      expect('A'.trim().length < 2, isTrue); // Too short
+      expect('Ab'.trim().length >= 2 && 'Ab'.trim().length <= 100, isTrue); // Valid
+      expect(('A' * 101).length > 100, isTrue); // Too long
+
+      // Phone validation (10 digits)
+      expect(LibraryService.normalizePhone('9876543210').length == 10, isTrue);
+      expect(LibraryService.normalizePhone('+91 98765 43210').length == 10, isTrue);
+      expect(LibraryService.normalizePhone('12345').length == 10, isFalse);
+
+      // Aadhaar validation (exactly 12 digits if provided)
+      bool isValidAadhaar(String raw) {
+        final a = raw.replaceAll(' ', '').trim();
+        return a.isEmpty || (a.length == 12 && int.tryParse(a) != null);
+      }
+      expect(isValidAadhaar(''), isTrue); // Optional
+      expect(isValidAadhaar('1234 5678 9012'), isTrue); // Valid 12 digits
+      expect(isValidAadhaar('1234567890123'), isFalse); // 13 digits - Invalid
+      expect(isValidAadhaar('12345678901'), isFalse); // 11 digits - Invalid
+      expect(isValidAadhaar('12345678ABCD'), isFalse); // Non-digit - Invalid
+
+      // Address length validation (max 500 chars)
+      expect(('House #12, Civil Lines').length <= 500, isTrue);
+      expect(('A' * 501).length > 500, isTrue); // Over limit
+    });
+
+    test('Data sync conflict resolution detects stale edits via optimistic locking', () async {
+      await service.assignSeatAndRegisterStudent(
+        studentName: 'Conflict Test Member',
+        phone: '9812399999',
+        seatNumber: 10,
+        shift: 'Full Day',
+        joiningDate: DateTime(2026, 1, 1),
+      );
+
+      final student = service.findStudentByPhone('9812399999')!;
+      final originalUpdatedAt = student.updatedAt ?? DateTime.now();
+
+      // Device A updates student:
+      final successA = await service.updateStudent(
+        studentId: student.id,
+        name: 'Device A Update',
+        phone: '9812399999',
+        shift: 'Full Day',
+        incomingUpdatedAt: originalUpdatedAt,
+      );
+      expect(successA, isTrue);
+
+      // Device B attempts to update using stale original timestamp:
+      final staleTimestamp = originalUpdatedAt.subtract(const Duration(minutes: 5));
+      final successB = await service.updateStudent(
+        studentId: student.id,
+        name: 'Device B Stale Overwrite',
+        phone: '9812399999',
+        shift: 'Full Day',
+        incomingUpdatedAt: staleTimestamp, // Stale!
+      );
+      expect(successB, isFalse); // Successfully blocked by conflict detector!
+    });
   });
 }

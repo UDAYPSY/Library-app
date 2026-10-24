@@ -1,0 +1,15 @@
+﻿{
+  "@@locale": "en",
+  "appTitle": "TrackMyLibrary",
+  "loginTitle": "Sign in to Library",
+  "seatsTab": "Seats",
+  "studentsTab": "Students",
+  "paymentsTab": "Payments",
+  "expensesTab": "Expenses",
+  "settingsTab": "Settings",
+  "addStudent": "Add Member",
+  "duesPending": "Dues Pending",
+  "collectFee": "Collect Fee",
+  "vacantSeats": "Vacant Seats",
+  "occupiedSeats": "Occupied Seats"
+}

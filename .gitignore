@@ -42,3 +42,6 @@ migrate_working_dir/
 # Keystore files
 *.jks
 *.keystore
+
+# API Keys & Secrets
+lib/constants/api_keys.dart

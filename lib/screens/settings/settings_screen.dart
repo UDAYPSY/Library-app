@@ -849,7 +849,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   phone: phone,
                   role: selectedRole,
                   email: email,
-                  pin: pin,
+                  pinHash: LibraryService.hashPin(pin),
                   addedAt: DateTime.now(),
                 );
                 _service.addStaffMember(newStaff);

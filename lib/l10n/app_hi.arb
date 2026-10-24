@@ -1,0 +1,15 @@
+﻿{
+  "@@locale": "hi",
+  "appTitle": "ट्रैक माय लाइब्रेरी",
+  "loginTitle": "लाइब्रेरी में साइन इन करें",
+  "seatsTab": "सीटें",
+  "studentsTab": "छात्र",
+  "paymentsTab": "भुगतान",
+  "expensesTab": "खर्च",
+  "settingsTab": "सेटिंग्स",
+  "addStudent": "नया सदस्य जोड़ें",
+  "duesPending": "बकाया शुल्क",
+  "collectFee": "शुल्क जमा करें",
+  "vacantSeats": "खाली सीटें",
+  "occupiedSeats": "भरी हुई सीटें"
+}

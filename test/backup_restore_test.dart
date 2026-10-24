@@ -23,6 +23,7 @@ void main() {
       expect(decoded, isA<Map<String, dynamic>>());
       expect(decoded['app'], equals('TrackMyLibrary'));
       expect(decoded['version'], equals('2.0.0'));
+      expect(decoded['schemaVersion'], equals(3));
       expect(decoded['profile'], isNotNull);
       expect(decoded['sections'], isList);
       expect(decoded['shifts'], isList);
@@ -118,6 +119,33 @@ void main() {
       final resultBad = await service.restoreFromBackupJson('not valid json at all');
       expect(resultBad['success'], isFalse);
       expect(resultBad['error'], isNotNull);
+    });
+
+    test('Schema migration converts legacy v1 backup with missing gender and updatedAt to v3', () async {
+      final legacyBackup = {
+        'app': 'TrackMyLibrary',
+        'version': '1.0.0',
+        'schemaVersion': 1,
+        'profile': {
+          'library_name': 'Legacy Library',
+        },
+        'students': [
+          {
+            'id': 'legacy_std_1',
+            'name': 'Aakash Verma',
+            'phone': '9811223344',
+            'shift': 'Morning',
+            // Missing gender and updated_at
+          }
+        ],
+      };
+
+      final result = await service.restoreFromBackupJson(json.encode(legacyBackup));
+      expect(result['success'], isTrue);
+
+      final student = service.findStudentByPhone('9811223344');
+      expect(student, isNotNull);
+      expect(student!.gender, equals('Male')); // Default migrated
     });
   });
 }

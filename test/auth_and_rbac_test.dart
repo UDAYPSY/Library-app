@@ -90,7 +90,7 @@ void main() {
         name: 'Pooja Verma',
         phone: '9988776655',
         role: 'Receptionist & Desk',
-        pin: '5678',
+        pinHash: LibraryService.hashPin('5678'),
         email: 'pooja@library.local',
         addedAt: DateTime.now(),
         isActive: true,
@@ -116,7 +116,7 @@ void main() {
         name: 'Vikram Singh',
         phone: '9123456780',
         role: 'Night Supervisor',
-        pin: '9999',
+        pinHash: LibraryService.hashPin('9999'),
         addedAt: DateTime.now(),
         isActive: false, // Deactivated
       );

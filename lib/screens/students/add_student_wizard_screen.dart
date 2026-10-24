@@ -331,7 +331,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   Navigator.pop(ctx);
                   try {
                     final picker = ImagePicker();
-                    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 600, imageQuality: 80);
+                    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 400, maxHeight: 400, imageQuality: 70);
                     if (image != null) {
                       final bytes = await image.readAsBytes();
                       setState(() {
@@ -352,7 +352,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   Navigator.pop(ctx);
                   try {
                     final picker = ImagePicker();
-                    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 600, imageQuality: 80);
+                    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 400, maxHeight: 400, imageQuality: 70);
                     if (image != null) {
                       final bytes = await image.readAsBytes();
                       setState(() {
@@ -445,41 +445,66 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     }
   }
 
+  String _sanitize(String input) => input.trim().replaceAll(RegExp(r'\s+'), ' ');
+
   void _goToStep2() {
-    if (_fullNameCtrl.text.trim().isEmpty) {
+    final cleanName = _sanitize(_fullNameCtrl.text);
+    if (cleanName.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter member\'s full name')),
+        const SnackBar(
+          content: Text('Name must be at least 2 characters'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) {
+    if (cleanName.length > 100) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter phone number')),
+        const SnackBar(
+          content: Text('Name is too long (max 100 chars)'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
+
+    final phone = LibraryService.normalizePhone(_phoneCtrl.text);
     if (phone.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Mobile number must be exactly 10 digits.'),
+          content: Text('Enter a valid 10-digit phone number'),
           backgroundColor: Color(0xFFE11D48),
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
-    final aadhaar = _aadhaarCtrl.text.trim();
-    if (aadhaar.isNotEmpty && aadhaar.length != 12) {
+
+    final aadhaar = _aadhaarCtrl.text.replaceAll(' ', '').trim();
+    if (aadhaar.isNotEmpty && (aadhaar.length != 12 || int.tryParse(aadhaar) == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Aadhaar number (UID) must be exactly 12 digits.'),
+          content: Text('Aadhaar must be exactly 12 digits'),
           backgroundColor: Color(0xFFE11D48),
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
+
+    if (_addressCtrl.text.length > 500) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Address is too long (max 500 chars)'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (_service.isDuplicateStudentPhone(phone, excludeStudentId: widget.studentToEdit?.id)) {
       final existing = _service.findStudentByPhone(phone);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -536,14 +561,24 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   }
 
   Future<void> _finishAndSave() async {
-    final name = _fullNameCtrl.text.trim();
-    final phone = _phoneCtrl.text.trim();
+    final name = _sanitize(_fullNameCtrl.text);
+    final phone = LibraryService.normalizePhone(_phoneCtrl.text);
     final seatNum = _selectedSeat;
 
-    if (phone.length != 10) {
+    if (name.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Mobile number must be exactly 10 digits.'),
+          content: Text('Name must be at least 2 characters'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (name.length > 100) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Name is too long (max 100 chars)'),
           backgroundColor: Color(0xFFE11D48),
           behavior: SnackBarBehavior.floating,
         ),
@@ -551,11 +586,33 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       return;
     }
 
-    final aadhaar = _aadhaarCtrl.text.trim();
-    if (aadhaar.isNotEmpty && aadhaar.length != 12) {
+    if (phone.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Aadhaar number (UID) must be exactly 12 digits.'),
+          content: Text('Enter a valid 10-digit phone number'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final aadhaar = _aadhaarCtrl.text.replaceAll(' ', '').trim();
+    if (aadhaar.isNotEmpty && (aadhaar.length != 12 || int.tryParse(aadhaar) == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aadhaar must be exactly 12 digits'),
+          backgroundColor: Color(0xFFE11D48),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_addressCtrl.text.length > 500) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Address is too long (max 500 chars)'),
           backgroundColor: Color(0xFFE11D48),
           behavior: SnackBarBehavior.floating,
         ),
@@ -734,10 +791,10 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         validUntil: _validUntilDate,
         paymentDate: _paymentDate,
         note: _notesCtrl.text.trim(),
-        fatherName: _fatherNameCtrl.text.trim(),
-        address: _addressCtrl.text.trim(),
-        aadhaarNumber: _aadhaarCtrl.text.trim(),
-        preparationFor: _preparationCtrl.text.trim(),
+        fatherName: _sanitize(_fatherNameCtrl.text),
+        address: _sanitize(_addressCtrl.text),
+        aadhaarNumber: _aadhaarCtrl.text.replaceAll(' ', '').trim(),
+        preparationFor: _sanitize(_preparationCtrl.text),
         gender: _gender,
         photoBase64: _photoBase64,
       );
