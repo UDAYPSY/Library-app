@@ -75,56 +75,52 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     return 500;
   }
 
-  // Actual fee already paid by student for the current active membership cycle
-  int get _currentCyclePaidAmount {
+  // Effective fee already paid/covered for student in the active membership cycle
+  int get _studentEffectivePaidCoverage {
     if (widget.studentToEdit == null) return 0;
     final s = widget.studentToEdit!;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final isDueActive = s.feeDueDate != null && !s.feeDueDate!.isBefore(today);
-    if (!isDueActive && s.status != 'ACTIVE') return 0;
 
-    final cycleStart = s.feeDueDate != null
-        ? s.feeDueDate!.subtract(const Duration(days: 35))
-        : (s.joinedAt ?? now.subtract(const Duration(days: 30)));
+    // 1. Check notes for excess credit or recorded original fee
+    int recordedCredit = 0;
+    final matchCredit = RegExp(r'₹(\d+)\s+excess credit').firstMatch(s.note);
+    if (matchCredit != null) {
+      recordedCredit = int.tryParse(matchCredit.group(1) ?? '0') ?? 0;
+    }
 
+    final matchOriginal = RegExp(r'original paid[:\s]+₹?(\d+)', caseSensitive: false).firstMatch(s.note);
+    if (matchOriginal != null) {
+      final orig = int.tryParse(matchOriginal.group(1) ?? '0') ?? 0;
+      if (orig > 0) return orig;
+    }
+
+    // 2. Query student payment transactions for highest/recent payment
     final studentPayments = _service.currentPayments.where((p) {
-      final matchesStudent = (s.id.isNotEmpty && p.studentId == s.id) ||
+      return (s.id.isNotEmpty && p.studentId == s.id) ||
           (s.phone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == LibraryService.normalizePhone(s.phone));
-      if (!matchesStudent) return false;
-      return !p.date.isBefore(cycleStart);
     }).toList();
 
-    int totalPaidInCycle = 0;
+    int maxRecentPayment = 0;
     for (var p in studentPayments) {
-      totalPaidInCycle += p.amount;
-    }
-
-    // Baseline fallback: if no transaction log exists, use student's monthly fee minus dues
-    if (totalPaidInCycle == 0) {
-      if (s.duesAmount == 0 && s.monthlyFee > 0) {
-        totalPaidInCycle = s.monthlyFee;
-      } else if (s.duesAmount > 0 && s.monthlyFee > 0) {
-        totalPaidInCycle = (s.monthlyFee - s.duesAmount).clamp(0, s.monthlyFee);
+      if (p.amount > maxRecentPayment) {
+        maxRecentPayment = p.amount;
       }
     }
 
-    // If student is marked active with 0 dues, they paid at least s.monthlyFee
-    if (s.duesAmount == 0 && s.monthlyFee > totalPaidInCycle) {
-      totalPaidInCycle = s.monthlyFee;
+    // 3. Current monthly fee minus dues
+    final feeMinusDues = (s.monthlyFee - s.duesAmount).clamp(0, 999999);
+
+    int totalCovered = feeMinusDues;
+    if (s.duesAmount == 0 && (s.monthlyFee + recordedCredit) > totalCovered) {
+      totalCovered = s.monthlyFee + recordedCredit;
+    }
+    if (maxRecentPayment > totalCovered && s.duesAmount == 0) {
+      totalCovered = maxRecentPayment;
     }
 
-    // Check if student notes record an excess credit from a previous downgrade
-    final matchCredit = RegExp(r'₹(\d+)\s+excess credit to adjust').firstMatch(s.note);
-    if (matchCredit != null) {
-      final credit = int.tryParse(matchCredit.group(1) ?? '0') ?? 0;
-      if (credit > 0 && (s.monthlyFee + credit) > totalPaidInCycle) {
-        totalPaidInCycle = s.monthlyFee + credit;
-      }
-    }
-
-    return totalPaidInCycle;
+    return totalCovered;
   }
+
+  int get _currentCyclePaidAmount => _studentEffectivePaidCoverage;
 
   bool get _isStudentInPaidActiveTenure {
     if (widget.studentToEdit == null) return false;
@@ -143,59 +139,45 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   // Shift upgrade difference in ongoing cycle (₹0 if same/lower price, >0 if higher price)
   int get _shiftUpgradeDifference {
     if (widget.studentToEdit == null) return 0;
-    final paid = _currentCyclePaidAmount;
-    final diff = _fixedMonthlyFee - paid;
+    final coverage = _studentEffectivePaidCoverage;
+    final currentCost = _fixedMonthlyFee;
+    final diff = currentCost - coverage;
     return diff > 0 ? diff : 0;
   }
 
   // Excess credit when downgrading shift in ongoing cycle
   int get _shiftDowngradeExcessCredit {
     if (widget.studentToEdit == null) return 0;
-    if (!_isStudentInPaidActiveTenure) return 0;
-    final paid = _currentCyclePaidAmount;
-    final diff = paid - _fixedMonthlyFee;
+    final coverage = _studentEffectivePaidCoverage;
+    final currentCost = _fixedMonthlyFee;
+    final diff = coverage - currentCost;
     return diff > 0 ? diff : 0;
   }
 
   // Fixed / Non-editable Already Paid for existing students
-  int get _alreadyPaidAmount {
-    if (widget.studentToEdit == null) return 0;
-    return _currentCyclePaidAmount;
-  }
+  int get _alreadyPaidAmount => _studentEffectivePaidCoverage;
 
   // Auto-calculated Due Amount
   int get _dueAmount {
     if (widget.studentToEdit == null) return _calculatedTotalFee;
     final s = widget.studentToEdit!;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final isDueActive = s.feeDueDate != null && !s.feeDueDate!.isBefore(today);
 
-    if (_isStudentInPaidActiveTenure) {
-      final upgradeDiff = _shiftUpgradeDifference;
-      if (_selectedDurationMonths == 1) {
-        return upgradeDiff;
-      } else {
-        final advanceMonths = _selectedDurationMonths - 1;
-        return upgradeDiff + (_fixedMonthlyFee * advanceMonths);
-      }
+    final coverage = _studentEffectivePaidCoverage;
+    final currentCost = _fixedMonthlyFee;
+    final upgradeDiff = (currentCost - coverage) > 0 ? (currentCost - coverage) : 0;
+    final baseDues = s.duesAmount > 0 ? s.duesAmount : 0;
+
+    // Cycle due is upgrade difference + previous pending dues
+    final cycleDue = (s.duesAmount > 0 && coverage < s.monthlyFee)
+        ? (currentCost - coverage).clamp(0, 999999)
+        : (baseDues + upgradeDiff);
+
+    if (_selectedDurationMonths <= 1) {
+      return cycleDue;
+    } else {
+      final advanceMonths = _selectedDurationMonths - 1;
+      return cycleDue + (_fixedMonthlyFee * advanceMonths);
     }
-
-    if (s.duesAmount > 0 && isDueActive) {
-      final paid = _currentCyclePaidAmount;
-      final currentCycleCost = _fixedMonthlyFee;
-      final upgradeDiff = (currentCycleCost - (paid + s.duesAmount)) > 0
-          ? (currentCycleCost - (paid + s.duesAmount))
-          : 0;
-      if (_selectedDurationMonths == 1) {
-        return s.duesAmount + upgradeDiff;
-      } else {
-        final advanceMonths = _selectedDurationMonths - 1;
-        return s.duesAmount + upgradeDiff + (_fixedMonthlyFee * advanceMonths);
-      }
-    }
-
-    return _calculatedTotalFee;
   }
 
   void _updateDuration(int months) {
@@ -662,10 +644,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         String shiftLog = '';
         if (isShiftChanged) {
           final excess = _shiftDowngradeExcessCredit;
+          final coverage = _studentEffectivePaidCoverage;
           if (excess > 0) {
-            shiftLog = 'Shift changed: $oldShift → ${_selectedShift.name} (₹$fixedMonthly/mo). ₹$excess excess credit to adjust in next month.';
+            shiftLog = 'Shift changed: $oldShift → ${_selectedShift.name} (₹$fixedMonthly/mo). ₹$excess excess credit to adjust in next month. (Original paid: ₹$coverage)';
           } else {
-            shiftLog = 'Shift changed: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())}';
+            shiftLog = 'Shift changed: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())}. (Original paid: ₹$coverage)';
           }
         }
 
@@ -1076,34 +1059,91 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               ),
               const SizedBox(height: 16),
 
-              _fieldLabel('Joining Date', isRequired: true),
-              const SizedBox(height: 6),
-              InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: _pickJoiningDate,
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        dateStr,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textNavy,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _fieldLabel('Joining Date', isRequired: true),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock_outline_rounded, size: 12, color: Color(0xFF64748B)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Fixed / Non-editable',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-                      const Icon(Icons.calendar_month_outlined, color: Color(0xFF64748B), size: 20),
-                    ],
+                      ],
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Container(
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today_rounded, color: Color(0xFF0D9488), size: 18),
+                        const SizedBox(width: 10),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textNavy,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 13),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${(DateTime.now().difference(DateTime(_joiningDate.year, _joiningDate.month, _joiningDate.day)).inDays + 1).clamp(1, 99999)}d Completed',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0284C7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Joining date is fixed from registration to track student tenure in the library.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 16),
 
@@ -1812,15 +1852,102 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
               final currentPaid = parsedPaid.clamp(0, maxPayable);
               final remainingDues = (maxPayable - currentPaid).clamp(0, 999999);
 
-              final bool isFullyPaid = currentPaid == maxPayable && maxPayable > 0;
-              final bool isPartiallyPaid = currentPaid > 0 && currentPaid < maxPayable;
-              final bool isUnpaid = currentPaid == 0;
+              final bool hasZeroDue = maxPayable == 0;
+              final bool isFullyPaid = hasZeroDue || (currentPaid == maxPayable && maxPayable > 0);
+              final bool isPartiallyPaid = !hasZeroDue && currentPaid > 0 && currentPaid < maxPayable;
+              final bool isUnpaid = !hasZeroDue && currentPaid == 0;
               final bool isShiftChanged = widget.studentToEdit != null &&
                   _selectedShift.name.toLowerCase() != widget.studentToEdit!.shift.toLowerCase();
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Downgrade Excess Credit Banner
+                  if (isEdit && _shiftDowngradeExcessCredit > 0)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F9FF),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF0284C7), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Shift Downgraded: ₹$_shiftDowngradeExcessCredit Excess Credit',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0369A1),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'Amount remains with library owner to adjust in next month. If upgraded back to the same shift level, no due payment is required.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0284C7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Upgrade Difference Banner
+                  if (isEdit && _shiftUpgradeDifference > 0)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.upgrade_rounded, color: Color(0xFFD97706), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Shift Upgrade Difference: ₹$_shiftUpgradeDifference',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'New shift monthly fee is ₹$_fixedMonthlyFee while student paid coverage is ₹$_studentEffectivePaidCoverage. Collect upgrade difference or leave as pending due.',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF92400E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1841,14 +1968,14 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                         ),
                         child: Text(
                           isFullyPaid
-                              ? '✓ Fully Paid'
-                              : (isPartiallyPaid ? 'Partially Paid' : (maxPayable == 0 ? '✓ No Dues' : 'Unpaid')),
+                              ? (hasZeroDue ? '✓ No Dues / Paid' : '✓ Fully Paid')
+                              : (isPartiallyPaid ? 'Partially Paid' : 'Unpaid'),
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w900,
                             color: isFullyPaid
                                 ? const Color(0xFF15803D)
-                                : (isPartiallyPaid ? const Color(0xFFB45309) : (maxPayable == 0 ? const Color(0xFF15803D) : const Color(0xFFDC2626))),
+                                : (isPartiallyPaid ? const Color(0xFFB45309) : const Color(0xFFDC2626)),
                           ),
                         ),
                       ),
@@ -1857,7 +1984,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   const SizedBox(height: 8),
                   _formTextField(
                     controller: _amountPaidCtrl,
-                    hintText: 'Enter amount to collect (max ₹$maxPayable)',
+                    hintText: hasZeroDue ? '₹0 (No pending dues)' : 'Enter amount to collect (max ₹$maxPayable)',
                     keyboardType: TextInputType.number,
                     onChanged: (val) {
                       final p = int.tryParse(val.trim());
@@ -1871,63 +1998,88 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   const SizedBox(height: 10),
 
                   // Quick action chips
-                  Row(
-                    children: [
-                      InkWell(
+                  if (hasZeroDue)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
                         borderRadius: BorderRadius.circular(8),
-                        onTap: () {
-                          setState(() {
-                            _amountPaidCtrl.text = '$maxPayable';
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isFullyPaid ? const Color(0xFFE6F4F1) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isFullyPaid ? AppColors.primaryTeal : const Color(0xFFCBD5E1),
-                            ),
-                          ),
-                          child: Text(
-                            widget.studentToEdit != null ? (isShiftChanged ? 'Pay Upgrade (₹$maxPayable)' : 'Accept Due (₹$maxPayable)') : 'Full Paid (₹$totalFee)',
+                        border: Border.all(color: const Color(0xFF86EFAC)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded, color: Color(0xFF15803D), size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            '✓ Fully Covered (₹0 Due)',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: isFullyPaid ? AppColors.primaryTeal : const Color(0xFF475569),
+                              color: Color(0xFF15803D),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            setState(() {
+                              _amountPaidCtrl.text = '$maxPayable';
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: (currentPaid == maxPayable) ? const Color(0xFFE6F4F1) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: (currentPaid == maxPayable) ? AppColors.primaryTeal : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            child: Text(
+                              widget.studentToEdit != null ? (isShiftChanged ? 'Pay Upgrade (₹$maxPayable)' : 'Accept Due (₹$maxPayable)') : 'Full Paid (₹$totalFee)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: (currentPaid == maxPayable) ? AppColors.primaryTeal : const Color(0xFF475569),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () {
-                          setState(() {
-                            _amountPaidCtrl.text = '0';
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isUnpaid ? const Color(0xFFFFF1F2) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isUnpaid ? const Color(0xFFE11D48) : const Color(0xFFCBD5E1),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            setState(() {
+                              _amountPaidCtrl.text = '0';
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isUnpaid ? const Color(0xFFFFF1F2) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isUnpaid ? const Color(0xFFE11D48) : const Color(0xFFCBD5E1),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            widget.studentToEdit != null ? 'Leave as Due (₹0 Paid)' : 'Unpaid / ₹0 Paid',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: isUnpaid ? const Color(0xFFE11D48) : const Color(0xFF475569),
+                            child: Text(
+                              widget.studentToEdit != null ? 'Leave as Due (₹0 Paid)' : 'Unpaid / ₹0 Paid',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: isUnpaid ? const Color(0xFFE11D48) : const Color(0xFF475569),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   const SizedBox(height: 14),
 
                   // Calculated Payment Status & Remaining Balance Banner
@@ -1961,7 +2113,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                                 const SizedBox(height: 3),
                                 Text(
                                   isEdit
-                                      ? 'Paid ₹$currentPaid now of ₹$maxPayable due (Remaining Due: ₹$remainingDues • ₹$_alreadyPaidAmount already paid for current cycle)'
+                                      ? 'Paid ₹$currentPaid now of ₹$maxPayable due (Remaining Due: ₹$remainingDues • ₹$_alreadyPaidAmount covered for current cycle)'
                                       : 'Paid ₹$currentPaid of ₹$totalFee total fee ($totalFee - $currentPaid = ₹$remainingDues remaining)',
                                   style: const TextStyle(
                                     fontSize: 11,
@@ -1991,7 +2143,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                           Expanded(
                             child: Text(
                               isEdit
-                                  ? 'Payment Status: Fully Paid (₹$currentPaid Paid now • ₹$_alreadyPaidAmount already paid) • Active'
+                                  ? (currentPaid > 0
+                                      ? 'Payment Status: Fully Paid (₹$currentPaid upgrade paid now • Active)'
+                                      : 'Payment Status: Fully Paid / No Dues (Active)')
                                   : 'Payment Status: Fully Paid (₹$currentPaid) • Remaining Balance: ₹0 • Active',
                               style: const TextStyle(
                                 fontSize: 12,

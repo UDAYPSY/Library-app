@@ -411,5 +411,31 @@ void main() {
       expect(json['valid_from'], isNotNull);
       expect(json['valid_until'], isNotNull);
     });
+
+    test('Student tenure days completed calculation from joinedAt', () {
+      final now = DateTime.now();
+      // Joined today -> 1 day completed
+      final sToday = StudentInfo(
+        id: 's_today',
+        name: 'Student Today',
+        phone: '9876500011',
+        shift: 'Morning',
+        joinedAt: now,
+      );
+      final daysToday = (DateTime.now().difference(DateTime(sToday.joinedAt!.year, sToday.joinedAt!.month, sToday.joinedAt!.day)).inDays + 1).clamp(1, 99999);
+      expect(daysToday, equals(1));
+
+      // Joined 4 days ago -> 5 days completed (as in sample image '5d')
+      final join5d = now.subtract(const Duration(days: 4));
+      final s5d = StudentInfo(
+        id: 's_5d',
+        name: 'Student 5d',
+        phone: '9876500012',
+        shift: 'First',
+        joinedAt: join5d,
+      );
+      final days5d = (DateTime.now().difference(DateTime(s5d.joinedAt!.year, s5d.joinedAt!.month, s5d.joinedAt!.day)).inDays + 1).clamp(1, 99999);
+      expect(days5d, equals(5));
+    });
   });
 }

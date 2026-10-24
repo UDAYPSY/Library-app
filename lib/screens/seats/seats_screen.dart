@@ -994,6 +994,35 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                                 color: Color(0xFF64748B),
                                               ),
                                             ),
+                                            const SizedBox(width: 8),
+                                            Builder(
+                                              builder: (context) {
+                                                final occJoin = occ.joinedAt ?? DateTime.now();
+                                                final occDays = (DateTime.now().difference(DateTime(occJoin.year, occJoin.month, occJoin.day)).inDays + 1).clamp(1, 99999);
+                                                return Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFE0F2FE),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 11),
+                                                      const SizedBox(width: 2),
+                                                      Text(
+                                                        '${occDays}d tenure',
+                                                        style: const TextStyle(
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: Color(0xFF0284C7),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                           ],
                                         ),
                                       ],
@@ -1677,72 +1706,57 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                               ),
                                             ),
                                           ],
+                                        Builder(
+                                          builder: (context) {
+                                            final studentJoin = student.joinedAt ?? DateTime.now();
+                                            final daysCompleted = (DateTime.now().difference(DateTime(studentJoin.year, studentJoin.month, studentJoin.day)).inDays + 1).clamp(1, 99999);
+
+                                            return Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (isMultiOccupant) ...[
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFF3E8FF),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      border: Border.all(color: const Color(0xFFD8B4FE)),
+                                                    ),
+                                                    child: Text(
+                                                      '${seatStudents.length}S',
+                                                      style: const TextStyle(
+                                                        fontSize: 8,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: Color(0xFF7E22CE),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                ] else if (hasDues) ...[
+                                                  Text(
+                                                    'Due ₹${student.effectiveDues}',
+                                                    style: const TextStyle(
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: Color(0xFFE11D48),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                ],
+                                                const Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 12),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  '${daysCompleted}d',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Color(0xFF0284C7),
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
                                         ),
-                                        if (isMultiOccupant)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF3E8FF),
-                                              borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(color: const Color(0xFFD8B4FE)),
-                                            ),
-                                            child: Text(
-                                              '${seatStudents.length} SHIFTS',
-                                              style: const TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0xFF7E22CE),
-                                              ),
-                                            ),
-                                          )
-                                        else if (hasDues)
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 13),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                'Due ₹${student.effectiveDues}',
-                                                style: const TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: Color(0xFFE11D48),
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        else if (isTrial)
-                                          const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 13),
-                                              SizedBox(width: 2),
-                                              Text(
-                                                'Trial',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: Color(0xFF0284C7),
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        else
-                                          const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 13),
-                                              SizedBox(width: 2),
-                                              Text(
-                                                'Paid',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: Color(0xFF16A34A),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
                                       ],
                                     ),
 

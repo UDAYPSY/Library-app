@@ -784,9 +784,8 @@ _Powered by TrackMyLibrary_
         ? DateFormat('dd-MMM-yyyy').format(_student.joinedAt!)
         : DateFormat('dd-MMM-yyyy').format(DateTime.now());
 
-    final daysIn = _student.joinedAt != null
-        ? DateTime.now().difference(_student.joinedAt!).inDays + 1
-        : 1;
+    final studentJoin = _student.joinedAt ?? DateTime.now();
+    final daysIn = (DateTime.now().difference(DateTime(studentJoin.year, studentJoin.month, studentJoin.day)).inDays + 1).clamp(1, 99999);
 
     final validityStr = _student.feeDueDate != null
         ? 'Valid until ${DateFormat('dd-MMM-yyyy').format(_student.feeDueDate!)}'
@@ -1470,8 +1469,8 @@ _Powered by TrackMyLibrary_
                           // Enrolled On (Image 4 & 5)
                           _personalInfoRow(
                             icon: Icons.calendar_today_outlined,
-                            label: 'Enrolled On',
-                            value: enrolledDateStr,
+                            label: 'Enrolled On (Fixed)',
+                            value: '$enrolledDateStr ($daysIn days completed)',
                           ),
                           const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
 
