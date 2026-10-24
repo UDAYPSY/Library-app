@@ -1,4 +1,4 @@
-﻿// API Keys Template
+// API Keys Template
 // Copy this file to api_keys.dart and fill in your actual production/test credentials.
 // Never commit api_keys.dart to source control.
 

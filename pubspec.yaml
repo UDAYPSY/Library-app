@@ -1,4 +1,4 @@
-﻿name: library_manager
+name: library_manager
 description: "Self-study digital library seat and fee manager"
 publish_to: "none"
 version: 1.0.0+1

@@ -45,10 +45,16 @@ jobs:
           flutter test 2>&1 | tee test_run.log
 
       - name: Decode Release Keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          mkdir -p android/app
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/trackmylibrary-release.jks
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Decoding release keystore..."
+            mkdir -p android/app
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/trackmylibrary-release.jks
+          else
+            echo "KEYSTORE_BASE64 not configured, skipping custom keystore decode."
+          fi
 
       - name: Compile Release APK
         env:
@@ -146,7 +152,7 @@ jobs:
 
       - name: Compile Flutter Web
         run: |
-          flutter build web --release --base-href "/" 2>&1 | tee web_build.log || {
+          flutter build web --release --base-href "/Library-app/" 2>&1 | tee web_build.log || {
             echo "==================== WEB BUILD FAILURE LOG ===================="
             tail -n 150 web_build.log
             git config user.name "github-actions[bot]"
