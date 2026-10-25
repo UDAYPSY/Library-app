@@ -320,6 +320,7 @@ class StudentInfo {
 
   final String note;
   final int duesAmount;
+  final int advanceAmount;
   final String sectionName;
 
   final String fatherName;
@@ -343,6 +344,7 @@ class StudentInfo {
     this.paymentMode = 'UPI',
     this.note = '',
     this.duesAmount = 0,
+    this.advanceAmount = 0,
     this.sectionName = 'Main Hall',
     this.fatherName = '',
     this.address = '',
@@ -384,6 +386,7 @@ class StudentInfo {
     String? paymentMode,
     String? note,
     int? duesAmount,
+    int? advanceAmount,
     String? sectionName,
     String? fatherName,
     String? address,
@@ -410,6 +413,7 @@ class StudentInfo {
       paymentMode: paymentMode ?? this.paymentMode,
       note: note ?? this.note,
       duesAmount: duesAmount ?? this.duesAmount,
+      advanceAmount: advanceAmount ?? this.advanceAmount,
       sectionName: sectionName ?? this.sectionName,
       fatherName: fatherName ?? this.fatherName,
       address: address ?? this.address,
@@ -435,6 +439,7 @@ class StudentInfo {
       'payment_mode': paymentMode,
       'note': note,
       'dues_amount': duesAmount,
+      'advance_amount': advanceAmount,
       'section_name': sectionName,
       'father_name': fatherName,
       'address': address,
@@ -469,6 +474,7 @@ class StudentInfo {
       paymentMode: (data['payment_mode'] as String?) ?? 'UPI',
       note: (data['note'] as String?) ?? '',
       duesAmount: (data['dues_amount'] as num?)?.toInt() ?? 0,
+      advanceAmount: (data['advance_amount'] as num?)?.toInt() ?? 0,
       sectionName: (data['section_name'] as String?) ?? 'Main Hall',
       fatherName: (data['father_name'] as String?) ?? '',
       address: (data['address'] as String?) ?? '',

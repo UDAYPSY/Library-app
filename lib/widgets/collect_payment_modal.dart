@@ -43,17 +43,19 @@ Future<void> showCollectPaymentModal(
   }
 
   final initialTotalFee = hasUnexpiredDue ? defaultMonthly : defaultMonthly * selectedAdvanceMonths;
-  final initialDue = hasUnexpiredDue
+  final initialGrossDue = hasUnexpiredDue
       ? student.duesAmount
       : (initialTotalFee - alreadyPaid).clamp(0, initialTotalFee);
+  final initialAdvanceApplied = student.advanceAmount.clamp(0, initialGrossDue);
+  final initialNetPayable = (initialGrossDue - initialAdvanceApplied).clamp(0, initialGrossDue);
 
-  final dueAmountCtrl = TextEditingController(text: '$initialDue');
+  final dueAmountCtrl = TextEditingController(text: '$initialNetPayable');
   final notesCtrl = TextEditingController(
     text: hasUnexpiredDue
-        ? 'Dues cleared for period ending ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
+        ? 'Due payment for period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
         : (isExpired
-            ? '1 Month Membership Fee Renewal'
-            : '1 Month Advance Renewal Fee'),
+            ? '1 Month Membership Fee Renewal (Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)})'
+            : '1 Month Advance Renewal Fee (Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)})'),
   );
   DateTime paymentDate = DateTime.now();
   String selectedMethod = 'UPI';
@@ -73,30 +75,38 @@ Future<void> showCollectPaymentModal(
           setModalState(() {
             selectedAdvanceMonths = months;
             if (months > 0) {
+              int gross = 0;
               if (hasUnexpiredDue) {
                 if (months == 1) {
-                  final due = student.duesAmount;
-                  dueAmountCtrl.text = '$due';
+                  gross = student.duesAmount;
                   untilDate = student.feeDueDate!;
-                  notesCtrl.text = 'Dues cleared for period ending ${DateFormat('dd-MMM-yyyy').format(untilDate)}';
                 } else {
                   final total = defaultMonthly * months;
-                  final due = (total - alreadyPaid).clamp(0, total);
-                  dueAmountCtrl.text = '$due';
+                  gross = (total - alreadyPaid).clamp(0, total);
                   final base = student.feeDueDate!;
                   untilDate = DateTime(base.year, base.month + (months - 1), base.day);
-                  notesCtrl.text = '$months Months Fee (${student.duesAmount} Due + ${months - 1} mo Advance)';
                 }
               } else {
                 final total = defaultMonthly * months;
-                final due = total;
-                dueAmountCtrl.text = '$due';
+                gross = total;
                 untilDate = DateTime(fromDate.year, fromDate.month + months, fromDate.day);
-                if (months > 1) {
-                  notesCtrl.text = '$months Months Advance Fees Paid';
-                } else {
-                  notesCtrl.text = isExpired ? '1 Month Membership Fee Renewal' : '1 Month Advance Renewal Fee';
-                }
+              }
+
+              final advToApply = student.advanceAmount.clamp(0, gross);
+              final netPay = (gross - advToApply).clamp(0, gross);
+              dueAmountCtrl.text = '$netPay';
+
+              final periodTag = 'Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}';
+              if (hasUnexpiredDue) {
+                notesCtrl.text = months == 1
+                    ? 'Due payment for period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
+                    : '$months Months Fee (${student.duesAmount} Due + ${months - 1} mo Advance) • $periodTag';
+              } else {
+                notesCtrl.text = months > 1
+                    ? '$months Months Advance Fees Paid ($periodTag)'
+                    : (isExpired
+                        ? '1 Month Membership Fee Renewal ($periodTag)'
+                        : '1 Month Advance Renewal Fee ($periodTag)');
               }
             }
           });
@@ -355,18 +365,22 @@ Future<void> showCollectPaymentModal(
                 ),
                 const SizedBox(height: 16),
 
-                // Total Period Fee & Fixed Already Paid & Due Amount to Accept (Requirement 4)
+                // Total Period Fee & Fixed Already Paid & Advance Credit & Due Amount to Accept
                 Builder(
                   builder: (ctx) {
                     final totalPeriodFee = hasUnexpiredDue
                         ? (selectedAdvanceMonths == 1 ? defaultMonthly : defaultMonthly * selectedAdvanceMonths)
                         : (selectedAdvanceMonths > 0 ? defaultMonthly * selectedAdvanceMonths : defaultMonthly);
-                    final calculatedDue = hasUnexpiredDue
+                    final grossDue = hasUnexpiredDue
                         ? (selectedAdvanceMonths == 1 ? student.duesAmount : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee))
                         : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee);
-                    final enteredPaid = int.tryParse(dueAmountCtrl.text.trim()) ?? calculatedDue;
-                    final currentCollect = enteredPaid.clamp(0, calculatedDue);
-                    final remainingAfter = (calculatedDue - currentCollect).clamp(0, calculatedDue);
+
+                    final advanceToApply = student.advanceAmount.clamp(0, grossDue);
+                    final netPayable = (grossDue - advanceToApply).clamp(0, grossDue);
+                    final enteredPaid = int.tryParse(dueAmountCtrl.text.trim()) ?? netPayable;
+                    final currentCollect = enteredPaid.clamp(0, netPayable);
+                    final remainingAfter = (grossDue - (advanceToApply + currentCollect)).clamp(0, grossDue);
+                    final remainingAdvance = student.advanceAmount - advanceToApply;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,6 +493,73 @@ Future<void> showCollectPaymentModal(
                             ],
                           ),
                         ),
+
+                        // Advance Money with Library Box
+                        if (student.advanceAmount > 0) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFF6EE7B7)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF059669),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'ADVANCE MONEY WITH LIBRARY',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.5,
+                                          color: Color(0xFF047857),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '₹${student.advanceAmount} Available (₹$advanceToApply Adjusted)',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF065F46),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        advanceToApply >= grossDue
+                                            ? 'Full fee covered by student advance! (₹$remainingAdvance credit carries forward)'
+                                            : '₹$advanceToApply credit deducted from fee. Net cash/UPI to collect: ₹$netPayable.',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF047857),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
 
                         // Due Amount to Accept (Only Due Amount accepted, auto-calculated)
@@ -501,7 +582,7 @@ Future<void> showCollectPaymentModal(
                                 border: Border.all(color: const Color(0xFFFECDD3)),
                               ),
                               child: Text(
-                                'Max Payable: ₹$calculatedDue',
+                                'Max Payable: ₹$netPayable',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
@@ -526,16 +607,16 @@ Future<void> showCollectPaymentModal(
                               fontWeight: FontWeight.w800,
                               color: AppColors.text(sheetContext),
                             ),
-                            decoration: const InputDecoration(
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               border: InputBorder.none,
-                              prefixIcon: Icon(Icons.currency_rupee, color: Color(0xFF0D9488), size: 20),
-                              hintText: 'Enter amount to collect',
+                              prefixIcon: const Icon(Icons.currency_rupee, color: Color(0xFF0D9488), size: 20),
+                              hintText: netPayable == 0 ? 'Covered by Advance Credit' : 'Enter amount to collect',
                             ),
                             onChanged: (val) {
                               final p = int.tryParse(val.trim());
-                              if (p != null && p > calculatedDue) {
-                                dueAmountCtrl.text = '$calculatedDue';
+                              if (p != null && p > netPayable) {
+                                dueAmountCtrl.text = '$netPayable';
                                 dueAmountCtrl.selection = TextSelection.fromPosition(TextPosition(offset: dueAmountCtrl.text.length));
                               }
                               setModalState(() {});
@@ -561,7 +642,7 @@ Future<void> showCollectPaymentModal(
                               ),
                               child: Text(
                                 remainingAfter == 0
-                                    ? '✓ Full Due Cleared (₹0 Due)'
+                                    ? '✓ Full Due Cleared (₹0 Due)${advanceToApply > 0 ? " • ₹$advanceToApply Advance Adjusted" : ""}'
                                     : 'Remaining Due: ₹$remainingAfter',
                                 style: TextStyle(
                                   fontSize: 11,
@@ -909,15 +990,30 @@ Future<void> showCollectPaymentModal(
                           final totalPeriodFee = hasUnexpiredDue
                               ? (selectedAdvanceMonths == 1 ? defaultMonthly : defaultMonthly * selectedAdvanceMonths)
                               : (selectedAdvanceMonths > 0 ? defaultMonthly * selectedAdvanceMonths : defaultMonthly);
-                          final calculatedDue = hasUnexpiredDue
+                          final grossDue = hasUnexpiredDue
                               ? (selectedAdvanceMonths == 1 ? student.duesAmount : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee))
                               : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee);
-                          final rawPaid = int.tryParse(dueAmountCtrl.text.trim()) ?? calculatedDue;
-                          final paid = rawPaid.clamp(0, calculatedDue);
-                          final remainingDues = (calculatedDue - paid).clamp(0, 999999);
+                          final advanceToApply = student.advanceAmount.clamp(0, grossDue);
+                          final netPayable = (grossDue - advanceToApply).clamp(0, grossDue);
+                          final rawPaid = int.tryParse(dueAmountCtrl.text.trim()) ?? netPayable;
+                          final paid = rawPaid.clamp(0, netPayable);
+                          final remainingAdvance = student.advanceAmount - advanceToApply;
+                          final remainingDues = (grossDue - (paid + advanceToApply)).clamp(0, 999999);
                           Navigator.pop(ctx);
 
-                          if (paid > 0) {
+                          final periodStr = 'Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}';
+                          String effectiveNotes = notesCtrl.text.trim();
+                          if (effectiveNotes.isEmpty) {
+                            if (hasUnexpiredDue) {
+                              effectiveNotes = 'Due payment of ₹$paid${advanceToApply > 0 ? " + ₹$advanceToApply advance credit" : ""} for $periodStr';
+                            } else {
+                              effectiveNotes = 'Payment of ₹$paid${advanceToApply > 0 ? " + ₹$advanceToApply advance credit" : ""} for $periodStr';
+                            }
+                          } else if (hasUnexpiredDue && !effectiveNotes.toLowerCase().contains('period')) {
+                            effectiveNotes = '$effectiveNotes ($periodStr)';
+                          }
+
+                          if (paid > 0 || advanceToApply > 0) {
                             final m = selectedAdvanceMonths > 0 ? selectedAdvanceMonths : 1;
                             await service.recordPayment(
                               studentId: student.id,
@@ -925,12 +1021,10 @@ Future<void> showCollectPaymentModal(
                               phone: student.phone,
                               seatNumber: student.seatNumber,
                               shift: student.shift,
-                              amount: paid,
+                              amount: paid > 0 ? paid : advanceToApply,
                               date: paymentDate,
-                              paymentMode: selectedMethod,
-                              notes: notesCtrl.text.trim().isNotEmpty
-                                  ? notesCtrl.text.trim()
-                                  : (remainingDues == 0 ? 'Full payment received' : 'Partial payment received'),
+                              paymentMode: paid > 0 ? selectedMethod : 'Advance Credit',
+                              notes: effectiveNotes,
                               validFrom: fromDate,
                               validUntil: untilDate,
                               durationMonths: m,
@@ -944,6 +1038,7 @@ Future<void> showCollectPaymentModal(
                             shift: student.shift,
                             seatNumber: student.seatNumber,
                             duesAmount: remainingDues,
+                            advanceAmount: remainingAdvance,
                             status: remainingDues > 0 ? 'DUES' : 'ACTIVE',
                             feeDueDate: untilDate,
                           );
@@ -954,8 +1049,8 @@ Future<void> showCollectPaymentModal(
                             SnackBar(
                               content: Text(
                                 remainingDues > 0
-                                    ? 'Payment of ₹$paid recorded. Remaining ₹$remainingDues due. Valid until ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
-                                    : 'Payment of ₹$paid recorded! Active until ${DateFormat('dd-MMM-yyyy').format(untilDate)}',
+                                    ? 'Payment of ₹$paid recorded (${advanceToApply > 0 ? "₹$advanceToApply advance adjusted, " : ""}₹$remainingDues remaining due). Valid until ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
+                                    : 'Payment of ₹$paid recorded${advanceToApply > 0 ? " (₹$advanceToApply advance adjusted)" : ""}! Active until ${DateFormat('dd-MMM-yyyy').format(untilDate)}',
                               ),
                               backgroundColor: remainingDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF0D9488),
                               behavior: SnackBarBehavior.floating,

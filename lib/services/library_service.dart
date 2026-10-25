@@ -404,6 +404,13 @@ class LibraryService {
         }
       }
     }
+    if (fromVersion < 4 && data['students'] is List) {
+      for (final s in data['students']) {
+        if (s is Map) {
+          s.putIfAbsent('advance_amount', () => 0);
+        }
+      }
+    }
   }
 
   String exportFullBackupJson() {
@@ -1226,23 +1233,17 @@ class LibraryService {
     final payDate = date ?? DateTime.now();
     final paymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
 
-    if (isFirebaseConnected) {
-      await _tenantCol('payments').doc(paymentId).set({
-        'payment_id': paymentId,
-        'student_id': studentId ?? '',
-        'student_name': studentName,
-        'student_phone': phone ?? '',
-        'seat_number': seatNumber,
-        'shift': shift,
-        'amount': amount,
-        'date': Timestamp.fromDate(payDate),
-        'payment_mode': paymentMode,
-        'notes': notes,
-        if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom),
-        if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil),
-        if (durationMonths != null) 'duration_months': durationMonths,
-      });
+    // Format explicit period note for due collections
+    String effectiveNotes = notes;
+    String periodStr = '';
+    if (validFrom != null && validUntil != null) {
+      periodStr = '${DateFormat('dd-MMM-yyyy').format(validFrom)} to ${DateFormat('dd-MMM-yyyy').format(validUntil)}';
+    } else if (validUntil != null) {
+      final approxStart = date ?? DateTime.now();
+      periodStr = '${DateFormat('dd-MMM-yyyy').format(approxStart)} to ${DateFormat('dd-MMM-yyyy').format(validUntil)}';
+    }
 
+    if (isFirebaseConnected) {
       if (studentId != null && studentId.isNotEmpty) {
         try {
           final studentDoc = await _tenantCol('students').doc(studentId).get();
@@ -1253,10 +1254,19 @@ class LibraryService {
             DateTime? currentDueDate;
             if (dueDateRaw is Timestamp) currentDueDate = dueDateRaw.toDate();
 
+            final isDuePayment = curDues > 0 || notes.toLowerCase().contains('due');
+            if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
+              effectiveNotes = notes.isNotEmpty
+                  ? '$notes • Due payment for period: $periodStr'
+                  : 'Due payment for period: $periodStr';
+            }
+
             final newDues = curDues > 0 ? (curDues - amount).clamp(0, 999999) : 0;
             final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
             final curNote = (data['note'] as String?) ?? '';
-            final payLog = 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
+            final payLog = isDuePayment && periodStr.isNotEmpty
+                ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr (Period: $periodStr)${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
+                : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
             final updatedNote = appendNote(curNote, payLog);
 
             final updates = <String, dynamic>{
@@ -1271,7 +1281,59 @@ class LibraryService {
           }
         } catch (_) {}
       }
+
+      await _tenantCol('payments').doc(paymentId).set({
+        'payment_id': paymentId,
+        'student_id': studentId ?? '',
+        'student_name': studentName,
+        'student_phone': phone ?? '',
+        'seat_number': seatNumber,
+        'shift': shift,
+        'amount': amount,
+        'date': Timestamp.fromDate(payDate),
+        'payment_mode': paymentMode,
+        'notes': effectiveNotes,
+        if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom),
+        if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil),
+        if (durationMonths != null) 'duration_months': durationMonths,
+      });
     } else {
+      // Reconcile dues & activity log in student if registered
+      final matchIdx = _mockStudents.indexWhere((s) =>
+          (studentId != null && studentId.isNotEmpty && s.id == studentId) ||
+          (phone != null && phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(phone)) ||
+          (s.name.toLowerCase() == studentName.toLowerCase()));
+
+      if (matchIdx != -1) {
+        final s = _mockStudents[matchIdx];
+        final currentDues = s.effectiveDues;
+        final isDuePayment = currentDues > 0 || notes.toLowerCase().contains('due');
+        if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
+          effectiveNotes = notes.isNotEmpty
+              ? '$notes • Due payment for period: $periodStr'
+              : 'Due payment for period: $periodStr';
+        }
+
+        final newDues = currentDues > 0 ? (currentDues - amount).clamp(0, 999999) : 0;
+        DateTime? updatedDueDate = s.feeDueDate;
+        if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
+          updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
+        }
+        final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
+        final payLog = isDuePayment && periodStr.isNotEmpty
+            ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr (Period: $periodStr)${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
+            : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
+        final updatedNote = appendNote(s.note, payLog);
+
+        _mockStudents[matchIdx] = s.copyWith(
+          duesAmount: newDues,
+          status: newDues == 0 ? 'ACTIVE' : 'DUES',
+          feeDueDate: updatedDueDate,
+          note: updatedNote,
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+
       _mockPayments.insert(
         0,
         PaymentTransaction(
@@ -1284,40 +1346,13 @@ class LibraryService {
           amount: amount,
           date: payDate,
           paymentMode: paymentMode,
-          notes: notes,
+          notes: effectiveNotes,
           validFrom: validFrom,
           validUntil: validUntil,
           durationMonths: durationMonths,
         ),
       );
       _mockPaymentsController.add(List.unmodifiable(_mockPayments));
-
-      // Reconcile dues & activity log in student if registered
-      final matchIdx = _mockStudents.indexWhere((s) =>
-          (studentId != null && studentId.isNotEmpty && s.id == studentId) ||
-          (phone != null && phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(phone)) ||
-          (s.name.toLowerCase() == studentName.toLowerCase()));
-
-      if (matchIdx != -1) {
-        final s = _mockStudents[matchIdx];
-        final currentDues = s.effectiveDues;
-        final newDues = currentDues > 0 ? (currentDues - amount).clamp(0, 999999) : 0;
-        DateTime? updatedDueDate = s.feeDueDate;
-        if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
-          updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
-        }
-        final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
-        final payLog = 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
-        final updatedNote = appendNote(s.note, payLog);
-
-        _mockStudents[matchIdx] = s.copyWith(
-          duesAmount: newDues,
-          status: newDues == 0 ? 'ACTIVE' : 'DUES',
-          feeDueDate: updatedDueDate,
-          note: updatedNote,
-        );
-        _mockStudentsController.add(List.unmodifiable(_mockStudents));
-      }
 
       await _saveLocalState();
     }
@@ -1536,6 +1571,7 @@ class LibraryService {
       feeAmount: 0,
       monthlyFee: student.monthlyFee,
       duesAmount: student.duesAmount,
+      advanceAmount: student.advanceAmount,
       status: student.status,
       joiningDate: student.joinedAt ?? DateTime.now(),
       validUntil: student.feeDueDate,
@@ -1564,6 +1600,7 @@ class LibraryService {
     DateTime? paymentDate,
     String note = '',
     int duesAmount = 0,
+    int advanceAmount = 0,
     String fatherName = '',
     String address = '',
     String aadhaarNumber = '',
@@ -1611,6 +1648,7 @@ class LibraryService {
         note: note,
         monthlyFee: effectiveMonthly,
         duesAmount: duesAmount,
+        advanceAmount: advanceAmount,
         status: status,
         feeDueDate: effectiveValidUntil,
         fatherName: fatherName,
@@ -1692,6 +1730,7 @@ class LibraryService {
           'payment_mode': paymentMode,
           'note': note,
           'dues_amount': duesAmount,
+          'advance_amount': advanceAmount,
           'father_name': fatherName,
           'address': address,
           'aadhaar_number': aadhaarNumber,
@@ -1750,6 +1789,7 @@ class LibraryService {
           paymentMode: paymentMode,
           note: note,
           duesAmount: duesAmount,
+          advanceAmount: advanceAmount,
           fatherName: fatherName,
           address: address,
           aadhaarNumber: aadhaarNumber,
@@ -2091,6 +2131,7 @@ class LibraryService {
     String? note,
     int? monthlyFee,
     int? duesAmount,
+    int? advanceAmount,
     String? status,
     DateTime? feeDueDate,
     String? fatherName,
@@ -2153,6 +2194,7 @@ class LibraryService {
       if (seatNumber != null) updates['seat_number'] = seatNumber;
       if (monthlyFee != null) updates['monthly_fee'] = monthlyFee;
       if (duesAmount != null) updates['dues_amount'] = duesAmount;
+      if (advanceAmount != null) updates['advance_amount'] = advanceAmount;
       if (status != null) updates['status'] = status;
       if (feeDueDate != null) updates['fee_due_date'] = Timestamp.fromDate(feeDueDate);
       if (fatherName != null) updates['father_name'] = fatherName;
@@ -2214,6 +2256,7 @@ class LibraryService {
           note: mergedNote,
           monthlyFee: monthlyFee ?? s.monthlyFee,
           duesAmount: duesAmount ?? s.duesAmount,
+          advanceAmount: advanceAmount ?? s.advanceAmount,
           status: status ?? s.status,
           feeDueDate: feeDueDate ?? s.feeDueDate,
           fatherName: fatherName ?? s.fatherName,

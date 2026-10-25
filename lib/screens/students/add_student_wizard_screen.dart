@@ -133,13 +133,15 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int get _studentEffectivePaidCoverage {
     if (widget.studentToEdit == null) return 0;
     final s = widget.studentToEdit!;
-    final tenureMonths = _effectiveTenureMonths;
+    final tenureMonths = _existingStudentTenureMonths;
 
-    // 1. Check notes for excess credit or recorded original fee
-    int recordedCredit = 0;
-    final matchCredit = RegExp(r'₹(\d+)\s+excess credit').firstMatch(s.note);
-    if (matchCredit != null) {
-      recordedCredit = int.tryParse(matchCredit.group(1) ?? '0') ?? 0;
+    // 1. Structured advanceAmount has highest priority; fallback to legacy regex
+    int effectiveAdvance = s.advanceAmount;
+    if (effectiveAdvance == 0) {
+      final matchCredit = RegExp(r'₹(\d+)\s+excess credit').firstMatch(s.note);
+      if (matchCredit != null) {
+        effectiveAdvance = int.tryParse(matchCredit.group(1) ?? '0') ?? 0;
+      }
     }
 
     final matchOriginal = RegExp(r'original paid[:\s]+₹?(\d+)', caseSensitive: false).firstMatch(s.note);
@@ -148,29 +150,21 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       if (orig > 0) return orig;
     }
 
-    // 2. Query student payment transactions for highest/recent payment
-    final studentPayments = _service.currentPayments.where((p) {
-      return (s.id.isNotEmpty && p.studentId == s.id) ||
-          (s.phone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == LibraryService.normalizePhone(s.phone));
-    }).toList();
-
-    int maxRecentPayment = 0;
-    for (var p in studentPayments) {
-      if (p.amount > maxRecentPayment) {
-        maxRecentPayment = p.amount;
-      }
-    }
-
-    // 3. Expected tenure fee minus dues
+    // 2. Expected tenure fee minus dues plus advance credit
     final expectedTenureFee = s.monthlyFee * tenureMonths;
-    final feeMinusDues = (expectedTenureFee - s.duesAmount).clamp(0, 999999);
+    int totalCovered = (expectedTenureFee - s.duesAmount + effectiveAdvance).clamp(0, 9999999);
 
-    int totalCovered = feeMinusDues;
-    if (s.duesAmount == 0 && (expectedTenureFee + recordedCredit) > totalCovered) {
-      totalCovered = expectedTenureFee + recordedCredit;
-    }
-    if (maxRecentPayment > totalCovered && s.duesAmount == 0) {
-      totalCovered = maxRecentPayment;
+    if (effectiveAdvance == 0 && s.duesAmount == 0) {
+      final studentPayments = _service.currentPayments.where((p) {
+        return (s.id.isNotEmpty && p.studentId == s.id) ||
+            (s.phone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == LibraryService.normalizePhone(s.phone));
+      }).toList();
+
+      for (var p in studentPayments) {
+        if (p.amount > totalCovered) {
+          totalCovered = p.amount;
+        }
+      }
     }
 
     return totalCovered;
@@ -213,25 +207,13 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   // Fixed / Non-editable Already Paid for existing students
   int get _alreadyPaidAmount => _studentEffectivePaidCoverage;
 
-  // Auto-calculated Due Amount
+  // Auto-calculated Due Amount (Accurately balances any number of shift upgrades/downgrades)
   int get _dueAmount {
     if (widget.studentToEdit == null) return _calculatedTotalFee;
-    final s = widget.studentToEdit!;
-
     final coverage = _studentEffectivePaidCoverage;
-    final tenureCost = _fixedMonthlyFee * _effectiveTenureMonths;
-    final upgradeDiff = (tenureCost - coverage) > 0 ? (tenureCost - coverage) : 0;
-    final baseDues = s.duesAmount > 0 ? s.duesAmount : 0;
-
-    // Cycle due is upgrade difference + previous pending dues
-    final cycleDue = baseDues + upgradeDiff;
-
-    if (_selectedDurationMonths <= _existingStudentTenureMonths) {
-      return cycleDue;
-    } else {
-      final advanceMonths = _selectedDurationMonths - _existingStudentTenureMonths;
-      return cycleDue + (_fixedMonthlyFee * advanceMonths);
-    }
+    final totalTargetCost = _fixedMonthlyFee * _effectiveTenureMonths;
+    final diff = totalTargetCost - coverage;
+    return diff > 0 ? diff : 0;
   }
 
   void _updateDuration(int months) {
@@ -755,15 +737,25 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         }
 
         // Record shift change in notes if shift changed
+        // Calculate structured finalAdvanceAmount:
+        final tenureCost = fixedMonthly * _effectiveTenureMonths;
+        final coverage = _studentEffectivePaidCoverage;
+        final diff = tenureCost - coverage;
+
+        final int finalAdvanceAmount;
+        if (diff > 0) {
+          finalAdvanceAmount = 0;
+        } else {
+          finalAdvanceAmount = coverage - tenureCost;
+        }
+
+        // Record shift change in notes if shift changed
         String shiftLog = '';
         if (isShiftChanged) {
-          final diff = _shiftUpgradeDifference;
-          final excess = _shiftDowngradeExcessCredit;
-          final coverage = _studentEffectivePaidCoverage;
           if (diff > 0) {
             shiftLog = 'Shift upgraded: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())} for $_selectedDurationMonths mo tenure. (Paid: ₹$coverage, Upgrade diff: ₹$diff)';
-          } else if (excess > 0) {
-            shiftLog = 'Shift downgraded: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())} for $_selectedDurationMonths mo tenure. Student already paid ₹$coverage. ₹$excess excess credit remains with the library to adjust in next renewal.';
+          } else if (finalAdvanceAmount > 0) {
+            shiftLog = 'Shift downgraded: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())} for $_selectedDurationMonths mo tenure. Student already paid ₹$coverage. ₹$finalAdvanceAmount excess credit remains with the library to adjust in next renewal.';
           } else {
             shiftLog = 'Shift updated: $oldShift → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())} for $_selectedDurationMonths mo tenure.';
           }
@@ -779,9 +771,10 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         }
 
         // Record payment in notes if collected now
+        final periodStr = '${DateFormat('dd-MMM-yyyy').format(_fromDate)} to ${DateFormat('dd-MMM-yyyy').format(_validUntilDate)}';
         String payLog = '';
         if (collectedNow > 0) {
-          payLog = 'Payment of ₹$collectedNow collected via $_selectedPaymentMethod on ${DateFormat('dd-MMM-yyyy').format(_paymentDate)} ($_selectedDurationMonths mo tenure)${isShiftChanged ? " (Shift upgrade)" : ""}.';
+          payLog = 'Due payment of ₹$collectedNow collected via $_selectedPaymentMethod on ${DateFormat('dd-MMM-yyyy').format(_paymentDate)} for period: $periodStr ($_selectedDurationMonths mo tenure)${isShiftChanged ? " (Shift upgrade)" : ""}.';
         }
 
         String finalNotes = _notesCtrl.text.trim();
@@ -798,8 +791,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         // CRITICAL SYNC: Record payment in financial ledger & transaction stream
         if (collectedNow > 0) {
           final paymentNotes = isShiftChanged
-              ? 'Shift upgrade: $oldShift → ${_selectedShift.name} • ₹$collectedNow collected ($_selectedDurationMonths mo tenure)'
-              : 'Payment collected via Edit Student Details ($_selectedDurationMonths mo tenure)';
+              ? 'Shift upgrade: $oldShift → ${_selectedShift.name} • Due payment of ₹$collectedNow for period: $periodStr ($_selectedDurationMonths mo tenure)'
+              : 'Due payment of ₹$collectedNow for period: $periodStr ($_selectedDurationMonths mo tenure)';
           await _service.recordPayment(
             studentId: s.id,
             studentName: name,
@@ -825,6 +818,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           note: finalNotes,
           monthlyFee: fixedMonthly,
           duesAmount: editDuesAmount,
+          advanceAmount: finalAdvanceAmount,
           status: editStatus,
           feeDueDate: _validUntilDate,
           fatherName: _fatherNameCtrl.text.trim(),
@@ -1742,6 +1736,81 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           ),
           const SizedBox(height: 18),
 
+          // Student Advance Money Box if advance credit exists
+          Builder(
+            builder: (context) {
+              final s = widget.studentToEdit;
+              if (s == null) return const SizedBox.shrink();
+              final excess = _shiftDowngradeExcessCredit;
+              final adv = s.advanceAmount;
+              if (adv <= 0 && excess <= 0) return const SizedBox.shrink();
+
+              final displayAmount = excess > 0 ? excess : adv;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF6EE7B7)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF059669),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            excess > 0 ? 'SHIFT DOWNGRADE EXCESS CREDIT' : 'STUDENT ADVANCE MONEY AVAILABLE',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: Color(0xFF047857),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '₹$displayAmount',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF065F46),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            excess > 0
+                                ? '₹$excess excess credit remains with the library to adjust in next renewal.'
+                                : 'This advance balance is automatically adjusted into renewals or shift upgrades.',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF047857),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
           // Month Selection (Payment Duration / Advance Period)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1776,7 +1845,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   s.feeDueDate != null &&
                   !s.feeDueDate!.isBefore(today);
 
-              String firstChipLabel = '1 Month';
+              final currentTenure = s != null ? _existingStudentTenureMonths : 1;
+              String firstChipLabel = currentTenure > 1 ? '$currentTenure Months (Current)' : '1 Month';
               if (hasPendingCurrentDue) {
                 firstChipLabel = 'Clear Due (₹${s.duesAmount})';
               } else if (_isStudentInPaidActiveTenure && isShiftChanged) {
@@ -1792,7 +1862,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                   children: [
                     _durationChip(
                       label: firstChipLabel,
-                      months: 1,
+                      months: currentTenure,
                     ),
                     const SizedBox(width: 8),
                     _durationChip(

@@ -676,5 +676,208 @@ void main() {
       expect(day2Payments.any((p) => p.studentName == 'Student Day 2'), isTrue);
       expect(day2Payments.any((p) => p.studentName == 'Student Day 1'), isFalse);
     });
+
+    test('Multiple shift changes in the same tenure accurately compute dues and advance credit every time', () async {
+      // 1. Enrolled in 1-month tenure at ₹1000/mo (paid full ₹1000)
+      final s = StudentInfo(
+        id: 'std_multi_shift_1',
+        name: 'Multi Shift Student',
+        phone: '9988776655',
+        shift: 'Full Day',
+        seatNumber: 15,
+        monthlyFee: 1000,
+        duesAmount: 0,
+        advanceAmount: 0,
+        status: 'ACTIVE',
+        feeDueDate: DateTime.now().add(const Duration(days: 30)),
+      );
+      await service.addStudent(s);
+
+      // Simulation of Wizard / Service Multi-Shift Math:
+      // Invariant: effectiveCoverage = (s.monthlyFee * tenure) - s.duesAmount + s.advanceAmount
+      int tenureMonths = 1;
+      int coverage = (s.monthlyFee * tenureMonths) - s.duesAmount + s.advanceAmount; // 1000
+
+      // CHANGE 1 (Downgrade): Change to 800/mo
+      int newCost = 800 * tenureMonths; // 800
+      int diff = newCost - coverage; // 800 - 1000 = -200 (200 excess credit)
+      expect(diff, equals(-200));
+      int advanceAmount = diff < 0 ? -diff : 0; // 200
+      int dueAmount = diff > 0 ? diff : 0; // 0
+      expect(advanceAmount, equals(200));
+      expect(dueAmount, equals(0));
+
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: 'Morning Shift',
+        monthlyFee: 800,
+        duesAmount: dueAmount,
+        advanceAmount: advanceAmount,
+      );
+
+      var studentAfterChg1 = service.findStudentByPhone('9988776655')!;
+      expect(studentAfterChg1.monthlyFee, equals(800));
+      expect(studentAfterChg1.duesAmount, equals(0));
+      expect(studentAfterChg1.advanceAmount, equals(200));
+
+      // CHANGE 2 (Downgrade Again in same tenure): Change from 800/mo to 600/mo
+      coverage = (studentAfterChg1.monthlyFee * tenureMonths) - studentAfterChg1.duesAmount + studentAfterChg1.advanceAmount;
+      expect(coverage, equals(1000)); // Still maintains full 1000 baseline!
+
+      newCost = 600 * tenureMonths; // 600
+      diff = newCost - coverage; // 600 - 1000 = -400
+      advanceAmount = diff < 0 ? -diff : 0; // 400
+      dueAmount = diff > 0 ? diff : 0; // 0
+      expect(advanceAmount, equals(400));
+      expect(dueAmount, equals(0));
+
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: 'Evening Shift',
+        monthlyFee: 600,
+        duesAmount: dueAmount,
+        advanceAmount: advanceAmount,
+      );
+
+      var studentAfterChg2 = service.findStudentByPhone('9988776655')!;
+      expect(studentAfterChg2.monthlyFee, equals(600));
+      expect(studentAfterChg2.advanceAmount, equals(400));
+      expect(studentAfterChg2.duesAmount, equals(0));
+
+      // CHANGE 3 (Upgrade in same tenure): Change from 600/mo to 1200/mo
+      coverage = (studentAfterChg2.monthlyFee * tenureMonths) - studentAfterChg2.duesAmount + studentAfterChg2.advanceAmount;
+      expect(coverage, equals(1000)); // Still exact 1000 baseline!
+
+      newCost = 1200 * tenureMonths; // 1200
+      diff = newCost - coverage; // 1200 - 1000 = +200
+      advanceAmount = diff < 0 ? -diff : 0; // 0
+      dueAmount = diff > 0 ? diff : 0; // 200
+      expect(advanceAmount, equals(0));
+      expect(dueAmount, equals(200));
+
+      // Student pays 0 right now, accepts 200 due
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: '24 Hour Shift',
+        monthlyFee: 1200,
+        duesAmount: dueAmount,
+        advanceAmount: advanceAmount,
+      );
+
+      var studentAfterChg3 = service.findStudentByPhone('9988776655')!;
+      expect(studentAfterChg3.monthlyFee, equals(1200));
+      expect(studentAfterChg3.duesAmount, equals(200));
+      expect(studentAfterChg3.advanceAmount, equals(0));
+
+      // CHANGE 4 (Downgrade after uncollected upgrade in same tenure): Change from 1200/mo to 700/mo
+      coverage = (studentAfterChg3.monthlyFee * tenureMonths) - studentAfterChg3.duesAmount + studentAfterChg3.advanceAmount;
+      expect(coverage, equals(1000)); // (1200 * 1) - 200 + 0 = 1000 baseline preserved!
+
+      newCost = 700 * tenureMonths; // 700
+      diff = newCost - coverage; // 700 - 1000 = -300
+      advanceAmount = diff < 0 ? -diff : 0; // 300
+      dueAmount = diff > 0 ? diff : 0; // 0 (due is automatically cleared!)
+      expect(advanceAmount, equals(300));
+      expect(dueAmount, equals(0));
+
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: 'Afternoon Shift',
+        monthlyFee: 700,
+        duesAmount: dueAmount,
+        advanceAmount: advanceAmount,
+      );
+
+      var studentAfterChg4 = service.findStudentByPhone('9988776655')!;
+      expect(studentAfterChg4.monthlyFee, equals(700));
+      expect(studentAfterChg4.advanceAmount, equals(300));
+      expect(studentAfterChg4.duesAmount, equals(0));
+
+      // 4. NEXT MONTH PURCHASE / RENEWAL ADJUSTMENT
+      // Student has 300 advance credit. Renewing for next month at 700/mo:
+      final nextMonthFee = 700;
+      final advanceToAdjust = studentAfterChg4.advanceAmount.clamp(0, nextMonthFee); // 300
+      final netCashToCollect = (nextMonthFee - advanceToAdjust).clamp(0, nextMonthFee); // 400
+      final remainingAdvance = studentAfterChg4.advanceAmount - advanceToAdjust; // 0
+
+      expect(advanceToAdjust, equals(300));
+      expect(netCashToCollect, equals(400));
+      expect(remainingAdvance, equals(0));
+
+      // Record payment for the net amount
+      final fromDate = studentAfterChg4.feeDueDate!;
+      final untilDate = DateTime(fromDate.year, fromDate.month + 1, fromDate.day);
+      await service.recordPayment(
+        studentId: s.id,
+        studentName: s.name,
+        phone: s.phone,
+        amount: netCashToCollect,
+        validFrom: fromDate,
+        validUntil: untilDate,
+        notes: 'Renewal payment of ₹$netCashToCollect + ₹$advanceToAdjust advance credit adjusted for period: 01-Nov-2026 to 01-Dec-2026',
+      );
+
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: studentAfterChg4.shift,
+        duesAmount: 0,
+        advanceAmount: remainingAdvance,
+        feeDueDate: untilDate,
+      );
+
+      var studentAfterRenewal = service.findStudentByPhone('9988776655')!;
+      expect(studentAfterRenewal.advanceAmount, equals(0));
+      expect(studentAfterRenewal.duesAmount, equals(0));
+      expect(studentAfterRenewal.status, equals('ACTIVE'));
+    });
+
+    test('Due payment collection explicitly notes the validity time period in payment records', () async {
+      final s = StudentInfo(
+        id: 'std_due_period_test',
+        name: 'Due Period Student',
+        phone: '9911223344',
+        shift: 'Morning Shift',
+        monthlyFee: 600,
+        duesAmount: 300,
+        status: 'DUES',
+        joinedAt: DateTime(2026, 10, 1),
+        feeDueDate: DateTime(2026, 11, 1),
+      );
+      await service.addStudent(s);
+
+      final validFrom = DateTime(2026, 10, 1);
+      final validUntil = DateTime(2026, 11, 1);
+
+      // Collect the due payment of ₹300
+      await service.recordPayment(
+        studentId: s.id,
+        studentName: s.name,
+        phone: s.phone,
+        amount: 300,
+        paymentMode: 'Cash',
+        validFrom: validFrom,
+        validUntil: validUntil,
+        notes: 'Due payment for period: 01-Oct-2026 to 01-Nov-2026',
+      );
+
+      final latestPayment = service.currentPayments.firstWhere((p) => p.studentId == s.id);
+      expect(latestPayment.notes.contains('Due payment for period: 01-Oct-2026 to 01-Nov-2026'), isTrue);
+
+      final updated = service.findStudentByPhone('9911223344')!;
+      expect(updated.duesAmount, equals(0));
+      expect(updated.status, equals('ACTIVE'));
+      expect(updated.note.contains('Due payment of ₹300 collected via Cash'), isTrue);
+      expect(updated.note.contains('01-Oct-2026 to 01-Nov-2026'), isTrue);
+    });
   });
 }

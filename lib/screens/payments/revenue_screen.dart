@@ -923,6 +923,46 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                       ],
                                     ),
                                   ),
+                                  if (p.notes.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: p.notes.toLowerCase().contains('due')
+                                            ? (AppColors.isDark(context) ? const Color(0xFF451A03) : const Color(0xFFFFFBEB))
+                                            : (AppColors.isDark(context) ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: p.notes.toLowerCase().contains('due')
+                                              ? (AppColors.isDark(context) ? const Color(0xFF78350F) : const Color(0xFFFDE68A))
+                                              : AppColors.cardBorderColor(context),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            p.notes.toLowerCase().contains('due') ? Icons.assignment_late_outlined : Icons.notes_rounded,
+                                            size: 13,
+                                            color: p.notes.toLowerCase().contains('due') ? const Color(0xFFD97706) : AppColors.textSubtleColor(context),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              p.notes,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: p.notes.toLowerCase().contains('due')
+                                                    ? (AppColors.isDark(context) ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                                                    : AppColors.textSubtleColor(context),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             );

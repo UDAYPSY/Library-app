@@ -1044,6 +1044,74 @@ _Powered by TrackMyLibrary_
                               ),
                             ],
                           ),
+
+                          // Advance Balance Box with Library
+                          if (_student.advanceAmount > 0) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFF6EE7B7)),
+                                boxShadow: const [
+                                  BoxShadow(color: Color(0x0D059669), blurRadius: 6, offset: Offset(0, 2)),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF059669),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 22),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'ADVANCE MONEY WITH LIBRARY',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.5,
+                                            color: Color(0xFF047857),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '₹${_student.advanceAmount}',
+                                          style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF065F46),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text(
+                                          'Credit available with library. Automatically adjusted in next renewal or shift upgrades.',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF047857),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 16),
 
                           // Collect Payment Button (Image 2)
@@ -1316,6 +1384,21 @@ _Powered by TrackMyLibrary_
                               ),
                             ),
                           ),
+                          if (_student.advanceAmount > 0) ...[
+                            const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
+                            _membershipItem(
+                              icon: Icons.savings_outlined,
+                              label: 'Advance Balance',
+                              valueWidget: Text(
+                                '₹${_student.advanceAmount}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
