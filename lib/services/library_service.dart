@@ -9,14 +9,23 @@ import '../models/library_models.dart';
 import 'local_storage_service.dart';
 
 class LibraryService {
-  // Static activity logger & note helper
+  // Static activity logger & note helper (persists all notes without overwriting)
   static String appendNote(String? currentNote, String newEntry) {
-    final cur = (currentNote ?? '').trim();
-    final entry = newEntry.trim();
-    if (entry.isEmpty) return cur;
-    if (cur.isEmpty) return '• $entry';
-    if (cur.contains(entry)) return cur;
-    return '$cur\n• $entry';
+    var cur = (currentNote ?? '').trim();
+    final raw = newEntry.trim();
+    if (raw.isEmpty) return cur;
+
+    final lines = raw.split('\n');
+    for (var line in lines) {
+      var entry = line.trim();
+      while (entry.startsWith('•')) {
+        entry = entry.substring(1).trim();
+      }
+      if (entry.isEmpty) continue;
+      if (cur.contains(entry)) continue;
+      cur = cur.isEmpty ? '• $entry' : '$cur\n• $entry';
+    }
+    return cur;
   }
 
   // Static security and hashing utilities
@@ -1362,13 +1371,22 @@ class LibraryService {
           'last_updated_by': deviceUserId,
         }, SetOptions(merge: true));
 
-        // 3. Update student with seat change activity note
+        // 3. Update student with seat and shift change activity notes
         final curNote = (sData['note'] as String?) ?? '';
+        final oldShift = (sData['shift'] as String?) ?? '';
         final dateStr = DateFormat('dd-MMM-yyyy').format(DateTime.now());
-        final seatLog = oldSeat != null
-            ? 'Seat changed: S-$oldSeat → S-$newSeatNumber ($effectiveShift) on $dateStr.'
-            : 'Seat assigned: S-$newSeatNumber ($effectiveShift) on $dateStr.';
-        final updatedNote = appendNote(curNote, seatLog);
+        String updatedNote = curNote;
+        if (oldSeat != null && oldSeat != newSeatNumber) {
+          updatedNote = appendNote(updatedNote, 'Seat changed: S-$oldSeat → S-$newSeatNumber ($effectiveShift) on $dateStr.');
+        } else if (oldSeat == null) {
+          updatedNote = appendNote(updatedNote, 'Seat assigned: S-$newSeatNumber ($effectiveShift) on $dateStr.');
+        }
+        if (oldShift.isNotEmpty && oldShift.toLowerCase() != effectiveShift.toLowerCase()) {
+          updatedNote = appendNote(updatedNote, 'Shift changed: $oldShift → $effectiveShift on $dateStr.');
+        }
+        if (feePaidNow > 0) {
+          updatedNote = appendNote(updatedNote, 'Payment of ₹$feePaidNow collected via $paymentMode on $dateStr.');
+        }
 
         final updateData = <String, dynamic>{
           'seat_number': newSeatNumber,
@@ -1463,10 +1481,18 @@ class LibraryService {
       }
 
       final dateStr = DateFormat('dd-MMM-yyyy').format(DateTime.now());
-      final seatLog = s.seatNumber != null
-          ? 'Seat changed: S-${s.seatNumber} → S-$newSeatNumber ($effectiveShift) on $dateStr.'
-          : 'Seat assigned: S-$newSeatNumber ($effectiveShift) on $dateStr.';
-      final updatedNote = appendNote(s.note, seatLog);
+      String updatedNote = s.note;
+      if (s.seatNumber != null && s.seatNumber != newSeatNumber) {
+        updatedNote = appendNote(updatedNote, 'Seat changed: S-${s.seatNumber} → S-$newSeatNumber ($effectiveShift) on $dateStr.');
+      } else if (s.seatNumber == null) {
+        updatedNote = appendNote(updatedNote, 'Seat assigned: S-$newSeatNumber ($effectiveShift) on $dateStr.');
+      }
+      if (s.shift.isNotEmpty && s.shift.toLowerCase() != effectiveShift.toLowerCase()) {
+        updatedNote = appendNote(updatedNote, 'Shift changed: ${s.shift} → $effectiveShift on $dateStr.');
+      }
+      if (feePaidNow > 0) {
+        updatedNote = appendNote(updatedNote, 'Payment of ₹$feePaidNow collected via $paymentMode on $dateStr.');
+      }
 
       _mockStudents[sIdx] = s.copyWith(
         seatNumber: newSeatNumber,
@@ -1766,14 +1792,29 @@ class LibraryService {
   // Vacate Seat (Sets seat isOccupied: false, and student.seatNumber: null without marking inactive)
   Future<void> vacateSeat(int seatNumber, String? studentId) async {
     ensureInitialized();
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+    final vacateLog = 'Seat unassigned / vacated from S-$seatNumber on $dateStr.';
+
     if (isFirebaseConnected) {
       final batch = _db.batch();
 
       if (studentId != null && studentId.trim().isNotEmpty) {
-        final studentDocRef = _tenantCol('students').doc(studentId.trim());
-        batch.update(studentDocRef, {
-          'seat_number': null,
-        });
+        final sId = studentId.trim();
+        final studentDocRef = _tenantCol('students').doc(sId);
+        try {
+          final snap = await studentDocRef.get();
+          if (snap.exists) {
+            final curNote = (snap.data()?['note'] as String?) ?? '';
+            final updatedNote = appendNote(curNote, vacateLog);
+            batch.update(studentDocRef, {
+              'seat_number': null,
+              'note': updatedNote,
+            });
+          }
+        } catch (_) {
+          batch.update(studentDocRef, {'seat_number': null});
+        }
       }
 
       final otherStudents = _mockStudents.where(
@@ -1805,9 +1846,11 @@ class LibraryService {
             _mockStudents.indexWhere((s) => s.id == studentId);
         if (studentIndex != -1) {
           final s = _mockStudents[studentIndex];
+          final updatedNote = appendNote(s.note, vacateLog);
           _mockStudents[studentIndex] = s.copyWith(
             seatNumber: null,
             clearSeatNumber: true,
+            note: updatedNote,
           );
         }
       }
@@ -1821,12 +1864,29 @@ class LibraryService {
   // Move Student to Inactive (frees seat, keeps record in INACTIVE tab)
   Future<void> markStudentInactive(String studentId, int? seatNumber) async {
     ensureInitialized();
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+    final inactiveLog = seatNumber != null
+        ? 'Member moved to Inactive on $dateStr (Seat S-$seatNumber freed).'
+        : 'Member moved to Inactive on $dateStr.';
+
     if (isFirebaseConnected) {
       final batch = _db.batch();
       final studentDocRef = _tenantCol('students').doc(studentId);
+
+      String updatedNote = '';
+      try {
+        final snap = await studentDocRef.get();
+        if (snap.exists) {
+          final curNote = (snap.data()?['note'] as String?) ?? '';
+          updatedNote = appendNote(curNote, inactiveLog);
+        }
+      } catch (_) {}
+
       batch.update(studentDocRef, {
         'status': 'INACTIVE',
         'seat_number': null,
+        if (updatedNote.isNotEmpty) 'note': updatedNote,
       });
       if (seatNumber != null) {
         final otherStudents = _mockStudents.where(
@@ -1854,10 +1914,13 @@ class LibraryService {
     } else {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
-        _mockStudents[idx] = _mockStudents[idx].copyWith(
+        final s = _mockStudents[idx];
+        final updatedNote = appendNote(s.note, inactiveLog);
+        _mockStudents[idx] = s.copyWith(
           status: 'INACTIVE',
           seatNumber: null,
           clearSeatNumber: true,
+          note: updatedNote,
         );
       }
       _syncSeatsWithStudents();
@@ -1966,12 +2029,29 @@ class LibraryService {
     int? seatNumber,
   ]) async {
     ensureInitialized();
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+    final reactivateLog = seatNumber != null
+        ? 'Member reactivated to Active on $dateStr (Assigned Seat S-$seatNumber).'
+        : 'Member reactivated to Active on $dateStr.';
+
     if (isFirebaseConnected) {
       final batch = _db.batch();
       final studentDocRef = _tenantCol('students').doc(studentId);
+
+      String updatedNote = '';
+      try {
+        final snap = await studentDocRef.get();
+        if (snap.exists) {
+          final curNote = (snap.data()?['note'] as String?) ?? '';
+          updatedNote = appendNote(curNote, reactivateLog);
+        }
+      } catch (_) {}
+
       final updates = <String, dynamic>{
         'status': 'ACTIVE',
         'dues_amount': 0,
+        if (updatedNote.isNotEmpty) 'note': updatedNote,
       };
       if (seatNumber != null) {
         updates['seat_number'] = seatNumber;
@@ -1987,10 +2067,12 @@ class LibraryService {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
         final s = _mockStudents[idx];
+        final updatedNote = appendNote(s.note, reactivateLog);
         _mockStudents[idx] = s.copyWith(
           status: 'ACTIVE',
           seatNumber: seatNumber ?? s.seatNumber,
           duesAmount: 0,
+          note: updatedNote,
         );
         _syncSeatsWithStudents();
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
@@ -2000,14 +2082,13 @@ class LibraryService {
   }
 
   // Update Student details (Name, Phone, Shift, Seat, Note, Status, Due Date, etc.)
-  // Update Student details (Name, Phone, Shift, Seat, Note, Status, Due Date, etc.)
   Future<bool> updateStudent({
     required String studentId,
     required String name,
     required String phone,
     required String shift,
     int? seatNumber,
-    String note = '',
+    String? note,
     int? monthlyFee,
     int? duesAmount,
     String? status,
@@ -2023,13 +2104,50 @@ class LibraryService {
   }) async {
     ensureInitialized();
     final now = DateTime.now();
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+
     if (isFirebaseConnected) {
       final studentDocRef = _tenantCol('students').doc(studentId);
+      String curNote = '';
+      String oldShift = '';
+      int? oldSeat;
+      String oldStatus = '';
+      try {
+        final snap = await studentDocRef.get();
+        if (snap.exists) {
+          final d = snap.data() ?? {};
+          curNote = (d['note'] as String?) ?? '';
+          oldShift = (d['shift'] as String?) ?? '';
+          oldSeat = (d['seat_number'] as num?)?.toInt();
+          oldStatus = (d['status'] as String?) ?? '';
+        }
+      } catch (_) {}
+
+      String mergedNote = curNote;
+      // 1. Audit shift change if modified
+      if (oldShift.isNotEmpty && oldShift.toLowerCase() != shift.toLowerCase()) {
+        mergedNote = appendNote(mergedNote, 'Shift changed: $oldShift → $shift on $dateStr.');
+      }
+      // 2. Audit seat change if modified
+      if (seatNumber != null && oldSeat != null && seatNumber != oldSeat) {
+        mergedNote = appendNote(mergedNote, 'Seat changed: S-$oldSeat → S-$seatNumber ($shift) on $dateStr.');
+      } else if (seatNumber != null && oldSeat == null) {
+        mergedNote = appendNote(mergedNote, 'Seat assigned: S-$seatNumber ($shift) on $dateStr.');
+      }
+      // 3. Audit status change if modified
+      if (status != null && oldStatus.isNotEmpty && status != oldStatus) {
+        mergedNote = appendNote(mergedNote, 'Status changed: $oldStatus → $status on $dateStr.');
+      }
+      // 4. Merge incoming remarks if provided (never wipe existing notes)
+      if (note != null && note.trim().isNotEmpty) {
+        mergedNote = appendNote(mergedNote, note.trim());
+      }
+
       final updates = <String, dynamic>{
         'name': name,
         'phone': phone,
         'shift': shift,
-        'note': note,
+        'note': mergedNote,
         'updated_at': Timestamp.fromDate(now),
       };
       if (seatNumber != null) updates['seat_number'] = seatNumber;
@@ -2057,6 +2175,28 @@ class LibraryService {
 
         final oldSeat = s.seatNumber;
         final newSeat = seatNumber ?? oldSeat;
+        final oldShift = s.shift;
+        final oldStatus = s.status;
+
+        String mergedNote = s.note;
+        // 1. Audit shift change if modified
+        if (oldShift.isNotEmpty && oldShift.toLowerCase() != shift.toLowerCase()) {
+          mergedNote = appendNote(mergedNote, 'Shift changed: $oldShift → $shift on $dateStr.');
+        }
+        // 2. Audit seat change if modified
+        if (newSeat != null && oldSeat != null && newSeat != oldSeat) {
+          mergedNote = appendNote(mergedNote, 'Seat changed: S-$oldSeat → S-$newSeat ($shift) on $dateStr.');
+        } else if (newSeat != null && oldSeat == null) {
+          mergedNote = appendNote(mergedNote, 'Seat assigned: S-$newSeat ($shift) on $dateStr.');
+        }
+        // 3. Audit status change if modified
+        if (status != null && oldStatus.isNotEmpty && status != oldStatus) {
+          mergedNote = appendNote(mergedNote, 'Status changed: $oldStatus → $status on $dateStr.');
+        }
+        // 4. Merge incoming remarks if provided (never wipe existing notes)
+        if (note != null && note.trim().isNotEmpty) {
+          mergedNote = appendNote(mergedNote, note.trim());
+        }
 
         // If changing to a new seat or shift, ensure it is not already occupied for that shift
         if (newSeat != null && (newSeat != oldSeat || shift != s.shift) && isSeatOccupied(newSeat, shift: shift, excludeStudentId: studentId)) {
@@ -2071,7 +2211,7 @@ class LibraryService {
           phone: phone,
           shift: shift,
           seatNumber: newSeat,
-          note: note,
+          note: mergedNote,
           monthlyFee: monthlyFee ?? s.monthlyFee,
           duesAmount: duesAmount ?? s.duesAmount,
           status: status ?? s.status,
@@ -2106,6 +2246,8 @@ class LibraryService {
     ensureInitialized();
     final now = DateTime.now();
     final validUntil = now.add(const Duration(days: 30));
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+    final payLog = 'Payment of ₹$amount collected via $paymentMode on $dateStr${notes.isNotEmpty ? " • $notes" : ""}.';
 
     if (isFirebaseConnected) {
       final studentDocRef = _tenantCol('students').doc(studentId);
@@ -2117,6 +2259,7 @@ class LibraryService {
       int? seatNumber;
       String shift = 'Full Day';
       int currentDues = 0;
+      String curNote = '';
 
       try {
         final snap = await studentDocRef.get();
@@ -2127,16 +2270,19 @@ class LibraryService {
           seatNumber = (data['seat_number'] as num?)?.toInt();
           shift = (data['shift'] as String?) ?? 'Full Day';
           currentDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
+          curNote = (data['note'] as String?) ?? '';
         }
       } catch (_) {}
 
       final newDues = (currentDues - amount).clamp(0, 999999);
       final newStatus = newDues == 0 ? 'ACTIVE' : 'DUES';
+      final updatedNote = appendNote(curNote, payLog);
 
       final updateData = <String, dynamic>{
         'status': newStatus,
         'dues_amount': newDues,
         'payment_mode': paymentMode,
+        'note': updatedNote,
       };
       if (newDues == 0) {
         updateData['fee_due_date'] = Timestamp.fromDate(validUntil);
@@ -2166,12 +2312,14 @@ class LibraryService {
         final newDues = (currentDues - amount).clamp(0, 999999);
         final newStatus = newDues == 0 ? 'ACTIVE' : 'DUES';
         final newDueDate = newDues == 0 ? validUntil : s.feeDueDate;
+        final updatedNote = appendNote(s.note, payLog);
 
         _mockStudents[idx] = s.copyWith(
           status: newStatus,
           duesAmount: newDues,
           feeDueDate: newDueDate,
           paymentMode: paymentMode,
+          note: updatedNote,
         );
         _mockPayments.insert(
           0,

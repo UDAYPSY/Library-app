@@ -597,7 +597,48 @@ void main() {
       expect(updated.seatNumber, equals(9));
       expect(updated.note.contains('Seat changed: S-4 → S-9'), isTrue);
 
-      // 3. Static appendNote helper verifies bulleting and duplicate prevention
+      // 3. Shift change via updateStudent -> shift change note appended without deleting prior notes
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: 'Evening Shift',
+      );
+
+      updated = service.findStudentByPhone('9822233333')!;
+      expect(updated.note.contains('Initial remarks'), isTrue);
+      expect(updated.note.contains('Payment of ₹500'), isTrue);
+      expect(updated.note.contains('Seat changed: S-4 → S-9'), isTrue);
+      expect(updated.note.contains('Shift changed: Morning Shift → Evening Shift'), isTrue);
+
+      // 4. Update without note parameter (e.g. from collect payment modal) -> notes are strictly preserved
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: 'Evening Shift',
+        duesAmount: 0,
+      );
+
+      updated = service.findStudentByPhone('9822233333')!;
+      expect(updated.note.contains('Initial remarks'), isTrue);
+      expect(updated.note.contains('Shift changed: Morning Shift → Evening Shift'), isTrue);
+
+      // 5. Deactivate student -> inactive note appended without deleting notes
+      await service.markStudentInactive(s.id, 9);
+      updated = service.currentStudents.firstWhere((st) => st.id == s.id);
+      expect(updated.status, equals('INACTIVE'));
+      expect(updated.note.contains('Member moved to Inactive'), isTrue);
+      expect(updated.note.contains('Initial remarks'), isTrue);
+
+      // 6. Reactivate student -> reactivated note appended without deleting notes
+      await service.reactivateStudent(s.id, 9);
+      updated = service.currentStudents.firstWhere((st) => st.id == s.id);
+      expect(updated.status, equals('ACTIVE'));
+      expect(updated.note.contains('Member reactivated to Active'), isTrue);
+      expect(updated.note.contains('Initial remarks'), isTrue);
+
+      // 7. Static appendNote helper verifies bulleting and duplicate prevention
       final note1 = LibraryService.appendNote('Existing note', 'Action performed');
       expect(note1, equals('Existing note\n• Action performed'));
       final note2 = LibraryService.appendNote(note1, 'Action performed'); // duplicate

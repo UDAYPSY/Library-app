@@ -195,12 +195,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
               ),
               onPressed: () async {
                 if (tempSeat != null) {
-                  await _service.updateStudent(
+                  await _service.assignSeatToExistingStudent(
+                    newSeatNumber: tempSeat!,
                     studentId: _student.id,
-                    name: _student.name,
-                    phone: _student.phone,
                     shift: _student.shift,
-                    seatNumber: tempSeat,
                   );
                   Navigator.pop(ctx);
                   _refreshStudent();
@@ -319,6 +317,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
       phone: _student.phone,
       shift: _student.shift,
       seatNumber: _student.seatNumber,
+      note: _student.note,
       photoBase64: '',
     );
     _refreshStudent();
