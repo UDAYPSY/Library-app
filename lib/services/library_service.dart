@@ -1512,6 +1512,8 @@ class LibraryService {
       duesAmount: student.duesAmount,
       status: student.status,
       joiningDate: student.joinedAt ?? DateTime.now(),
+      validUntil: student.feeDueDate,
+      note: student.note,
       fatherName: student.fatherName,
       address: student.address,
       aadhaarNumber: student.aadhaarNumber,
