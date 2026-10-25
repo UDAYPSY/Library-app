@@ -1264,8 +1264,8 @@ class LibraryService {
             final newDues = curDues > 0 ? (curDues - amount).clamp(0, 999999) : 0;
             final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
             final curNote = (data['note'] as String?) ?? '';
-            final payLog = isDuePayment && periodStr.isNotEmpty
-                ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr (Period: $periodStr)${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
+            final payLog = isDuePayment
+                ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
                 : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
             final updatedNote = appendNote(curNote, payLog);
 
@@ -1320,8 +1320,8 @@ class LibraryService {
           updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
         }
         final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
-        final payLog = isDuePayment && periodStr.isNotEmpty
-            ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr (Period: $periodStr)${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
+        final payLog = isDuePayment
+            ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
             : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
         final updatedNote = appendNote(s.note, payLog);
 
@@ -2025,17 +2025,32 @@ class LibraryService {
   // Mark Student as Trial
   Future<void> markStudentTrial(String studentId) async {
     ensureInitialized();
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+    final trialLog = 'Status changed to TRIAL on $dateStr.';
+
     if (isFirebaseConnected) {
+      String updatedNote = '';
+      try {
+        final snap = await _tenantCol('students').doc(studentId).get();
+        if (snap.exists) {
+          final curNote = (snap.data()?['note'] as String?) ?? '';
+          updatedNote = appendNote(curNote, trialLog);
+        }
+      } catch (_) {}
       await _tenantCol('students').doc(studentId).update({
         'status': 'TRIAL',
         'dues_amount': 0,
+        if (updatedNote.isNotEmpty) 'note': updatedNote,
       });
     } else {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
+        final updatedNote = appendNote(_mockStudents[idx].note, trialLog);
         _mockStudents[idx] = _mockStudents[idx].copyWith(
           status: 'TRIAL',
           duesAmount: 0,
+          note: updatedNote,
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
         _saveLocalState();
@@ -2052,19 +2067,37 @@ class LibraryService {
     ensureInitialized();
     final dDate = dueDate ?? DateTime.now();
     final newStatus = duesAmount > 0 ? 'DUES' : 'ACTIVE';
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+    final dueDateStr = DateFormat('dd-MMM-yyyy').format(dDate);
+    final duesLog = duesAmount > 0
+        ? 'Pending dues of ₹$duesAmount marked on $dateStr (Due date: $dueDateStr).'
+        : 'Pending dues cleared on $dateStr.';
+
     if (isFirebaseConnected) {
+      String updatedNote = '';
+      try {
+        final snap = await _tenantCol('students').doc(studentId).get();
+        if (snap.exists) {
+          final curNote = (snap.data()?['note'] as String?) ?? '';
+          updatedNote = appendNote(curNote, duesLog);
+        }
+      } catch (_) {}
       await _tenantCol('students').doc(studentId).update({
         'status': newStatus,
         'dues_amount': duesAmount,
         'fee_due_date': Timestamp.fromDate(dDate),
+        if (updatedNote.isNotEmpty) 'note': updatedNote,
       });
     } else {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);
       if (idx != -1) {
+        final updatedNote = appendNote(_mockStudents[idx].note, duesLog);
         _mockStudents[idx] = _mockStudents[idx].copyWith(
           status: newStatus,
           duesAmount: duesAmount,
           feeDueDate: dDate,
+          note: updatedNote,
         );
         _syncSeatsWithStudents();
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
