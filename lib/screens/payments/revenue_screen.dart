@@ -21,6 +21,12 @@ class _RevenueScreenState extends State<RevenueScreen> {
   late String _selectedYear;
   late String _selectedMonth;
   late final List<String> _years;
+  DateTime? _selectedDate; // Specific Date Filter
+
+  bool _isSameDay(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
 
   final List<String> _months = [
     'All Months',
@@ -76,7 +82,12 @@ class _RevenueScreenState extends State<RevenueScreen> {
       _selectedMonth = 'Oct';
     }
 
-    if (widget.initialTimeFilter == 'MONTHLY') {
+    if (widget.initialTimeFilter == 'TODAY') {
+      _selectedDate = DateTime(now.year, now.month, now.day);
+      _selectedMonth = monthShort;
+      _selectedYear = '${now.year}';
+    } else if (widget.initialTimeFilter == 'MONTHLY') {
+      _selectedDate = null;
       _selectedMonth = monthShort;
       _selectedYear = '${now.year}';
     }
@@ -108,10 +119,9 @@ class _RevenueScreenState extends State<RevenueScreen> {
       _selectedYear = 'All Years';
       _selectedMonth = 'All Months';
       _selectedPaymentMethod = 'All Methods';
+      _selectedDate = null;
     });
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +133,11 @@ class _RevenueScreenState extends State<RevenueScreen> {
         // Apply Search & Filters
         final query = _searchCtrl.text.trim().toLowerCase();
         final filteredPayments = allPayments.where((p) {
+          // Specific date filter
+          if (_selectedDate != null) {
+            if (!_isSameDay(p.date, _selectedDate)) return false;
+          }
+
           // Search filter
           if (query.isNotEmpty) {
             final matchName = p.studentName.toLowerCase().contains(query);
@@ -290,6 +305,201 @@ class _RevenueScreenState extends State<RevenueScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
+
+                        // Date Filter Chips Row: [All Dates] [Today] [Yesterday] [Select Date]
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              // All Dates
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () => setState(() => _selectedDate = null),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: _selectedDate == null ? AppColors.primaryTeal : AppColors.subSurface(context),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: _selectedDate == null ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'All Dates',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: _selectedDate == null ? Colors.white : AppColors.text(context),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Today
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () {
+                                    final now = DateTime.now();
+                                    setState(() {
+                                      _selectedDate = DateTime(now.year, now.month, now.day);
+                                      _selectedYear = '${now.year}';
+                                      _selectedMonth = DateFormat('MMM').format(now);
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: _isSameDay(_selectedDate, DateTime.now()) ? AppColors.primaryTeal : AppColors.subSurface(context),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: _isSameDay(_selectedDate, DateTime.now()) ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Today',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: _isSameDay(_selectedDate, DateTime.now()) ? Colors.white : AppColors.text(context),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Yesterday
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () {
+                                    final yest = DateTime.now().subtract(const Duration(days: 1));
+                                    setState(() {
+                                      _selectedDate = DateTime(yest.year, yest.month, yest.day);
+                                      _selectedYear = '${yest.year}';
+                                      _selectedMonth = DateFormat('MMM').format(yest);
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: _isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1))) ? AppColors.primaryTeal : AppColors.subSurface(context),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: _isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1))) ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Yesterday',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: _isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1))) ? Colors.white : AppColors.text(context),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Calendar Date Picker Button
+                              InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () async {
+                                  final now = DateTime.now();
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: _selectedDate ?? now,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2035),
+                                    builder: (context, child) {
+                                      return Theme(
+                                        data: Theme.of(context).copyWith(
+                                          colorScheme: const ColorScheme.light(
+                                            primary: AppColors.primaryTeal,
+                                            onPrimary: Colors.white,
+                                          ),
+                                        ),
+                                        child: child!,
+                                      );
+                                    },
+                                  );
+                                  if (picked != null) {
+                                    setState(() {
+                                      _selectedDate = DateTime(picked.year, picked.month, picked.day);
+                                      _selectedYear = '${picked.year}';
+                                      _selectedMonth = DateFormat('MMM').format(picked);
+                                    });
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: _selectedDate != null &&
+                                            !_isSameDay(_selectedDate, DateTime.now()) &&
+                                            !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
+                                        ? AppColors.primaryTeal
+                                        : AppColors.subSurface(context),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _selectedDate != null &&
+                                              !_isSameDay(_selectedDate, DateTime.now()) &&
+                                              !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
+                                          ? AppColors.primaryTeal
+                                          : AppColors.cardBorderColor(context),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_month_rounded,
+                                        size: 14,
+                                        color: _selectedDate != null &&
+                                                !_isSameDay(_selectedDate, DateTime.now()) &&
+                                                !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
+                                            ? Colors.white
+                                            : AppColors.primaryTeal,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        _selectedDate != null
+                                            ? DateFormat('dd-MMM-yyyy').format(_selectedDate!)
+                                            : 'Select Date',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: _selectedDate != null &&
+                                                  !_isSameDay(_selectedDate, DateTime.now()) &&
+                                                  !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
+                                              ? Colors.white
+                                              : AppColors.text(context),
+                                        ),
+                                      ),
+                                      if (_selectedDate != null) ...[
+                                        const SizedBox(width: 6),
+                                        GestureDetector(
+                                          onTap: () => setState(() => _selectedDate = null),
+                                          child: Icon(
+                                            Icons.close_rounded,
+                                            size: 14,
+                                            color: _selectedDate != null &&
+                                                    !_isSameDay(_selectedDate, DateTime.now()) &&
+                                                    !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
+                                                ? Colors.white
+                                                : AppColors.textMutedColor(context),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
 
                         // Year Filter Chips Row: [All Years] [2025] [2026] (Image 2)
                         SingleChildScrollView(

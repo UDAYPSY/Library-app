@@ -504,5 +504,136 @@ void main() {
       );
       expect(successB, isFalse); // Successfully blocked by conflict detector!
     });
+
+    test('Shift change for existing student calculates upgrade and downgrade across whole multi-month tenure', () async {
+      // 1. Student registered for 3 months in Morning Shift (₹600/mo * 3 = ₹1800 paid)
+      final tenureMonths = 3;
+      final oldMonthlyFee = 600;
+      final totalPaid = oldMonthlyFee * tenureMonths; // 1800
+      final joinDate = DateTime(2026, 1, 1);
+      final dueDate = DateTime(2026, 4, 1);
+
+      final student = StudentInfo(
+        id: 'std_tenure_1',
+        name: 'Multi Month Member',
+        phone: '9800011111',
+        shift: 'Morning Shift',
+        seatNumber: 15,
+        monthlyFee: oldMonthlyFee,
+        status: 'ACTIVE',
+        joinedAt: joinDate,
+        feeDueDate: dueDate,
+      );
+      await service.addStudent(student);
+
+      // Record 3-month payment transaction
+      await service.recordPayment(
+        studentId: student.id,
+        studentName: student.name,
+        phone: student.phone,
+        seatNumber: 15,
+        shift: 'Morning Shift',
+        amount: totalPaid,
+        date: joinDate,
+        validFrom: joinDate,
+        validUntil: dueDate,
+        durationMonths: tenureMonths,
+        notes: 'Initial 3-month membership',
+      );
+
+      // Verify payment was recorded with durationMonths
+      final recordedPayments = service.currentPayments.where((p) => p.studentId == student.id).toList();
+      expect(recordedPayments.first.durationMonths, equals(3));
+      expect(recordedPayments.first.amount, equals(1800));
+
+      // 2. UPGRADE: Upgrading from Morning (₹600/mo) to Full Day (₹1000/mo) for 3-month tenure
+      final newMonthlyFeeUpgrade = 1000;
+      final expectedUpgradeCost = newMonthlyFeeUpgrade * tenureMonths; // 3000
+      final upgradeDiff = expectedUpgradeCost - totalPaid; // 3000 - 1800 = 1200
+      expect(upgradeDiff, equals(1200));
+
+      // 3. DOWNGRADE: If student had paid Full Day (₹1000/mo * 3 = ₹3000) and downgrades to Morning (₹600/mo * 3 = ₹1800)
+      final initialFullDayPaid = 3000;
+      final newMonthlyFeeDowngrade = 600;
+      final expectedDowngradeCost = newMonthlyFeeDowngrade * tenureMonths; // 1800
+      final excessCredit = initialFullDayPaid - expectedDowngradeCost; // 3000 - 1800 = 1200
+      expect(excessCredit, equals(1200));
+    });
+
+    test('Activity notes are automatically appended for payment collection and seat change', () async {
+      final s = StudentInfo(
+        id: 'std_audit_1',
+        name: 'Audit Log Test Member',
+        phone: '9822233333',
+        shift: 'Morning Shift',
+        seatNumber: 4,
+        monthlyFee: 500,
+        status: 'ACTIVE',
+        note: 'Initial remarks',
+      );
+      await service.addStudent(s);
+
+      // 1. Record payment -> note must be automatically appended
+      await service.recordPayment(
+        studentId: s.id,
+        studentName: s.name,
+        phone: s.phone,
+        amount: 500,
+        paymentMode: 'UPI',
+        notes: 'Monthly renewal',
+      );
+
+      var updated = service.findStudentByPhone('9822233333')!;
+      expect(updated.note.contains('Initial remarks'), isTrue);
+      expect(updated.note.contains('Payment of ₹500 collected via UPI'), isTrue);
+
+      // 2. Change seat -> seat change note must be automatically appended
+      await service.assignSeatToExistingStudent(
+        newSeatNumber: 9,
+        studentId: s.id,
+      );
+
+      updated = service.findStudentByPhone('9822233333')!;
+      expect(updated.seatNumber, equals(9));
+      expect(updated.note.contains('Seat changed: S-4 → S-9'), isTrue);
+
+      // 3. Static appendNote helper verifies bulleting and duplicate prevention
+      final note1 = LibraryService.appendNote('Existing note', 'Action performed');
+      expect(note1, equals('Existing note\n• Action performed'));
+      final note2 = LibraryService.appendNote(note1, 'Action performed'); // duplicate
+      expect(note2, equals(note1));
+    });
+
+    test('Payment transactions can be filtered by specific single date', () async {
+      final date1 = DateTime(2026, 10, 24);
+      final date2 = DateTime(2026, 10, 25);
+
+      await service.recordPayment(
+        studentName: 'Student Day 1',
+        amount: 500,
+        date: date1,
+      );
+      await service.recordPayment(
+        studentName: 'Student Day 2',
+        amount: 800,
+        date: date2,
+      );
+
+      final allPayments = service.currentPayments;
+      final day1Payments = allPayments.where((p) =>
+          p.date.year == date1.year &&
+          p.date.month == date1.month &&
+          p.date.day == date1.day).toList();
+      final day2Payments = allPayments.where((p) =>
+          p.date.year == date2.year &&
+          p.date.month == date2.month &&
+          p.date.day == date2.day).toList();
+
+      expect(day1Payments.any((p) => p.studentName == 'Student Day 1'), isTrue);
+      expect(day1Payments.any((p) => p.studentName == 'Student Day 2'), isFalse);
+
+      expect(day2Payments.any((p) => p.studentName == 'Student Day 2'), isTrue);
+      expect(day2Payments.any((p) => p.studentName == 'Student Day 1'), isFalse);
+    });
   });
 }

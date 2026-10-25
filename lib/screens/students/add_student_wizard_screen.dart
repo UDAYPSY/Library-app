@@ -75,10 +75,65 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     return 500;
   }
 
+  // Detect student's active paid tenure duration in months
+  int get _existingStudentTenureMonths {
+    if (widget.studentToEdit == null) return 1;
+    final s = widget.studentToEdit!;
+
+    // 1. Check matching payment transactions for durationMonths
+    final studentPayments = _service.currentPayments.where((p) {
+      return (s.id.isNotEmpty && p.studentId == s.id) ||
+          (s.phone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == LibraryService.normalizePhone(s.phone));
+    }).toList();
+
+    for (var p in studentPayments) {
+      if (p.durationMonths != null && p.durationMonths! > 0) {
+        return p.durationMonths!;
+      }
+    }
+
+    // 2. Check notes for explicit duration notation (e.g. "(3 mo)" or "3 months tenure")
+    final matchNote = RegExp(r'\((\d+)\s*mo\b', caseSensitive: false).firstMatch(s.note) ??
+        RegExp(r'(\d+)\s*months?\s+tenure\b', caseSensitive: false).firstMatch(s.note);
+    if (matchNote != null) {
+      final m = int.tryParse(matchNote.group(1) ?? '0') ?? 0;
+      if (m > 0) return m;
+    }
+
+    // 3. Calculate from joinedAt / validFrom and feeDueDate
+    if (s.feeDueDate != null) {
+      final start = s.joinedAt ?? DateTime.now();
+      final diffDays = s.feeDueDate!.difference(start).inDays;
+      if (diffDays > 45) {
+        final calcMonths = (diffDays / 30).round();
+        if (calcMonths > 1) return calcMonths;
+      }
+    }
+
+    // 4. Calculate from payment amount vs monthly fee
+    if (studentPayments.isNotEmpty && s.monthlyFee > 0) {
+      final maxPay = studentPayments.map((p) => p.amount).reduce((a, b) => a > b ? a : b);
+      if (maxPay > s.monthlyFee) {
+        final ratio = (maxPay / s.monthlyFee).round();
+        if (ratio > 1 && (maxPay % s.monthlyFee == 0 || (maxPay - s.monthlyFee).abs() < 100)) {
+          return ratio;
+        }
+      }
+    }
+
+    return 1;
+  }
+
+  int get _effectiveTenureMonths {
+    if (widget.studentToEdit == null) return _selectedDurationMonths;
+    return _selectedDurationMonths > 0 ? _selectedDurationMonths : _existingStudentTenureMonths;
+  }
+
   // Effective fee already paid/covered for student in the active membership cycle
   int get _studentEffectivePaidCoverage {
     if (widget.studentToEdit == null) return 0;
     final s = widget.studentToEdit!;
+    final tenureMonths = _effectiveTenureMonths;
 
     // 1. Check notes for excess credit or recorded original fee
     int recordedCredit = 0;
@@ -106,12 +161,13 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       }
     }
 
-    // 3. Current monthly fee minus dues
-    final feeMinusDues = (s.monthlyFee - s.duesAmount).clamp(0, 999999);
+    // 3. Expected tenure fee minus dues
+    final expectedTenureFee = s.monthlyFee * tenureMonths;
+    final feeMinusDues = (expectedTenureFee - s.duesAmount).clamp(0, 999999);
 
     int totalCovered = feeMinusDues;
-    if (s.duesAmount == 0 && (s.monthlyFee + recordedCredit) > totalCovered) {
-      totalCovered = s.monthlyFee + recordedCredit;
+    if (s.duesAmount == 0 && (expectedTenureFee + recordedCredit) > totalCovered) {
+      totalCovered = expectedTenureFee + recordedCredit;
     }
     if (maxRecentPayment > totalCovered && s.duesAmount == 0) {
       totalCovered = maxRecentPayment;
@@ -136,20 +192,20 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     return s.status == 'ACTIVE';
   }
 
-  // Shift upgrade difference in ongoing cycle (₹0 if same/lower price, >0 if higher price)
+  // Shift upgrade difference across full tenure (₹0 if same/lower price, >0 if higher price)
   int get _shiftUpgradeDifference {
     if (widget.studentToEdit == null) return 0;
     final coverage = _studentEffectivePaidCoverage;
-    final currentCost = _fixedMonthlyFee;
+    final currentCost = _fixedMonthlyFee * _effectiveTenureMonths;
     final diff = currentCost - coverage;
     return diff > 0 ? diff : 0;
   }
 
-  // Excess credit when downgrading shift in ongoing cycle
+  // Excess credit when downgrading shift across full tenure
   int get _shiftDowngradeExcessCredit {
     if (widget.studentToEdit == null) return 0;
     final coverage = _studentEffectivePaidCoverage;
-    final currentCost = _fixedMonthlyFee;
+    final currentCost = _fixedMonthlyFee * _effectiveTenureMonths;
     final diff = coverage - currentCost;
     return diff > 0 ? diff : 0;
   }
@@ -163,19 +219,17 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     final s = widget.studentToEdit!;
 
     final coverage = _studentEffectivePaidCoverage;
-    final currentCost = _fixedMonthlyFee;
-    final upgradeDiff = (currentCost - coverage) > 0 ? (currentCost - coverage) : 0;
+    final tenureCost = _fixedMonthlyFee * _effectiveTenureMonths;
+    final upgradeDiff = (tenureCost - coverage) > 0 ? (tenureCost - coverage) : 0;
     final baseDues = s.duesAmount > 0 ? s.duesAmount : 0;
 
     // Cycle due is upgrade difference + previous pending dues
-    final cycleDue = (s.duesAmount > 0 && coverage < s.monthlyFee)
-        ? (currentCost - coverage).clamp(0, 999999)
-        : (baseDues + upgradeDiff);
+    final cycleDue = baseDues + upgradeDiff;
 
-    if (_selectedDurationMonths <= 1) {
+    if (_selectedDurationMonths <= _existingStudentTenureMonths) {
       return cycleDue;
     } else {
-      final advanceMonths = _selectedDurationMonths - 1;
+      final advanceMonths = _selectedDurationMonths - _existingStudentTenureMonths;
       return cycleDue + (_fixedMonthlyFee * advanceMonths);
     }
   }
@@ -189,11 +243,13 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         final isDueActive = s.feeDueDate != null && !s.feeDueDate!.isBefore(today);
 
         if (isDueActive) {
-          if (months == 1) {
+          final existingTenure = _existingStudentTenureMonths;
+          if (months <= existingTenure) {
             _validUntilDate = s.feeDueDate!;
           } else {
+            final advanceMonths = months - existingTenure;
             final base = s.feeDueDate!;
-            _validUntilDate = DateTime(base.year, base.month + (months - 1), base.day);
+            _validUntilDate = DateTime(base.year, base.month + advanceMonths, base.day);
           }
         } else {
           _validUntilDate = DateTime(_fromDate.year, _fromDate.month + months, _fromDate.day);
@@ -266,6 +322,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       if (shiftMatch.isNotEmpty) {
         _selectedShift = shiftMatch.first;
       }
+      _selectedDurationMonths = _existingStudentTenureMonths;
       _feeCtrl.text = '$_fixedMonthlyFee';
 
       final today = DateTime(now.year, now.month, now.day);
@@ -275,13 +332,13 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       final isExpired = s.feeDueDate == null || s.feeDueDate!.isBefore(today);
 
       if (hasPendingCurrentDue) {
-        _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(const Duration(days: 30));
+        _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(Duration(days: 30 * _selectedDurationMonths));
         _validUntilDate = s.feeDueDate!;
       } else if (isExpired) {
         _fromDate = now;
         _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
       } else {
-        _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(const Duration(days: 30));
+        _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(Duration(days: 30 * _selectedDurationMonths));
         _validUntilDate = s.feeDueDate!;
       }
 
@@ -700,29 +757,49 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         // Record shift change in notes if shift changed
         String shiftLog = '';
         if (isShiftChanged) {
+          final diff = _shiftUpgradeDifference;
           final excess = _shiftDowngradeExcessCredit;
           final coverage = _studentEffectivePaidCoverage;
-          if (excess > 0) {
-            shiftLog = 'Shift changed: $oldShift → ${_selectedShift.name} (₹$fixedMonthly/mo). ₹$excess excess credit to adjust in next month. (Original paid: ₹$coverage)';
+          if (diff > 0) {
+            shiftLog = 'Shift upgraded: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())} for $_selectedDurationMonths mo tenure. (Paid: ₹$coverage, Upgrade diff: ₹$diff)';
+          } else if (excess > 0) {
+            shiftLog = 'Shift downgraded: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())} for $_selectedDurationMonths mo tenure. Student already paid ₹$coverage. ₹$excess excess credit remains with the library to adjust in next renewal.';
           } else {
-            shiftLog = 'Shift changed: $oldShift (₹$oldMonthly/mo) → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())}. (Original paid: ₹$coverage)';
+            shiftLog = 'Shift updated: $oldShift → ${_selectedShift.name} (₹$fixedMonthly/mo) on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())} for $_selectedDurationMonths mo tenure.';
           }
+        }
+
+        // Record seat change in notes if seat changed
+        final isSeatChanged = s.seatNumber != seatNum;
+        String seatLog = '';
+        if (isSeatChanged) {
+          final oldSeatStr = s.seatNumber != null ? 'S-${s.seatNumber}' : 'Unallocated';
+          final newSeatStr = seatNum != null ? 'S-$seatNum' : 'Unallocated';
+          seatLog = 'Seat changed: $oldSeatStr → $newSeatStr on ${DateFormat('dd-MMM-yyyy').format(DateTime.now())}.';
+        }
+
+        // Record payment in notes if collected now
+        String payLog = '';
+        if (collectedNow > 0) {
+          payLog = 'Payment of ₹$collectedNow collected via $_selectedPaymentMethod on ${DateFormat('dd-MMM-yyyy').format(_paymentDate)} ($_selectedDurationMonths mo tenure)${isShiftChanged ? " (Shift upgrade)" : ""}.';
         }
 
         String finalNotes = _notesCtrl.text.trim();
         if (isShiftChanged) {
-          if (finalNotes.isEmpty) {
-            finalNotes = shiftLog;
-          } else if (!finalNotes.contains(shiftLog)) {
-            finalNotes = '$finalNotes\n• $shiftLog';
-          }
+          finalNotes = LibraryService.appendNote(finalNotes, shiftLog);
+        }
+        if (isSeatChanged) {
+          finalNotes = LibraryService.appendNote(finalNotes, seatLog);
+        }
+        if (collectedNow > 0) {
+          finalNotes = LibraryService.appendNote(finalNotes, payLog);
         }
 
         // CRITICAL SYNC: Record payment in financial ledger & transaction stream
         if (collectedNow > 0) {
           final paymentNotes = isShiftChanged
-              ? 'Shift upgrade: $oldShift → ${_selectedShift.name} • ₹$collectedNow collected'
-              : 'Payment collected via Edit Student Details ($_selectedDurationMonths mo)';
+              ? 'Shift upgrade: $oldShift → ${_selectedShift.name} • ₹$collectedNow collected ($_selectedDurationMonths mo tenure)'
+              : 'Payment collected via Edit Student Details ($_selectedDurationMonths mo tenure)';
           await _service.recordPayment(
             studentId: s.id,
             studentName: name,
@@ -1939,7 +2016,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Shift Downgraded: ₹$_shiftDowngradeExcessCredit Excess Credit',
+                                  'Shift Downgraded: ₹$_shiftDowngradeExcessCredit Excess Credit ($_effectiveTenureMonths mo tenure)',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w900,
@@ -1947,9 +2024,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 2),
-                                const Text(
-                                  'Amount remains with library owner to adjust in next month. If upgraded back to the same shift level, no due payment is required.',
-                                  style: TextStyle(
+                                Text(
+                                  'Student paid ₹$_studentEffectivePaidCoverage for $_effectiveTenureMonths months tenure. ₹$_shiftDowngradeExcessCredit excess credit remains with the library to adjust in next renewal.',
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF0284C7),
@@ -1982,7 +2059,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Shift Upgrade Difference: ₹$_shiftUpgradeDifference',
+                                  'Shift Upgrade Difference: ₹$_shiftUpgradeDifference ($_effectiveTenureMonths mo tenure)',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w900,
@@ -1991,7 +2068,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'New shift monthly fee is ₹$_fixedMonthlyFee while student paid coverage is ₹$_studentEffectivePaidCoverage. Collect upgrade difference or leave as pending due.',
+                                  'New shift is ₹$_fixedMonthlyFee/mo (Total ₹${_fixedMonthlyFee * _effectiveTenureMonths} for $_effectiveTenureMonths mo tenure). Paid coverage is ₹$_studentEffectivePaidCoverage. Collect upgrade difference or leave as pending due.',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -2281,7 +2358,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Shift upgraded: ${s.shift} → ${_selectedShift.name} (₹$_fixedMonthlyFee/mo). Price difference of ₹$diff applies for the current tenure ending ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. If not paid now, it will be added as pending dues.',
+                                    'Shift upgraded: ${s.shift} → ${_selectedShift.name} (₹$_fixedMonthlyFee/mo). Price difference of ₹$diff applies for the current $_effectiveTenureMonths months tenure ending ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. If not paid now, it will be added as pending dues.',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
@@ -2307,7 +2384,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Shift downgraded: ${s.shift} → ${_selectedShift.name} (₹$_fixedMonthlyFee/mo). Student already paid ₹$_currentCyclePaidAmount for current cycle. ₹$excess excess credit remains with the library to adjust in next month.',
+                                    'Shift downgraded: ${s.shift} → ${_selectedShift.name} (₹$_fixedMonthlyFee/mo). Student already paid ₹$_currentCyclePaidAmount for $_effectiveTenureMonths months tenure. ₹$excess excess credit remains with the library to adjust in next renewal.',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
@@ -2333,7 +2410,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Shift updated: ${s.shift} → ${_selectedShift.name}. Same price tier (₹$_fixedMonthlyFee/mo). Student already paid ₹$_currentCyclePaidAmount for current cycle. No extra charges or dues.',
+                                    'Shift updated: ${s.shift} → ${_selectedShift.name}. Same price tier (₹$_fixedMonthlyFee/mo). Student already paid ₹$_currentCyclePaidAmount for $_effectiveTenureMonths months tenure. No extra charges or dues.',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,

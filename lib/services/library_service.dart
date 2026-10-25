@@ -4,10 +4,21 @@ import 'package:crypto/crypto.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../models/library_models.dart';
 import 'local_storage_service.dart';
 
 class LibraryService {
+  // Static activity logger & note helper
+  static String appendNote(String? currentNote, String newEntry) {
+    final cur = (currentNote ?? '').trim();
+    final entry = newEntry.trim();
+    if (entry.isEmpty) return cur;
+    if (cur.isEmpty) return '• $entry';
+    if (cur.contains(entry)) return cur;
+    return '$cur\n• $entry';
+  }
+
   // Static security and hashing utilities
   static String hashPin(String pin) {
     final bytes = utf8.encode(pin);
@@ -1234,9 +1245,15 @@ class LibraryService {
             if (dueDateRaw is Timestamp) currentDueDate = dueDateRaw.toDate();
 
             final newDues = curDues > 0 ? (curDues - amount).clamp(0, 999999) : 0;
+            final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
+            final curNote = (data['note'] as String?) ?? '';
+            final payLog = 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
+            final updatedNote = appendNote(curNote, payLog);
+
             final updates = <String, dynamic>{
               'dues_amount': newDues,
               'status': newDues == 0 ? 'ACTIVE' : 'DUES',
+              'note': updatedNote,
             };
             if (currentDueDate != null && currentDueDate.isBefore(payDate) && newDues == 0) {
               updates['fee_due_date'] = Timestamp.fromDate(DateTime(payDate.year, payDate.month + 1, payDate.day));
@@ -1266,7 +1283,7 @@ class LibraryService {
       );
       _mockPaymentsController.add(List.unmodifiable(_mockPayments));
 
-      // Reconcile dues in student if registered
+      // Reconcile dues & activity log in student if registered
       final matchIdx = _mockStudents.indexWhere((s) =>
           (studentId != null && studentId.isNotEmpty && s.id == studentId) ||
           (phone != null && phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(phone)) ||
@@ -1275,19 +1292,22 @@ class LibraryService {
       if (matchIdx != -1) {
         final s = _mockStudents[matchIdx];
         final currentDues = s.effectiveDues;
-        if (currentDues > 0) {
-          final newDues = (currentDues - amount).clamp(0, 999999);
-          DateTime? updatedDueDate = s.feeDueDate;
-          if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
-            updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
-          }
-          _mockStudents[matchIdx] = s.copyWith(
-            duesAmount: newDues,
-            status: newDues == 0 ? 'ACTIVE' : 'DUES',
-            feeDueDate: updatedDueDate,
-          );
-          _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        final newDues = currentDues > 0 ? (currentDues - amount).clamp(0, 999999) : 0;
+        DateTime? updatedDueDate = s.feeDueDate;
+        if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
+          updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
         }
+        final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
+        final payLog = 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
+        final updatedNote = appendNote(s.note, payLog);
+
+        _mockStudents[matchIdx] = s.copyWith(
+          duesAmount: newDues,
+          status: newDues == 0 ? 'ACTIVE' : 'DUES',
+          feeDueDate: updatedDueDate,
+          note: updatedNote,
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
       }
 
       await _saveLocalState();
@@ -1342,12 +1362,20 @@ class LibraryService {
           'last_updated_by': deviceUserId,
         }, SetOptions(merge: true));
 
-        // 3. Update student
+        // 3. Update student with seat change activity note
+        final curNote = (sData['note'] as String?) ?? '';
+        final dateStr = DateFormat('dd-MMM-yyyy').format(DateTime.now());
+        final seatLog = oldSeat != null
+            ? 'Seat changed: S-$oldSeat → S-$newSeatNumber ($effectiveShift) on $dateStr.'
+            : 'Seat assigned: S-$newSeatNumber ($effectiveShift) on $dateStr.';
+        final updatedNote = appendNote(curNote, seatLog);
+
         final updateData = <String, dynamic>{
           'seat_number': newSeatNumber,
           'shift': effectiveShift,
           'section_name': effectiveSection,
           'status': 'ACTIVE',
+          'note': updatedNote,
         };
         if (feePaidNow > 0) {
           final payRef = _tenantCol('payments').doc();
@@ -1434,6 +1462,12 @@ class LibraryService {
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));
       }
 
+      final dateStr = DateFormat('dd-MMM-yyyy').format(DateTime.now());
+      final seatLog = s.seatNumber != null
+          ? 'Seat changed: S-${s.seatNumber} → S-$newSeatNumber ($effectiveShift) on $dateStr.'
+          : 'Seat assigned: S-$newSeatNumber ($effectiveShift) on $dateStr.';
+      final updatedNote = appendNote(s.note, seatLog);
+
       _mockStudents[sIdx] = s.copyWith(
         seatNumber: newSeatNumber,
         shift: effectiveShift,
@@ -1441,6 +1475,7 @@ class LibraryService {
         feeDueDate: updatedDueDate,
         duesAmount: updatedDues,
         status: updatedStatus,
+        note: updatedNote,
       );
 
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
