@@ -2163,6 +2163,7 @@ class LibraryService {
       String oldShift = '';
       int? oldSeat;
       String oldStatus = '';
+      String oldPhoto = '';
       try {
         final snap = await studentDocRef.get();
         if (snap.exists) {
@@ -2171,6 +2172,7 @@ class LibraryService {
           oldShift = (d['shift'] as String?) ?? '';
           oldSeat = (d['seat_number'] as num?)?.toInt();
           oldStatus = (d['status'] as String?) ?? '';
+          oldPhoto = (d['photo_base64'] as String?) ?? '';
         }
       } catch (_) {}
 
@@ -2204,7 +2206,6 @@ class LibraryService {
       }
       // 4. Audit photo update or removal
       if (photoBase64 != null) {
-        final oldPhoto = (snap.exists ? (snap.data()?['photo_base64'] as String?) : null) ?? '';
         if (photoBase64.isNotEmpty && photoBase64 != oldPhoto) {
           mergedNote = appendNote(mergedNote, 'Profile photo updated on $dateStr.');
         } else if (photoBase64.isEmpty && oldPhoto.isNotEmpty) {
