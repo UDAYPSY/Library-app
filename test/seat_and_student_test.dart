@@ -879,5 +879,171 @@ void main() {
       expect(updated.note.contains('Due payment of ₹300 collected via Cash'), isTrue);
       expect(updated.note.contains('01-Oct-2026 to 01-Nov-2026'), isTrue);
     });
+
+    test('Multiple sequential shift downgrades and upgrades in same tenure show only current excess credit', () async {
+      final s = StudentInfo(
+        id: 'std_multi_downgrade_test',
+        name: 'Multi Downgrade Student',
+        phone: '9922334455',
+        shift: 'Morning Shift',
+        monthlyFee: 1000,
+        duesAmount: 0,
+        advanceAmount: 0,
+        status: 'ACTIVE',
+        joinedAt: DateTime(2026, 10, 1),
+        feeDueDate: DateTime(2026, 11, 1),
+      );
+      await service.addStudent(s);
+
+      // STEP 1: Downgrade from 1000/mo to 800/mo
+      // Coverage = 1000 * 1 - 0 + 0 = 1000
+      // Target cost = 800 * 1 = 800
+      // Diff = 800 - 1000 = -200 -> excess credit = 200
+      var coverage = (s.monthlyFee * 1) - s.duesAmount + s.advanceAmount;
+      var newCost = 800 * 1;
+      var diff = newCost - coverage;
+      var excessCredit = diff < 0 ? -diff : 0;
+      var due = diff > 0 ? diff : 0;
+
+      expect(excessCredit, equals(200));
+      expect(due, equals(0));
+
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: 'Evening Shift',
+        monthlyFee: 800,
+        duesAmount: due,
+        advanceAmount: excessCredit,
+        note: 'Shift downgraded: Morning Shift (₹1000/mo) → Evening Shift (₹800/mo). ₹200 excess credit remains with the library to adjust in next renewal.',
+      );
+
+      var st1 = service.findStudentByPhone('9922334455')!;
+      expect(st1.monthlyFee, equals(800));
+      expect(st1.advanceAmount, equals(200));
+
+      // STEP 2: Upgrade back to 1000/mo
+      // Coverage = 800 * 1 - 0 + 200 = 1000
+      // Target cost = 1000 * 1 = 1000
+      // Diff = 1000 - 1000 = 0 -> advance credit is consumed!
+      coverage = (st1.monthlyFee * 1) - st1.duesAmount + st1.advanceAmount;
+      newCost = 1000 * 1;
+      diff = newCost - coverage;
+      excessCredit = diff < 0 ? -diff : 0;
+      due = diff > 0 ? diff : 0;
+
+      expect(excessCredit, equals(0));
+      expect(due, equals(0));
+
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: 'Morning Shift',
+        monthlyFee: 1000,
+        duesAmount: due,
+        advanceAmount: excessCredit,
+        note: 'Shift upgraded: Evening Shift (₹800/mo) → Morning Shift (₹1000/mo). (Paid: ₹1000, Upgrade diff: ₹0)',
+      );
+
+      var st2 = service.findStudentByPhone('9922334455')!;
+      expect(st2.monthlyFee, equals(1000));
+      expect(st2.advanceAmount, equals(0)); // Previous credit was used to upgrade!
+
+      // STEP 3: Downgrade AGAIN to 800/mo
+      // Coverage = 1000 * 1 - 0 + 0 = 1000
+      // Target cost = 800 * 1 = 800
+      // Diff = 800 - 1000 = -200 -> excess credit should ONLY be 200, NOT 400!
+      coverage = (st2.monthlyFee * 1) - st2.duesAmount + st2.advanceAmount;
+      newCost = 800 * 1;
+      diff = newCost - coverage;
+      excessCredit = diff < 0 ? -diff : 0;
+      due = diff > 0 ? diff : 0;
+
+      expect(excessCredit, equals(200)); // Exactly 200! Logical previous is zero!
+      expect(due, equals(0));
+
+      await service.updateStudent(
+        studentId: s.id,
+        name: s.name,
+        phone: s.phone,
+        shift: 'Evening Shift',
+        monthlyFee: 800,
+        duesAmount: due,
+        advanceAmount: excessCredit,
+        note: 'Shift downgraded: Morning Shift (₹1000/mo) → Evening Shift (₹800/mo). ₹200 excess credit remains with the library to adjust in next renewal.',
+      );
+
+      var st3 = service.findStudentByPhone('9922334455')!;
+      expect(st3.monthlyFee, equals(800));
+      expect(st3.advanceAmount, equals(200));
+    });
+
+    test('All actions on a student add persistent, cumulative notes to student profile', () async {
+      final phone = '9933445566';
+      // 1. Admission
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 15,
+        studentName: 'Audit Action Student',
+        phone: phone,
+        shift: 'Morning Shift',
+        feeAmount: 500,
+        duesAmount: 0,
+      );
+      var st = service.findStudentByPhone(phone)!;
+      expect(st.note.contains('Admission on'), isTrue);
+
+      // 2. Change Seat
+      await service.assignSeatToExistingStudent(
+        newSeatNumber: 16,
+        studentId: st.id,
+        shift: 'Morning Shift',
+      );
+      st = service.findStudentByPhone(phone)!;
+      expect(st.note.contains('Seat changed: S-15 → S-16'), isTrue);
+      expect(st.note.contains('Admission on'), isTrue); // Persisted!
+
+      // 3. Mark Dues
+      await service.markStudentDues(st.id, 250);
+      st = service.findStudentByPhone(phone)!;
+      expect(st.note.contains('Pending dues of ₹250 marked'), isTrue);
+      expect(st.note.contains('Seat changed: S-15 → S-16'), isTrue); // Persisted!
+
+      // 4. Pay Dues
+      await service.recordPayment(
+        studentId: st.id,
+        studentName: st.name,
+        phone: st.phone,
+        amount: 250,
+        notes: 'Due payment cleared',
+      );
+      st = service.findStudentByPhone(phone)!;
+      expect(st.note.contains('Due payment of ₹250 collected'), isTrue);
+
+      // 5. Shift Change
+      await service.updateStudent(
+        studentId: st.id,
+        name: st.name,
+        phone: st.phone,
+        shift: 'Evening Shift',
+      );
+      st = service.findStudentByPhone(phone)!;
+      expect(st.note.contains('Shift changed: Morning Shift → Evening Shift'), isTrue);
+
+      // 6. Deactivate Member
+      await service.markStudentInactive(st.id, 16);
+      st = service.findStudentByPhone(phone)!;
+      expect(st.note.contains('Member moved to Inactive'), isTrue);
+
+      // 7. Reactivate Member
+      await service.reactivateStudent(st.id, 17);
+      st = service.findStudentByPhone(phone)!;
+      expect(st.note.contains('Member reactivated to Active'), isTrue);
+      // Verify all previous notes are intact
+      expect(st.note.contains('Admission on'), isTrue);
+      expect(st.note.contains('Seat changed: S-15 → S-16'), isTrue);
+      expect(st.note.contains('Due payment of ₹250 collected'), isTrue);
+    });
   });
 }

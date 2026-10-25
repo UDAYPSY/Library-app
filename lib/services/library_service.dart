@@ -1717,6 +1717,11 @@ class LibraryService {
         }
 
         // 1. Create Student record
+        final dateStr = DateFormat('dd-MMM-yyyy').format(effectiveJoiningDate);
+        final seatStr = seatNumber != null ? 'S-$seatNumber' : 'Unallocated';
+        final admitLog = 'Admission on $dateStr: Shift $shift (Seat $seatStr, ₹$effectiveMonthly/mo)${feeAmount > 0 ? ", Initial fee ₹$feeAmount paid via $paymentMode" : ""}${duesAmount > 0 ? ", Pending dues ₹$duesAmount" : ""}.';
+        final effectiveNote = appendNote(note, admitLog);
+
         transaction.set(studentDocRef, {
           'id': studentDocRef.id,
           'name': studentName,
@@ -1728,7 +1733,7 @@ class LibraryService {
           'joined_at': Timestamp.fromDate(now),
           'monthly_fee': effectiveMonthly,
           'payment_mode': paymentMode,
-          'note': note,
+          'note': effectiveNote,
           'dues_amount': duesAmount,
           'advance_amount': advanceAmount,
           'father_name': fatherName,
@@ -1774,6 +1779,11 @@ class LibraryService {
         }
       }
 
+      final dateStr = DateFormat('dd-MMM-yyyy').format(effectiveJoiningDate);
+      final seatStr = seatNumber != null ? 'S-$seatNumber' : 'Unallocated';
+      final admitLog = 'Admission on $dateStr: Shift $shift (Seat $seatStr, ₹$effectiveMonthly/mo)${feeAmount > 0 ? ", Initial fee ₹$feeAmount paid via $paymentMode" : ""}${duesAmount > 0 ? ", Pending dues ₹$duesAmount" : ""}.';
+      final effectiveNote = appendNote(note, admitLog);
+
       _mockStudents.insert(
         0,
         StudentInfo(
@@ -1787,7 +1797,7 @@ class LibraryService {
           joinedAt: now,
           monthlyFee: effectiveMonthly,
           paymentMode: paymentMode,
-          note: note,
+          note: effectiveNote,
           duesAmount: duesAmount,
           advanceAmount: advanceAmount,
           fatherName: fatherName,
@@ -2167,19 +2177,41 @@ class LibraryService {
       String mergedNote = curNote;
       // 1. Audit shift change if modified
       if (oldShift.isNotEmpty && oldShift.toLowerCase() != shift.toLowerCase()) {
-        mergedNote = appendNote(mergedNote, 'Shift changed: $oldShift → $shift on $dateStr.');
+        final hasShiftLog = note != null && (note.toLowerCase().contains('shift upgraded') || note.toLowerCase().contains('shift downgraded') || note.toLowerCase().contains('shift changed') || note.toLowerCase().contains('shift updated'));
+        if (!hasShiftLog) {
+          mergedNote = appendNote(mergedNote, 'Shift changed: $oldShift → $shift on $dateStr.');
+        }
       }
       // 2. Audit seat change if modified
       if (seatNumber != null && oldSeat != null && seatNumber != oldSeat) {
-        mergedNote = appendNote(mergedNote, 'Seat changed: S-$oldSeat → S-$seatNumber ($shift) on $dateStr.');
+        final hasSeatLog = note != null && note.toLowerCase().contains('seat changed');
+        if (!hasSeatLog) {
+          mergedNote = appendNote(mergedNote, 'Seat changed: S-$oldSeat → S-$seatNumber ($shift) on $dateStr.');
+        }
       } else if (seatNumber != null && oldSeat == null) {
-        mergedNote = appendNote(mergedNote, 'Seat assigned: S-$seatNumber ($shift) on $dateStr.');
+        final hasSeatLog = note != null && (note.toLowerCase().contains('seat assigned') || note.toLowerCase().contains('seat changed'));
+        if (!hasSeatLog) {
+          mergedNote = appendNote(mergedNote, 'Seat assigned: S-$seatNumber ($shift) on $dateStr.');
+        }
       }
       // 3. Audit status change if modified
       if (status != null && oldStatus.isNotEmpty && status != oldStatus) {
-        mergedNote = appendNote(mergedNote, 'Status changed: $oldStatus → $status on $dateStr.');
+        if (oldStatus == 'INACTIVE' && status != 'INACTIVE') {
+          mergedNote = appendNote(mergedNote, 'Member reactivated ($status) on $dateStr.');
+        } else {
+          mergedNote = appendNote(mergedNote, 'Status changed: $oldStatus → $status on $dateStr.');
+        }
       }
-      // 4. Merge incoming remarks if provided (never wipe existing notes)
+      // 4. Audit photo update or removal
+      if (photoBase64 != null) {
+        final oldPhoto = (snap.exists ? (snap.data()?['photo_base64'] as String?) : null) ?? '';
+        if (photoBase64.isNotEmpty && photoBase64 != oldPhoto) {
+          mergedNote = appendNote(mergedNote, 'Profile photo updated on $dateStr.');
+        } else if (photoBase64.isEmpty && oldPhoto.isNotEmpty) {
+          mergedNote = appendNote(mergedNote, 'Profile photo removed on $dateStr.');
+        }
+      }
+      // 5. Merge incoming remarks if provided (never wipe existing notes)
       if (note != null && note.trim().isNotEmpty) {
         mergedNote = appendNote(mergedNote, note.trim());
       }
@@ -2223,19 +2255,41 @@ class LibraryService {
         String mergedNote = s.note;
         // 1. Audit shift change if modified
         if (oldShift.isNotEmpty && oldShift.toLowerCase() != shift.toLowerCase()) {
-          mergedNote = appendNote(mergedNote, 'Shift changed: $oldShift → $shift on $dateStr.');
+          final hasShiftLog = note != null && (note.toLowerCase().contains('shift upgraded') || note.toLowerCase().contains('shift downgraded') || note.toLowerCase().contains('shift changed') || note.toLowerCase().contains('shift updated'));
+          if (!hasShiftLog) {
+            mergedNote = appendNote(mergedNote, 'Shift changed: $oldShift → $shift on $dateStr.');
+          }
         }
         // 2. Audit seat change if modified
         if (newSeat != null && oldSeat != null && newSeat != oldSeat) {
-          mergedNote = appendNote(mergedNote, 'Seat changed: S-$oldSeat → S-$newSeat ($shift) on $dateStr.');
+          final hasSeatLog = note != null && note.toLowerCase().contains('seat changed');
+          if (!hasSeatLog) {
+            mergedNote = appendNote(mergedNote, 'Seat changed: S-$oldSeat → S-$newSeat ($shift) on $dateStr.');
+          }
         } else if (newSeat != null && oldSeat == null) {
-          mergedNote = appendNote(mergedNote, 'Seat assigned: S-$newSeat ($shift) on $dateStr.');
+          final hasSeatLog = note != null && (note.toLowerCase().contains('seat assigned') || note.toLowerCase().contains('seat changed'));
+          if (!hasSeatLog) {
+            mergedNote = appendNote(mergedNote, 'Seat assigned: S-$newSeat ($shift) on $dateStr.');
+          }
         }
         // 3. Audit status change if modified
         if (status != null && oldStatus.isNotEmpty && status != oldStatus) {
-          mergedNote = appendNote(mergedNote, 'Status changed: $oldStatus → $status on $dateStr.');
+          if (oldStatus == 'INACTIVE' && status != 'INACTIVE') {
+            mergedNote = appendNote(mergedNote, 'Member reactivated ($status) on $dateStr.');
+          } else {
+            mergedNote = appendNote(mergedNote, 'Status changed: $oldStatus → $status on $dateStr.');
+          }
         }
-        // 4. Merge incoming remarks if provided (never wipe existing notes)
+        // 4. Audit photo update or removal
+        if (photoBase64 != null) {
+          final oldPhoto = s.photoBase64 ?? '';
+          if (photoBase64.isNotEmpty && photoBase64 != oldPhoto) {
+            mergedNote = appendNote(mergedNote, 'Profile photo updated on $dateStr.');
+          } else if (photoBase64.isEmpty && oldPhoto.isNotEmpty) {
+            mergedNote = appendNote(mergedNote, 'Profile photo removed on $dateStr.');
+          }
+        }
+        // 5. Merge incoming remarks if provided (never wipe existing notes)
         if (note != null && note.trim().isNotEmpty) {
           mergedNote = appendNote(mergedNote, note.trim());
         }

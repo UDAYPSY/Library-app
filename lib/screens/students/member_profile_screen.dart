@@ -259,6 +259,85 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     );
   }
 
+  void _showAddNoteDialog() {
+    final noteCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.note_add_rounded, color: Color(0xFF0D9488)),
+            SizedBox(width: 8),
+            Text('Add Member Note', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add a remark or note for this student profile:',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteCtrl,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: 'Enter notes, follow-up, or remarks...',
+                contentPadding: const EdgeInsets.all(14),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              final text = noteCtrl.text.trim();
+              if (text.isNotEmpty) {
+                Navigator.pop(ctx);
+                final dateStr = DateFormat('dd-MMM-yyyy').format(DateTime.now());
+                final userNote = 'Remark on $dateStr: $text';
+                await _service.updateStudent(
+                  studentId: _student.id,
+                  name: _student.name,
+                  phone: _student.phone,
+                  shift: _student.shift,
+                  seatNumber: _student.seatNumber,
+                  note: userNote,
+                );
+                _refreshStudent();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Note added to student profile!'),
+                      backgroundColor: Color(0xFF0D9488),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Save Note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickProfilePhoto(ImageSource source) async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -1569,136 +1648,34 @@ _Powered by TrackMyLibrary_
                     ),
                     const SizedBox(height: 24),
 
-                    // 4. Status Timeline Section (Images 4, 5, 5-)
-                    const Text(
-                      'Status Timeline',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textNavy,
-                      ),
+                    // 4. Notes & Activity History Section
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Notes & Activity History',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textNavy,
+                          ),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF0D9488),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          ),
+                          icon: const Icon(Icons.note_add_rounded, size: 16),
+                          label: const Text(
+                            'Add Note',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                          ),
+                          onPressed: _showAddNoteDialog,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                margin: const EdgeInsets.only(top: 4),
-                                width: 12,
-                                height: 12,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF0D9488),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'ADMISSION',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 13,
-                                            color: Color(0xFF0D9488),
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                        Text(
-                                          enrolledDateStr,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF64748B),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Text(
-                                      'Initial Admission',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_student.hasDues) ...[
-                            const SizedBox(height: 16),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  margin: const EdgeInsets.only(top: 4),
-                                  width: 12,
-                                  height: 12,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE11D48),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          const Text(
-                                            'DUES PENDING',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 13,
-                                              color: Color(0xFFE11D48),
-                                              letterSpacing: 0.5,
-                                            ),
-                                          ),
-                                          Text(
-                                            '₹${_student.effectiveDues}',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w900,
-                                              color: Color(0xFFE11D48),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        'Payment pending for this month',
-                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                    _buildNotesTimelineCard(enrolledDateStr),
                     const SizedBox(height: 24),
 
                     // 5. Payment History Section
@@ -2151,6 +2128,235 @@ _Powered by TrackMyLibrary_
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildNotesTimelineCard(String enrolledDateStr) {
+    final noteLines = _student.note
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_student.hasDues) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFECDD3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.pending_actions_rounded, color: Color(0xFFE11D48), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Pending Dues: ₹${_student.effectiveDues} due for active membership',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFE11D48),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (noteLines.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  children: [
+                    const Icon(Icons.event_note_outlined, size: 36, color: Color(0xFF94A3B8)),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'No activity notes recorded yet',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0D9488),
+                        side: const BorderSide(color: Color(0xFF0D9488)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add Note', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      onPressed: _showAddNoteDialog,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...List.generate(noteLines.length, (index) {
+              final rawLine = noteLines[index];
+              var line = rawLine;
+              while (line.startsWith('•')) {
+                line = line.substring(1).trim();
+              }
+
+              final lower = line.toLowerCase();
+              IconData icon = Icons.notes_rounded;
+              Color iconColor = const Color(0xFF64748B);
+              Color bgColor = const Color(0xFFF8FAFC);
+              String title = 'REMARK / NOTE';
+
+              if (lower.contains('admission') || lower.contains('admitted')) {
+                icon = Icons.how_to_reg_rounded;
+                iconColor = const Color(0xFF0284C7);
+                bgColor = const Color(0xFFF0F9FF);
+                title = 'ADMISSION';
+              } else if (lower.contains('shift')) {
+                icon = Icons.swap_calls_rounded;
+                iconColor = const Color(0xFF4F46E5);
+                bgColor = const Color(0xFFEEF2FF);
+                title = lower.contains('downgrade')
+                    ? 'SHIFT DOWNGRADE'
+                    : (lower.contains('upgrade') ? 'SHIFT UPGRADE' : 'SHIFT CHANGE');
+              } else if (lower.contains('seat')) {
+                icon = Icons.chair_alt_rounded;
+                iconColor = const Color(0xFF0D9488);
+                bgColor = const Color(0xFFF0FDFA);
+                title = lower.contains('vacated') || lower.contains('unassigned')
+                    ? 'SEAT VACATED'
+                    : 'SEAT UPDATE';
+              } else if (lower.contains('due payment') || (lower.contains('payment') && lower.contains('due'))) {
+                icon = Icons.pending_actions_rounded;
+                iconColor = const Color(0xFFE11D48);
+                bgColor = const Color(0xFFFFF1F2);
+                title = 'DUE PAYMENT';
+              } else if (lower.contains('payment') || lower.contains('fee')) {
+                icon = Icons.payments_rounded;
+                iconColor = const Color(0xFF059669);
+                bgColor = const Color(0xFFECFDF5);
+                title = 'FEE PAYMENT';
+              } else if (lower.contains('inactive')) {
+                icon = Icons.person_off_rounded;
+                iconColor = const Color(0xFFEF4444);
+                bgColor = const Color(0xFFFEF2F2);
+                title = 'MEMBER DEACTIVATED';
+              } else if (lower.contains('reactivate')) {
+                icon = Icons.person_add_rounded;
+                iconColor = const Color(0xFF16A34A);
+                bgColor = const Color(0xFFF0FDF4);
+                title = 'MEMBER REACTIVATED';
+              } else if (lower.contains('photo')) {
+                icon = Icons.camera_alt_rounded;
+                iconColor = const Color(0xFF0891B2);
+                bgColor = const Color(0xFFECFEFF);
+                title = 'PHOTO UPDATE';
+              } else if (lower.contains('trial')) {
+                icon = Icons.timer_outlined;
+                iconColor = const Color(0xFFD97706);
+                bgColor = const Color(0xFFFFFBEB);
+                title = 'TRIAL STATUS';
+              } else if (lower.contains('dues')) {
+                icon = Icons.pending_actions_rounded;
+                iconColor = const Color(0xFFE11D48);
+                bgColor = const Color(0xFFFFF1F2);
+                title = 'PENDING DUES';
+              }
+
+              return _buildNoteActivityItem(
+                icon: icon,
+                iconColor: iconColor,
+                bgColor: bgColor,
+                title: title,
+                content: line,
+                isLast: index == noteLines.length - 1,
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoteActivityItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String content,
+    bool isLast = false,
+  }) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: iconColor.withOpacity(0.3)),
+                ),
+                child: Icon(icon, size: 16, color: iconColor),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    color: const Color(0xFFE2E8F0),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (title.isNotEmpty) ...[
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: iconColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                  ],
+                  Text(
+                    content,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textNavy,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

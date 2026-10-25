@@ -134,40 +134,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     if (widget.studentToEdit == null) return 0;
     final s = widget.studentToEdit!;
     final tenureMonths = _existingStudentTenureMonths;
+    final monthlyFee = _studentCurrentShiftMonthlyFee;
 
-    // 1. Structured advanceAmount has highest priority; fallback to legacy regex
-    int effectiveAdvance = s.advanceAmount;
-    if (effectiveAdvance == 0) {
-      final matchCredit = RegExp(r'₹(\d+)\s+excess credit').firstMatch(s.note);
-      if (matchCredit != null) {
-        effectiveAdvance = int.tryParse(matchCredit.group(1) ?? '0') ?? 0;
-      }
-    }
-
-    final matchOriginal = RegExp(r'original paid[:\s]+₹?(\d+)', caseSensitive: false).firstMatch(s.note);
-    if (matchOriginal != null) {
-      final orig = int.tryParse(matchOriginal.group(1) ?? '0') ?? 0;
-      if (orig > 0) return orig;
-    }
-
-    // 2. Expected tenure fee minus dues plus advance credit
-    final expectedTenureFee = s.monthlyFee * tenureMonths;
-    int totalCovered = (expectedTenureFee - s.duesAmount + effectiveAdvance).clamp(0, 9999999);
-
-    if (effectiveAdvance == 0 && s.duesAmount == 0) {
-      final studentPayments = _service.currentPayments.where((p) {
-        return (s.id.isNotEmpty && p.studentId == s.id) ||
-            (s.phone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == LibraryService.normalizePhone(s.phone));
-      }).toList();
-
-      for (var p in studentPayments) {
-        if (p.amount > totalCovered) {
-          totalCovered = p.amount;
-        }
-      }
-    }
-
-    return totalCovered;
+    // Expected tenure fee minus dues plus current advance credit with library
+    final expectedTenureFee = monthlyFee * tenureMonths;
+    return (expectedTenureFee - s.duesAmount + s.advanceAmount).clamp(0, 9999999);
   }
 
   int get _currentCyclePaidAmount => _studentEffectivePaidCoverage;
