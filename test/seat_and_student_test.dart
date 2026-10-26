@@ -1158,7 +1158,7 @@ void main() {
       expect(paysMulti.first.shift, equals('Evening Shift'));
     });
 
-    test('Follow-up template and {note} interpolation format properly', () {
+    test('Follow-up template and action drafts do not dump historical notes, but support custom remarks', () {
       final service = LibraryService();
       final dummyStudent = StudentInfo(
         id: 'st_followup_test',
@@ -1168,21 +1168,52 @@ void main() {
         shift: 'Morning Shift',
         monthlyFee: 800,
         duesAmount: 300,
-        note: 'Requested 3 days fee extension for exams',
+        note: '• Internal Log: Admission on 01-Jan-2026\n• Previous seat changed S-10 -> S-42',
       );
 
-      service.saveWhatsAppSettings(
-        followupTpl: 'Hi {student_name}, note on file: {note}. Due: ₹{due_amount}.',
-      );
-
-      final formatted = service.formatTemplate(
-        service.profile.followupTemplate,
+      // Default follow-up template without custom remark must NOT include internal audit notes
+      final defaultFollowup = service.formatActionDraft(
+        actionType: 'followup',
         student: dummyStudent,
       );
+      expect(defaultFollowup.contains('Aarav Sharma'), isTrue);
+      expect(defaultFollowup.contains('S-42'), isTrue);
+      expect(defaultFollowup.contains('Internal Log'), isFalse);
+      expect(defaultFollowup.contains('{note}'), isFalse);
 
-      expect(formatted.contains('Aarav Sharma'), isTrue);
-      expect(formatted.contains('Requested 3 days fee extension for exams'), isTrue);
-      expect(formatted.contains('₹300'), isTrue);
+      // Action draft: Seat Change
+      final seatChangeDraft = service.formatActionDraft(
+        actionType: 'seat_change',
+        student: dummyStudent,
+      );
+      expect(seatChangeDraft.contains('Aarav Sharma'), isTrue);
+      expect(seatChangeDraft.contains('S-42'), isTrue);
+      expect(seatChangeDraft.contains('Internal Log'), isFalse);
+
+      // Action draft: Shift Change
+      final shiftChangeDraft = service.formatActionDraft(
+        actionType: 'shift_change',
+        student: dummyStudent,
+      );
+      expect(shiftChangeDraft.contains('Morning Shift'), isTrue);
+      expect(shiftChangeDraft.contains('Internal Log'), isFalse);
+
+      // Action draft: Seat Allotment
+      final allotmentDraft = service.formatActionDraft(
+        actionType: 'seat_allotment',
+        student: dummyStudent,
+      );
+      expect(allotmentDraft.contains('S-42'), isTrue);
+      expect(allotmentDraft.contains('Internal Log'), isFalse);
+
+      // Action draft with explicit custom remark cleanly appends remark
+      final withRemark = service.formatActionDraft(
+        actionType: 'seat_change',
+        student: dummyStudent,
+        customNote: 'Valid starting tomorrow morning',
+      );
+      expect(withRemark.contains('Valid starting tomorrow morning'), isTrue);
+      expect(withRemark.contains('Internal Log'), isFalse);
     });
   });
 }

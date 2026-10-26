@@ -80,36 +80,49 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     _showMessagingModal(isWhatsApp: false);
   }
 
-  void _showMessagingModal({required bool isWhatsApp}) {
-    String selectedTab = 'Follow-up';
+  void _showMessagingModal({required bool isWhatsApp, String initialAction = 'General Follow-up'}) {
+    String selectedAction = initialAction;
     bool useWhatsApp = isWhatsApp;
     
-    final noteCtrl = TextEditingController(text: _student.note);
+    final customRemarkCtrl = TextEditingController();
     final messageCtrl = TextEditingController();
 
-    String generateMessage(String tab, String currentNote) {
-      if (tab == 'Follow-up') {
-        return _service.formatTemplate(
-          _service.profile.followupTemplate,
-          student: _student,
-          customNote: currentNote,
-        );
-      } else if (tab == 'Fee Reminder') {
-        return _service.formatTemplate(
-          _service.profile.reminderTemplate,
-          student: _student,
-        );
-      } else if (tab == 'Welcome Pass') {
-        return _service.formatTemplate(
-          _service.profile.welcomeTemplate,
-          student: _student,
-        );
-      } else {
-        return 'Hello ${_student.name}, this is from ${_service.profile.libraryName}.';
+    String generateActionMessage(String action, String customRemark) {
+      String rawTpl;
+      switch (action) {
+        case 'Seat Change':
+          rawTpl = _service.profile.seatChangeTemplate;
+          break;
+        case 'Shift Change':
+          rawTpl = _service.profile.shiftChangeTemplate;
+          break;
+        case 'Seat Allotment':
+          rawTpl = _service.profile.seatAllotmentTemplate;
+          break;
+        case 'Fee Reminder':
+          rawTpl = _service.profile.reminderTemplate;
+          break;
+        case 'Custom':
+          return 'Hello ${_student.name}, this is from ${_service.profile.libraryName}.';
+        case 'General Follow-up':
+        default:
+          rawTpl = _service.profile.followupTemplate;
+          break;
       }
+
+      var msg = _service.formatTemplate(
+        rawTpl,
+        student: _student,
+        customNote: customRemark.trim(),
+      );
+
+      if (customRemark.trim().isNotEmpty && !rawTpl.contains('{note}')) {
+        msg += '\n\n📌 Note: ${customRemark.trim()}';
+      }
+      return msg;
     }
 
-    messageCtrl.text = generateMessage(selectedTab, _student.note);
+    messageCtrl.text = generateActionMessage(selectedAction, '');
 
     showModalBottomSheet(
       context: context,
@@ -240,25 +253,39 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Template Selection Chips
-                  const Text('Select Message Template:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                  // Action-Specific Template Selection Chips
+                  const Text('Select Action Draft Template:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
                   const SizedBox(height: 6),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: ['Follow-up', 'Fee Reminder', 'Welcome Pass', 'Custom'].map((t) {
-                        final isSel = selectedTab == t;
+                      children: [
+                        'Seat Change',
+                        'Shift Change',
+                        'Seat Allotment',
+                        'Fee Reminder',
+                        'General Follow-up',
+                        'Custom',
+                      ].map((action) {
+                        final isSel = selectedAction == action;
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: ChoiceChip(
-                            label: Text(t, style: TextStyle(fontWeight: FontWeight.w800, color: isSel ? Colors.white : AppColors.textNavy, fontSize: 12)),
+                            label: Text(
+                              action,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: isSel ? Colors.white : AppColors.textNavy,
+                                fontSize: 12,
+                              ),
+                            ),
                             selected: isSel,
                             selectedColor: useWhatsApp ? const Color(0xFF10B981) : const Color(0xFF0284C7),
                             backgroundColor: const Color(0xFFF1F5F9),
                             onSelected: (_) {
                               setModalState(() {
-                                selectedTab = t;
-                                messageCtrl.text = generateMessage(t, noteCtrl.text);
+                                selectedAction = action;
+                                messageCtrl.text = generateActionMessage(action, customRemarkCtrl.text);
                               });
                             },
                           ),
@@ -268,34 +295,38 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Note editor if Follow-up is selected
-                  if (selectedTab == 'Follow-up') ...[
-                    const Text('Student Follow-up Note / Remarks:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
-                    const SizedBox(height: 4),
-                    TextField(
-                      controller: noteCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. Discussed fee extension till Friday; wants quiet zone...',
-                        contentPadding: const EdgeInsets.all(12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                      ),
-                      onChanged: (val) {
-                        setModalState(() {
-                          messageCtrl.text = generateMessage('Follow-up', val);
-                        });
-                      },
+                  // Optional Custom Remark for THIS dispatch (does not dump whole historical notes)
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Add Custom Remark to Message:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                      Text('(Optional)', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: customRemarkCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Fee extension granted till Friday; 2nd floor silent zone assigned...',
+                      contentPadding: const EdgeInsets.all(12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
                     ),
-                    const SizedBox(height: 14),
-                  ],
+                    onChanged: (val) {
+                      setModalState(() {
+                        messageCtrl.text = generateActionMessage(selectedAction, val);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 14),
 
                   // Editable Message Preview
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Message to be sent:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                      Text('Draft Message to Send:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
                       Text('(Fully Editable)', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                     ],
                   ),
@@ -332,8 +363,11 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                             ),
                             onPressed: () async {
                               final textToSend = messageCtrl.text.trim();
-                              if (noteCtrl.text.trim() != _student.note) {
-                                final updated = _student.copyWith(note: noteCtrl.text.trim());
+                              final remark = customRemarkCtrl.text.trim();
+                              if (remark.isNotEmpty) {
+                                final dateStr = DateFormat('dd-MMM-yyyy').format(DateTime.now());
+                                final updatedNotes = LibraryService.appendNote(_student.note, 'Follow-up ($selectedAction) on $dateStr: $remark');
+                                final updated = _student.copyWith(note: updatedNotes);
                                 await _service.updateStudentInfo(updated);
                                 _refreshStudent();
                               }
@@ -397,7 +431,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
         },
       ),
     );
-  }
+
 
   void _openDialer() {
     final cleanPhone = LibraryService.normalizePhone(_student.phone);

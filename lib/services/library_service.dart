@@ -2881,6 +2881,9 @@ class LibraryService {
     String? reminderTpl,
     String? receiptTpl,
     String? followupTpl,
+    String? seatChangeTpl,
+    String? shiftChangeTpl,
+    String? seatAllotmentTpl,
   }) {
     if (notifications != null) profile.whatsappNotifications = notifications;
     if (autoReminders != null) profile.autoFeeReminders = autoReminders;
@@ -2893,6 +2896,9 @@ class LibraryService {
     if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
     if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
     if (followupTpl != null) profile.followupTemplate = followupTpl;
+    if (seatChangeTpl != null) profile.seatChangeTemplate = seatChangeTpl;
+    if (shiftChangeTpl != null) profile.shiftChangeTemplate = shiftChangeTpl;
+    if (seatAllotmentTpl != null) profile.seatAllotmentTemplate = seatAllotmentTpl;
     _saveLocalState();
 
     if (isFirebaseConnected) {
@@ -2929,11 +2935,8 @@ class LibraryService {
         ? DateFormat('dd MMM yyyy').format(dueDate)
         : (student.feeDueDate != null ? DateFormat('dd MMM yyyy').format(student.feeDueDate!) : 'Due Soon');
     final dueAmt = amount ?? (student.effectiveDues > 0 ? student.effectiveDues : student.monthlyFee);
-    final noteText = (customNote != null && customNote.trim().isNotEmpty)
-        ? customNote.trim()
-        : (student.note.trim().isNotEmpty ? student.note.trim() : 'Regular seat follow-up');
 
-    return tpl
+    var result = tpl
         .replaceAll('{student_name}', student.name)
         .replaceAll('{seat_number}', student.seatNumber != null ? '${student.seatNumber}' : 'Unallocated')
         .replaceAll('{shift}', student.shift)
@@ -2943,9 +2946,65 @@ class LibraryService {
         .replaceAll('{mode}', student.paymentMode)
         .replaceAll('{valid_until}', dueStr)
         .replaceAll('{library_name}', profile.libraryName)
-        .replaceAll('{note}', noteText)
         .replaceAll('{phone}', student.phone)
         .replaceAll('{status}', student.status);
+
+    if (customNote != null && customNote.trim().isNotEmpty) {
+      result = result.replaceAll('{note}', customNote.trim());
+    } else {
+      // Do not include or dump historical notes. Cleanly strip any {note} tag
+      result = result.replaceAll(RegExp(r'\n*📌\s*Note:\s*\{note\}'), '').replaceAll('{note}', '').trim();
+    }
+    return result;
+  }
+
+  String formatActionDraft({
+    required String actionType, // 'seat_change', 'shift_change', 'seat_allotment', 'fee_due', 'followup', 'welcome', 'receipt'
+    required StudentInfo student,
+    String? customNote,
+    int? amount,
+    DateTime? dueDate,
+  }) {
+    String tpl;
+    switch (actionType) {
+      case 'seat_change':
+        tpl = profile.seatChangeTemplate;
+        break;
+      case 'shift_change':
+        tpl = profile.shiftChangeTemplate;
+        break;
+      case 'seat_allotment':
+        tpl = profile.seatAllotmentTemplate;
+        break;
+      case 'fee_due':
+        tpl = profile.reminderTemplate;
+        break;
+      case 'welcome':
+        tpl = profile.welcomeTemplate;
+        break;
+      case 'receipt':
+        tpl = profile.receiptTemplate;
+        break;
+      case 'followup':
+      default:
+        tpl = profile.followupTemplate;
+        break;
+    }
+
+    String formatted = formatTemplate(
+      tpl,
+      student: student,
+      amount: amount,
+      dueDate: dueDate,
+      customNote: customNote,
+    );
+
+    // If an optional custom note was provided and template didn't contain {note}, cleanly append note line
+    if (customNote != null && customNote.trim().isNotEmpty && !tpl.contains('{note}')) {
+      formatted += '\n\n📌 Note: ${customNote.trim()}';
+    }
+
+    return formatted;
   }
 
   static Future<bool> sendWhatsAppDirect({

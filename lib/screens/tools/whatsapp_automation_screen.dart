@@ -301,7 +301,15 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: ['Follow-up', 'Reminder', 'Welcome', 'Receipt'].map((t) {
+                        children: [
+                          'Seat Change',
+                          'Shift Change',
+                          'Seat Allotment',
+                          'Fee Reminder',
+                          'Follow-up',
+                          'Welcome',
+                          'Receipt',
+                        ].map((t) {
                           final isSel = templateType == t;
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
@@ -356,9 +364,9 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                               ),
                               title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textNavy)),
                               subtitle: Text(
-                                'Seat #${s.seatNumber ?? "—"} • ${s.phone}${s.note.isNotEmpty ? "\nNote: ${s.note}" : ""}',
+                                'Seat #${s.seatNumber ?? "—"} • ${s.shift} • ${s.phone}',
                                 style: const TextStyle(fontSize: 11),
-                                maxLines: 2,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               trailing: Row(
@@ -371,19 +379,20 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                                     onPressed: () async {
                                       Navigator.pop(ctx);
                                       String rawTpl = _service.profile.followupTemplate;
-                                      if (templateType == 'Reminder') rawTpl = _service.profile.reminderTemplate;
+                                      if (templateType == 'Seat Change') rawTpl = _service.profile.seatChangeTemplate;
+                                      if (templateType == 'Shift Change') rawTpl = _service.profile.shiftChangeTemplate;
+                                      if (templateType == 'Seat Allotment') rawTpl = _service.profile.seatAllotmentTemplate;
+                                      if (templateType == 'Fee Reminder' || templateType == 'Reminder') rawTpl = _service.profile.reminderTemplate;
                                       if (templateType == 'Welcome') rawTpl = _service.profile.welcomeTemplate;
                                       if (templateType == 'Receipt') rawTpl = _service.profile.receiptTemplate;
 
                                       final msg = _formatTemplate(rawTpl, student: s);
                                       final ok = await LibraryService.sendSmsDirect(phone: s.phone, message: msg);
-                                      if (!ok) {
+                                      if (!ok && mounted) {
                                         Clipboard.setData(ClipboardData(text: msg));
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('Could not open SMS. Message for ${s.name} copied to clipboard!')),
-                                          );
-                                        }
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Could not open SMS. Message for ${s.name} copied to clipboard!')),
+                                        );
                                       }
                                     },
                                   ),
@@ -399,7 +408,10 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                                         _messagesSent = _service.profile.messagesSentCount;
                                       });
                                       String rawTpl = _service.profile.followupTemplate;
-                                      if (templateType == 'Reminder') rawTpl = _service.profile.reminderTemplate;
+                                      if (templateType == 'Seat Change') rawTpl = _service.profile.seatChangeTemplate;
+                                      if (templateType == 'Shift Change') rawTpl = _service.profile.shiftChangeTemplate;
+                                      if (templateType == 'Seat Allotment') rawTpl = _service.profile.seatAllotmentTemplate;
+                                      if (templateType == 'Fee Reminder' || templateType == 'Reminder') rawTpl = _service.profile.reminderTemplate;
                                       if (templateType == 'Welcome') rawTpl = _service.profile.welcomeTemplate;
                                       if (templateType == 'Receipt') rawTpl = _service.profile.receiptTemplate;
 
@@ -428,6 +440,9 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
     final reminderCtrl = TextEditingController(text: _service.profile.reminderTemplate);
     final receiptCtrl = TextEditingController(text: _service.profile.receiptTemplate);
     final followupCtrl = TextEditingController(text: _service.profile.followupTemplate);
+    final seatChangeCtrl = TextEditingController(text: _service.profile.seatChangeTemplate);
+    final shiftChangeCtrl = TextEditingController(text: _service.profile.shiftChangeTemplate);
+    final seatAllotmentCtrl = TextEditingController(text: _service.profile.seatAllotmentTemplate);
 
     showModalBottomSheet(
       context: context,
@@ -449,35 +464,41 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Customize Templates', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                  const Text('Customize Action Templates', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
               const SizedBox(height: 6),
               const Text(
-                'Available dynamic tags:\n{student_name}, {seat_number}, {due_amount}, {due_date}, {library_name}, {shift}, {note}, {mode}, {phone}',
+                'Available tags: {student_name}, {seat_number}, {shift}, {due_amount}, {due_date}, {library_name}, {mode}, {phone}',
                 style: TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.w700, height: 1.3),
               ),
               const SizedBox(height: 14),
-              const Text('Follow-up Note Template (Uses Student Note)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
-              const SizedBox(height: 4),
-              const Text('📌 Tip: {note} automatically pulls remarks & follow-up notes from the student profile.', style: TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontStyle: FontStyle.italic)),
+              const Text('💺 Seat Change Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
               const SizedBox(height: 6),
               TextField(
-                controller: followupCtrl,
-                maxLines: 3,
-                decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'Follow-up template with {note}...'),
-              ),
-              const SizedBox(height: 14),
-              const Text('Welcome Note Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: welcomeCtrl,
+                controller: seatChangeCtrl,
                 maxLines: 2,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
               const SizedBox(height: 14),
-              const Text('Fee Reminder Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const Text('⏰ Shift Change Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: shiftChangeCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 14),
+              const Text('🎫 Seat Allotment Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: seatAllotmentCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 14),
+              const Text('🔔 Fee Due Reminder Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
               const SizedBox(height: 6),
               TextField(
                 controller: reminderCtrl,
@@ -485,10 +506,26 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                 decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
               const SizedBox(height: 14),
-              const Text('Payment Receipt Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const Text('💬 General Follow-up Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: followupCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 14),
+              const Text('🧾 Payment Receipt Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
               const SizedBox(height: 6),
               TextField(
                 controller: receiptCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 14),
+              const Text('👋 Welcome Note Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: welcomeCtrl,
                 maxLines: 2,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
@@ -507,10 +544,13 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                       reminderTpl: reminderCtrl.text.trim(),
                       receiptTpl: receiptCtrl.text.trim(),
                       followupTpl: followupCtrl.text.trim(),
+                      seatChangeTpl: seatChangeCtrl.text.trim(),
+                      shiftChangeTpl: shiftChangeCtrl.text.trim(),
+                      seatAllotmentTpl: seatAllotmentCtrl.text.trim(),
                     );
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Templates updated and saved successfully!'), behavior: SnackBarBehavior.floating),
+                      const SnackBar(content: Text('Action templates updated and saved successfully!'), behavior: SnackBarBehavior.floating),
                     );
                   },
                   child: const Text('Save Templates', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -526,38 +566,53 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
   void _openFollowupMessengerSheet([StudentInfo? initialStudent]) {
     StudentInfo? selectedStudent = initialStudent;
     String search = '';
-    TextEditingController? noteCtrl;
+    String selectedAction = 'Seat Change';
+    final customRemarkCtrl = TextEditingController();
     TextEditingController? messageCtrl;
 
-    void initControllers(StudentInfo s, StateSetter setModalState) {
-      selectedStudent = s;
-      noteCtrl = TextEditingController(text: s.note);
-      final initialMsg = _service.formatTemplate(
-        _service.profile.followupTemplate,
-        student: s,
-        customNote: s.note,
+    String getActionDraft(String action, StudentInfo student, String customRemark) {
+      String rawTpl;
+      switch (action) {
+        case 'Seat Change':
+          rawTpl = _service.profile.seatChangeTemplate;
+          break;
+        case 'Shift Change':
+          rawTpl = _service.profile.shiftChangeTemplate;
+          break;
+        case 'Seat Allotment':
+          rawTpl = _service.profile.seatAllotmentTemplate;
+          break;
+        case 'Fee Reminder':
+          rawTpl = _service.profile.reminderTemplate;
+          break;
+        case 'Custom':
+          return 'Hello ${student.name}, this is from ${_service.profile.libraryName}.';
+        case 'General Follow-up':
+        default:
+          rawTpl = _service.profile.followupTemplate;
+          break;
+      }
+
+      var msg = _service.formatTemplate(
+        rawTpl,
+        student: student,
+        customNote: customRemark.trim().isNotEmpty ? customRemark.trim() : null,
       );
-      messageCtrl = TextEditingController(text: initialMsg);
-      noteCtrl!.addListener(() {
-        final newMsg = _service.formatTemplate(
-          _service.profile.followupTemplate,
-          student: s,
-          customNote: noteCtrl!.text,
-        );
-        setModalState(() {
-          messageCtrl!.text = newMsg;
-        });
-      });
+
+      if (customRemark.trim().isNotEmpty && !rawTpl.contains('{note}')) {
+        msg += '\n\n📌 Note: ${customRemark.trim()}';
+      }
+      return msg;
+    }
+
+    void initControllers(StudentInfo s) {
+      selectedStudent = s;
+      customRemarkCtrl.clear();
+      messageCtrl = TextEditingController(text: getActionDraft(selectedAction, s, ''));
     }
 
     if (initialStudent != null) {
-      noteCtrl = TextEditingController(text: initialStudent.note);
-      final initialMsg = _service.formatTemplate(
-        _service.profile.followupTemplate,
-        student: initialStudent,
-        customNote: initialStudent.note,
-      );
-      messageCtrl = TextEditingController(text: initialMsg);
+      initControllers(initialStudent);
     }
 
     showModalBottomSheet(
@@ -605,7 +660,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     ],
                   ),
                   const Text(
-                    'Send customized follow-up reminders incorporating student notes.',
+                    'Send action-specific templates (Seat Change, Shift Change, Seat Allotment, Fee Due, Follow-up).',
                     style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                   const SizedBox(height: 14),
@@ -643,7 +698,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                                   ),
                                   title: Text(st.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textNavy)),
                                   subtitle: Text(
-                                    'Seat #${st.seatNumber ?? "—"} • ${st.shift} • Note: ${st.note.isNotEmpty ? st.note : "None"}',
+                                    'Seat #${st.seatNumber ?? "—"} • ${st.shift} • ${st.phone}',
                                     style: const TextStyle(fontSize: 11),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -651,7 +706,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
                                   onTap: () {
                                     setModalState(() {
-                                      initControllers(st, setModalState);
+                                      initControllers(st);
                                     });
                                   },
                                 );
@@ -700,13 +755,62 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    const Text('Student Follow-up Note / Remarks:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.textNavy)),
+                    // Action Draft Selection Chips
+                    const Text('Select Action Draft Template:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.textNavy)),
+                    const SizedBox(height: 6),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          'Seat Change',
+                          'Shift Change',
+                          'Seat Allotment',
+                          'Fee Reminder',
+                          'General Follow-up',
+                          'Custom',
+                        ].map((action) {
+                          final isSel = selectedAction == action;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(
+                                action,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: isSel ? Colors.white : AppColors.textNavy,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              selected: isSel,
+                              selectedColor: const Color(0xFF0D9488),
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              onSelected: (_) {
+                                setModalState(() {
+                                  selectedAction = action;
+                                  messageCtrl?.text = getActionDraft(action, selectedStudent!, customRemarkCtrl.text);
+                                });
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Optional Custom Remark for THIS message dispatch
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Add Custom Remark to Message:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.textNavy)),
+                        Text('(Optional)', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      ],
+                    ),
                     const SizedBox(height: 4),
                     TextField(
-                      controller: noteCtrl,
+                      controller: customRemarkCtrl,
                       maxLines: 2,
                       decoration: InputDecoration(
-                        hintText: 'e.g. Requested 2 days extension; Exam approaching...',
+                        hintText: 'e.g. Granted 2 days extension / Shift effective 1st of next month...',
                         contentPadding: const EdgeInsets.all(12),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         filled: true,
@@ -714,11 +818,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                       ),
                       onChanged: (val) {
                         setModalState(() {
-                          messageCtrl?.text = _service.formatTemplate(
-                            _service.profile.followupTemplate,
-                            student: selectedStudent!,
-                            customNote: val,
-                          );
+                          messageCtrl?.text = getActionDraft(selectedAction, selectedStudent!, val);
                         });
                       },
                     ),
@@ -727,14 +827,14 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Personalized Follow-up Message:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.textNavy)),
-                        Text('(Editable)', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        Text('Draft Message to Send:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.textNavy)),
+                        Text('(Fully Editable)', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                       ],
                     ),
                     const SizedBox(height: 4),
                     TextField(
                       controller: messageCtrl,
-                      maxLines: 4,
+                      maxLines: 5,
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.all(12),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -758,8 +858,11 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                             label: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                             onPressed: () async {
                               final textToSend = messageCtrl?.text.trim() ?? '';
-                              if (noteCtrl != null && noteCtrl!.text.trim() != selectedStudent!.note) {
-                                await _service.updateStudentInfo(selectedStudent!.copyWith(note: noteCtrl!.text.trim()));
+                              final remark = customRemarkCtrl.text.trim();
+                              if (remark.isNotEmpty) {
+                                final dateStr = DateFormat('dd-MMM-yyyy').format(DateTime.now());
+                                final updatedNote = LibraryService.appendNote(selectedStudent!.note, 'Follow-up ($selectedAction) on $dateStr: $remark');
+                                await _service.updateStudentInfo(selectedStudent!.copyWith(note: updatedNote));
                               }
                               _service.useWhatsAppCredit(1);
                               setState(() {
@@ -771,13 +874,11 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                                 phone: selectedStudent!.phone,
                                 message: textToSend,
                               );
-                              if (!ok) {
+                              if (!ok && mounted) {
                                 Clipboard.setData(ClipboardData(text: textToSend));
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Could not open WhatsApp. Message copied to clipboard!')),
-                                  );
-                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Could not open WhatsApp. Message copied to clipboard!')),
+                                );
                               }
                             },
                           ),
@@ -795,21 +896,22 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                             label: const Text('SMS', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                             onPressed: () async {
                               final textToSend = messageCtrl?.text.trim() ?? '';
-                              if (noteCtrl != null && noteCtrl!.text.trim() != selectedStudent!.note) {
-                                await _service.updateStudentInfo(selectedStudent!.copyWith(note: noteCtrl!.text.trim()));
+                              final remark = customRemarkCtrl.text.trim();
+                              if (remark.isNotEmpty) {
+                                final dateStr = DateFormat('dd-MMM-yyyy').format(DateTime.now());
+                                final updatedNote = LibraryService.appendNote(selectedStudent!.note, 'Follow-up ($selectedAction) on $dateStr: $remark');
+                                await _service.updateStudentInfo(selectedStudent!.copyWith(note: updatedNote));
                               }
                               Navigator.pop(ctx);
                               final ok = await LibraryService.sendSmsDirect(
                                 phone: selectedStudent!.phone,
                                 message: textToSend,
                               );
-                              if (!ok) {
+                              if (!ok && mounted) {
                                 Clipboard.setData(ClipboardData(text: textToSend));
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Could not open SMS. Message copied to clipboard!')),
-                                  );
-                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Could not open SMS. Message copied to clipboard!')),
+                                );
                               }
                             },
                           ),
