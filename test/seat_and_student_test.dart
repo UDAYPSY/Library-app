@@ -1293,6 +1293,47 @@ void main() {
       expect(await recovery.getLastBackupStatus(), equals('Auto-Synced (Excel)'));
       expect(await recovery.getLastBackupTime(), isNotNull);
     });
+
+    test('UPI Payment QR generation and dynamic payee resolution', () {
+      final profile = LibraryProfile(
+        libraryName: 'Oxford Study Hall',
+        adminName: 'Amit Verma',
+        adminPhone: '9876543210',
+        upiId: 'oxfordlibrary@okhdfcbank',
+      );
+
+      // Verify explicit UPI ID
+      expect(profile.effectiveUpiId, equals('oxfordlibrary@okhdfcbank'));
+
+      // Verify NPCI UPI payment URL format
+      final upiUrl = profile.generateUpiPaymentUrl(
+        amount: 1200,
+        studentName: 'Rohan Sharma',
+        note: 'Fee: Rohan Sharma - June',
+      );
+      expect(upiUrl, startsWith('upi://pay?'));
+      expect(upiUrl, contains('pa=oxfordlibrary@okhdfcbank'));
+      expect(upiUrl, contains('pn=Oxford%20Study%20Hall'));
+      expect(upiUrl, contains('am=1200'));
+      expect(upiUrl, contains('cu=INR'));
+      expect(upiUrl, contains('tn=Fee%3A%20Rohan%20Sharma%20-%20June'));
+
+      // Verify auto-fallback when upiId is blank
+      final fallbackProfile = LibraryProfile(
+        libraryName: 'Apex Library',
+        adminName: 'Sunil',
+        adminPhone: '+91-9123456780',
+        upiId: '',
+      );
+      expect(fallbackProfile.effectiveUpiId, equals('9123456780@upi'));
+
+      // Verify serialization / deserialization maintains upiId
+      final map = profile.toMap();
+      expect(map['upi_id'], equals('oxfordlibrary@okhdfcbank'));
+      final restored = LibraryProfile.fromMap(map);
+      expect(restored.upiId, equals('oxfordlibrary@okhdfcbank'));
+      expect(restored.effectiveUpiId, equals('oxfordlibrary@okhdfcbank'));
+    });
   });
 }
 

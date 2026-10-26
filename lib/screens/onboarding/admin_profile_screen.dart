@@ -17,6 +17,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
+  late final TextEditingController _upiCtrl;
   final TextEditingController _passCtrl = TextEditingController();
   late final TextEditingController _driveEmailCtrl;
 
@@ -30,11 +31,20 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _nameCtrl = TextEditingController(text: _service.profile.adminName != 'Nivi' ? _service.profile.adminName : '');
     _emailCtrl = TextEditingController(text: '');
     _phoneCtrl = TextEditingController(text: '');
+    _upiCtrl = TextEditingController(text: _service.profile.upiId != '9457464850@upi' ? _service.profile.upiId : '');
     _driveEmailCtrl = TextEditingController(text: '');
 
     _emailCtrl.addListener(() {
       if (_driveEmailCtrl.text.isEmpty || _driveEmailCtrl.text == _emailCtrl.text) {
         _driveEmailCtrl.text = _emailCtrl.text;
+      }
+    });
+
+    _phoneCtrl.addListener(() {
+      final clean = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+      if (clean.length >= 10 && (_upiCtrl.text.isEmpty || _upiCtrl.text.endsWith('@upi'))) {
+        final p10 = clean.substring(clean.length - 10);
+        _upiCtrl.text = '$p10@upi';
       }
     });
   }
@@ -44,6 +54,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
+    _upiCtrl.dispose();
     _passCtrl.dispose();
     _driveEmailCtrl.dispose();
     super.dispose();
@@ -68,6 +79,20 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _service.profile.adminName = _nameCtrl.text.trim();
     _service.profile.adminEmail = _emailCtrl.text.trim();
     _service.profile.adminPhone = _phoneCtrl.text.trim();
+
+    final enteredUpi = _upiCtrl.text.trim();
+    if (enteredUpi.isNotEmpty) {
+      _service.profile.upiId = enteredUpi;
+    } else {
+      final cleanPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+      if (cleanPhone.length >= 10) {
+        final p10 = cleanPhone.substring(cleanPhone.length - 10);
+        _service.profile.upiId = '$p10@upi';
+      } else {
+        _service.profile.upiId = '9457464850@upi';
+      }
+    }
+
     await LocalStorageService.saveString('app_admin_password', _passCtrl.text.trim());
 
     final driveEmail = _driveEmailCtrl.text.trim().isNotEmpty ? _driveEmailCtrl.text.trim() : _emailCtrl.text.trim();
@@ -225,6 +250,62 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                         keyboardType: TextInputType.phone,
                         isError: _showErrors && !_isPhoneValid,
                         errorMessage: 'Phone number is required',
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Input 3b: UPI ID / VPA for Fee Collection QR
+                      _buildField(
+                        label: 'RECEIVE PAYMENTS (UPI ID / VPA)',
+                        controller: _upiCtrl,
+                        hintText: 'e.g. 9457464850@upi or yourname@okaxis',
+                        prefixIcon: Icons.qr_code_2_rounded,
+                        keyboardType: TextInputType.emailAddress,
+                        errorMessage: 'Enter a valid UPI ID',
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: ['@okaxis', '@okhdfcbank', '@paytm', '@ybl', '@upi'].map((suffix) {
+                          return InkWell(
+                            onTap: () {
+                              final cleanPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+                              final prefix = cleanPhone.length >= 10
+                                  ? cleanPhone.substring(cleanPhone.length - 10)
+                                  : (_upiCtrl.text.split('@').first.isNotEmpty
+                                      ? _upiCtrl.text.split('@').first
+                                      : '9457464850');
+                              _upiCtrl.text = '$prefix$suffix';
+                              setState(() {});
+                            },
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Text(
+                                suffix,
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F766E)),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 6),
+                      const Row(
+                        children: [
+                          Icon(Icons.verified_user_outlined, size: 13, color: Color(0xFF0D9488)),
+                          SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              'Direct Bank Settlement: In-app fee collection QR codes will credit directly to this UPI ID.',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 14),
 

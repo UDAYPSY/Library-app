@@ -910,7 +910,7 @@ Future<void> showCollectPaymentModal(
                         );
                         return;
                       }
-                      _showUpiQrDialog(sheetContext, student, amount, service.profile.libraryName);
+                      _showUpiQrDialog(sheetContext, student, amount, service.profile);
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
@@ -1188,10 +1188,13 @@ Widget _methodButton(String label, IconData icon, bool isSelected, bool isDark, 
   );
 }
 
-void _showUpiQrDialog(BuildContext context, StudentInfo student, int amount, String libraryName) {
-  final cleanName = Uri.encodeComponent(libraryName.isNotEmpty ? libraryName : 'Library');
-  final cleanNote = Uri.encodeComponent('Fee: ${student.name}');
-  final upiUri = 'upi://pay?pa=9457464850@upi&pn=$cleanName&am=$amount&cu=INR&tn=$cleanNote';
+void _showUpiQrDialog(BuildContext context, StudentInfo student, int amount, LibraryProfile profile) {
+  final upiUri = profile.generateUpiPaymentUrl(
+    amount: amount,
+    studentName: student.name,
+    note: 'Fee: ${student.name}',
+  );
+  final payeeUpi = profile.effectiveUpiId;
 
   showDialog(
     context: context,
@@ -1259,6 +1262,39 @@ void _showUpiQrDialog(BuildContext context, StudentInfo student, int amount, Str
             ),
           ),
           const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.account_balance_wallet_outlined, size: 14, color: Color(0xFF0F766E)),
+                const SizedBox(width: 6),
+                Text(
+                  payeeUpi,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: payeeUpi));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('UPI ID copied to clipboard!')),
+                    );
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(2.0),
+                    child: Icon(Icons.copy_rounded, size: 14, color: Color(0xFF0D9488)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
           const Text(
             'Scan with GPay, PhonePe, Paytm, or BHIM',
             textAlign: TextAlign.center,

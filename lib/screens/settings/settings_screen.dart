@@ -396,6 +396,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final nameCtrl = TextEditingController(text: p.adminName);
     final emailCtrl = TextEditingController(text: p.adminEmail);
     final phoneCtrl = TextEditingController(text: p.adminPhone);
+    final upiCtrl = TextEditingController(text: p.upiId);
     final libCtrl = TextEditingController(text: p.libraryName);
     final cityCtrl = TextEditingController(text: p.city);
 
@@ -442,6 +443,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 12),
               TextField(
+                controller: upiCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Payment UPI ID / VPA',
+                  helperText: 'UPI ID credited when students scan in-app fee QR codes',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.qr_code_2_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
                 controller: libCtrl,
                 decoration: const InputDecoration(labelText: 'Library Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.local_library_outlined)),
               ),
@@ -464,6 +475,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     p.adminName = nameCtrl.text.trim();
                     p.adminEmail = emailCtrl.text.trim();
                     p.adminPhone = phoneCtrl.text.trim();
+                    if (upiCtrl.text.trim().isNotEmpty) {
+                      p.upiId = upiCtrl.text.trim();
+                    }
                     p.libraryName = libCtrl.text.trim();
                     p.city = cityCtrl.text.trim();
                     await _service.persistAll();

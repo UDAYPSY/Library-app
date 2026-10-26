@@ -23,10 +23,32 @@ class LibraryProfile {
   String adminName;
   String adminEmail;
   String adminPhone;
+  String upiId;
   String logoEmblem;
   String? logoBase64;
   String? logoUrl;
   String tagline;
+
+  String get effectiveUpiId {
+    if (upiId.trim().isNotEmpty) return upiId.trim();
+    final cleanPhone = adminPhone.replaceAll(RegExp(r'\D'), '');
+    if (cleanPhone.length >= 10) {
+      final p10 = cleanPhone.substring(cleanPhone.length - 10);
+      return '$p10@upi';
+    }
+    return '9457464850@upi';
+  }
+
+  String generateUpiPaymentUrl({
+    required int amount,
+    required String studentName,
+    String? note,
+  }) {
+    final vpa = effectiveUpiId;
+    final name = Uri.encodeComponent(libraryName.isNotEmpty ? libraryName : 'Library');
+    final memo = Uri.encodeComponent(note ?? 'Fee: $studentName');
+    return 'upi://pay?pa=$vpa&pn=$name&am=$amount&cu=INR&tn=$memo';
+  }
 
   bool get hasCustomLogo => (logoBase64 != null && logoBase64!.isNotEmpty) || (logoUrl != null && logoUrl!.isNotEmpty);
   int whatsappCredits;
@@ -66,6 +88,7 @@ class LibraryProfile {
     this.adminName = 'Nivi',
     this.adminEmail = 'manageyourlib@gmail.com',
     this.adminPhone = '9457464850',
+    this.upiId = '9457464850@upi',
     this.logoEmblem = 'Book & Torch',
     this.logoBase64,
     this.logoUrl,
@@ -97,6 +120,7 @@ class LibraryProfile {
     String? adminName,
     String? adminEmail,
     String? adminPhone,
+    String? upiId,
     String? logoEmblem,
     String? logoBase64,
     String? logoUrl,
@@ -127,6 +151,7 @@ class LibraryProfile {
       adminName: adminName ?? this.adminName,
       adminEmail: adminEmail ?? this.adminEmail,
       adminPhone: adminPhone ?? this.adminPhone,
+      upiId: upiId ?? this.upiId,
       logoEmblem: logoEmblem ?? this.logoEmblem,
       logoBase64: logoBase64 ?? this.logoBase64,
       logoUrl: logoUrl ?? this.logoUrl,
@@ -160,6 +185,7 @@ class LibraryProfile {
       'admin_name': adminName,
       'admin_email': adminEmail,
       'admin_phone': adminPhone,
+      'upi_id': upiId,
       'logo_emblem': logoEmblem,
       'logo_base64': logoBase64,
       'logo_url': logoUrl,
@@ -193,6 +219,7 @@ class LibraryProfile {
       adminName: map['admin_name'] ?? 'Nivi',
       adminEmail: map['admin_email'] ?? '',
       adminPhone: map['admin_phone'] ?? '',
+      upiId: map['upi_id'] ?? '9457464850@upi',
       logoEmblem: map['logo_emblem'] ?? 'Book & Torch',
       logoBase64: map['logo_base64'] as String?,
       logoUrl: map['logo_url'] as String?,

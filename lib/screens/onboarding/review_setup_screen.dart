@@ -309,6 +309,84 @@ class ReviewSetupScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 14),
+
+                    // UPI Payment QR Fee Settlement Card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.3)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D9488).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF0D9488), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'UPI Fee Collection QR',
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textNavy),
+                                    ),
+                                    Text(
+                                      'Direct instant payments via GPay, PhonePe, Paytm',
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'READY',
+                                  style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Payee UPI ID / VPA:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              Text(
+                                service.profile.effectiveUpiId,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Settlement Mode:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              Text('Direct to Bank (0% Fee)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 20),
 
                     // Reassurance footnote
