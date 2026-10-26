@@ -511,39 +511,42 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   }
 
   Future<void> _sendWhatsApp(StudentInfo s) async {
-    final cleanPhone = s.phone.replaceAll(RegExp(r'\D'), '');
-    final duesText = s.duesAmount > 0 ? 'Pending dues: ₹${s.duesAmount}. ' : '';
-    final msg =
-        'Hello ${s.name}, greetings from ${_service.profile.libraryName}! Your library seat (${s.seatNumber != null ? "Seat #${s.seatNumber}" : "Unallocated"}) renewal is due. ${duesText}Monthly fee is ₹${s.monthlyFee}. Please visit the reception.';
-    final uri = Uri.parse('https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(msg)}');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri);
+    final msg = s.note.isNotEmpty
+        ? _service.formatTemplate(_service.profile.followupTemplate, student: s)
+        : _service.formatTemplate(_service.profile.reminderTemplate, student: s);
+    final ok = await LibraryService.sendWhatsAppDirect(phone: s.phone, message: msg);
+    if (!ok) {
+      Clipboard.setData(ClipboardData(text: msg));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open WhatsApp. Message copied to clipboard!'), behavior: SnackBarBehavior.floating),
+        );
       }
-    } catch (_) {}
+    }
   }
 
   Future<void> _sendSmsReminder(StudentInfo s) async {
-    final cleanPhone = s.phone.replaceAll(RegExp(r'\D'), '');
-    final duesText = s.duesAmount > 0 ? 'Due: Rs.${s.duesAmount}. ' : '';
-    final msg =
-        'Dear ${s.name}, reminder for library fee Rs.${s.monthlyFee}. ${duesText}Please pay at reception. - ${_service.profile.libraryName}';
-    final uri = Uri.parse('sms:$cleanPhone?body=${Uri.encodeComponent(msg)}');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
+    final msg = s.note.isNotEmpty
+        ? _service.formatTemplate(_service.profile.followupTemplate, student: s)
+        : _service.formatTemplate(_service.profile.reminderTemplate, student: s);
+    final ok = await LibraryService.sendSmsDirect(phone: s.phone, message: msg);
+    if (!ok) {
+      Clipboard.setData(ClipboardData(text: msg));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open SMS app. Message copied to clipboard!'), behavior: SnackBarBehavior.floating),
+        );
       }
-    } catch (_) {}
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('SMS reminder sent to ${s.name} (${s.phone})'),
-          backgroundColor: Colors.black87,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('SMS dispatched to ${s.name} (${s.phone})'),
+            backgroundColor: Colors.black87,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 

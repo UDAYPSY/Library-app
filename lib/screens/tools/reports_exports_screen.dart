@@ -33,18 +33,31 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
   }
 
   Future<void> _shareViaWhatsApp(String text, {String? phone}) async {
-    final encoded = Uri.encodeComponent(text);
     final phoneClean = phone != null ? LibraryService.normalizePhone(phone) : '';
-    final uri = phoneClean.isNotEmpty && phoneClean.length >= 10
-        ? Uri.parse('https://wa.me/91$phoneClean?text=$encoded')
-        : Uri.parse('https://wa.me/?text=$encoded');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri);
+    if (phoneClean.isNotEmpty && phoneClean.length >= 10) {
+      final ok = await LibraryService.sendWhatsAppDirect(phone: phoneClean, message: text);
+      if (!ok) {
+        Clipboard.setData(ClipboardData(text: text));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Report copied to clipboard! Ready to paste into WhatsApp.'), behavior: SnackBarBehavior.floating),
+          );
+        }
       }
-    } catch (_) {}
+    } else {
+      final encoded = Uri.encodeComponent(text);
+      final uri = Uri.parse('https://wa.me/?text=$encoded');
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        Clipboard.setData(ClipboardData(text: text));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Report copied to clipboard!'), behavior: SnackBarBehavior.floating),
+          );
+        }
+      }
+    }
   }
 
   String _cleanCsvField(String field) {

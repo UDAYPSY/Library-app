@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/library_models.dart';
 import 'local_storage_service.dart';
 
@@ -2855,6 +2856,7 @@ class LibraryService {
     String? welcomeTpl,
     String? reminderTpl,
     String? receiptTpl,
+    String? followupTpl,
   }) {
     if (notifications != null) profile.whatsappNotifications = notifications;
     if (autoReminders != null) profile.autoFeeReminders = autoReminders;
@@ -2866,6 +2868,7 @@ class LibraryService {
     if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
     if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
     if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+    if (followupTpl != null) profile.followupTemplate = followupTpl;
     _saveLocalState();
 
     if (isFirebaseConnected) {
@@ -2888,6 +2891,91 @@ class LibraryService {
       _saveLocalState();
       return true;
     }
+    return false;
+  }
+
+  String formatTemplate(
+    String tpl, {
+    required StudentInfo student,
+    int? amount,
+    DateTime? dueDate,
+    String? customNote,
+  }) {
+    final dueStr = dueDate != null
+        ? DateFormat('dd MMM yyyy').format(dueDate)
+        : (student.feeDueDate != null ? DateFormat('dd MMM yyyy').format(student.feeDueDate!) : 'Due Soon');
+    final dueAmt = amount ?? (student.effectiveDues > 0 ? student.effectiveDues : student.monthlyFee);
+    final noteText = (customNote != null && customNote.trim().isNotEmpty)
+        ? customNote.trim()
+        : (student.note.trim().isNotEmpty ? student.note.trim() : 'Regular seat follow-up');
+
+    return tpl
+        .replaceAll('{student_name}', student.name)
+        .replaceAll('{seat_number}', student.seatNumber != null ? '${student.seatNumber}' : 'Unallocated')
+        .replaceAll('{shift}', student.shift)
+        .replaceAll('{due_amount}', '$dueAmt')
+        .replaceAll('{due_date}', dueStr)
+        .replaceAll('{amount}', '$dueAmt')
+        .replaceAll('{mode}', student.paymentMode)
+        .replaceAll('{valid_until}', dueStr)
+        .replaceAll('{library_name}', profile.libraryName)
+        .replaceAll('{note}', noteText)
+        .replaceAll('{phone}', student.phone)
+        .replaceAll('{status}', student.status);
+  }
+
+  static Future<bool> sendWhatsAppDirect({
+    required String phone,
+    required String message,
+  }) async {
+    final cleanPhone = normalizePhone(phone);
+    final phoneClean = cleanPhone.length == 10 ? '91$cleanPhone' : cleanPhone;
+    final encoded = Uri.encodeComponent(message);
+
+    // 1. WhatsApp Universal URL
+    final waUri = Uri.parse('https://wa.me/$phoneClean?text=$encoded');
+    try {
+      if (await launchUrl(waUri, mode: LaunchMode.externalApplication)) {
+        return true;
+      }
+    } catch (_) {}
+
+    // 2. WhatsApp native scheme fallback
+    final nativeUri = Uri.parse('whatsapp://send?phone=$phoneClean&text=$encoded');
+    try {
+      if (await launchUrl(nativeUri, mode: LaunchMode.externalApplication)) {
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      if (await launchUrl(waUri)) {
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
+  static Future<bool> sendSmsDirect({
+    required String phone,
+    required String message,
+  }) async {
+    final cleanPhone = normalizePhone(phone);
+    final encoded = Uri.encodeComponent(message);
+    final smsUri = Uri.parse('sms:$cleanPhone?body=$encoded');
+    try {
+      if (await launchUrl(smsUri, mode: LaunchMode.externalApplication)) {
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      if (await launchUrl(smsUri)) {
+        return true;
+      }
+    } catch (_) {}
+
     return false;
   }
 }

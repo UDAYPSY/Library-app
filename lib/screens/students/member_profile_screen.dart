@@ -73,14 +73,330 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
   }
 
   void _openWhatsApp() {
-    final cleanPhone = LibraryService.normalizePhone(_student.phone);
-    final url = 'https://wa.me/91$cleanPhone?text=${Uri.encodeComponent('Hello ${_student.name}, this is from ${_service.profile.libraryName}.')}';
-    _launchUrlStr(url);
+    _showMessagingModal(isWhatsApp: true);
   }
 
   void _openSms() {
-    final cleanPhone = LibraryService.normalizePhone(_student.phone);
-    _launchUrlStr('sms:$cleanPhone');
+    _showMessagingModal(isWhatsApp: false);
+  }
+
+  void _showMessagingModal({required bool isWhatsApp}) {
+    String selectedTab = 'Follow-up';
+    bool useWhatsApp = isWhatsApp;
+    
+    final noteCtrl = TextEditingController(text: _student.note);
+    final messageCtrl = TextEditingController();
+
+    String generateMessage(String tab, String currentNote) {
+      if (tab == 'Follow-up') {
+        return _service.formatTemplate(
+          _service.profile.followupTemplate,
+          student: _student,
+          customNote: currentNote,
+        );
+      } else if (tab == 'Fee Reminder') {
+        return _service.formatTemplate(
+          _service.profile.reminderTemplate,
+          student: _student,
+        );
+      } else if (tab == 'Welcome Pass') {
+        return _service.formatTemplate(
+          _service.profile.welcomeTemplate,
+          student: _student,
+        );
+      } else {
+        return 'Hello ${_student.name}, this is from ${_service.profile.libraryName}.';
+      }
+    }
+
+    messageCtrl.text = generateMessage(selectedTab, _student.note);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: useWhatsApp ? const Color(0xFFECFDF5) : const Color(0xFFF0F9FF),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              useWhatsApp ? Icons.chat_bubble_outline_rounded : Icons.sms_outlined,
+                              color: useWhatsApp ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                useWhatsApp ? 'Send WhatsApp' : 'Send SMS',
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                              ),
+                              Text(
+                                'To: ${_student.name} (${_student.phone})',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Channel Toggle (WhatsApp / SMS)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(3),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setModalState(() => useWhatsApp = true),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: useWhatsApp ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: useWhatsApp ? const [BoxShadow(color: Color(0x0A000000), blurRadius: 4)] : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.chat_bubble_outline_rounded, size: 16, color: useWhatsApp ? const Color(0xFF10B981) : const Color(0xFF64748B)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'WhatsApp',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      color: useWhatsApp ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setModalState(() => useWhatsApp = false),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: !useWhatsApp ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: !useWhatsApp ? const [BoxShadow(color: Color(0x0A000000), blurRadius: 4)] : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.sms_outlined, size: 16, color: !useWhatsApp ? const Color(0xFF0284C7) : const Color(0xFF64748B)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'SMS',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      color: !useWhatsApp ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Template Selection Chips
+                  const Text('Select Message Template:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: ['Follow-up', 'Fee Reminder', 'Welcome Pass', 'Custom'].map((t) {
+                        final isSel = selectedTab == t;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(t, style: TextStyle(fontWeight: FontWeight.w800, color: isSel ? Colors.white : AppColors.textNavy, fontSize: 12)),
+                            selected: isSel,
+                            selectedColor: useWhatsApp ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            onSelected: (_) {
+                              setModalState(() {
+                                selectedTab = t;
+                                messageCtrl.text = generateMessage(t, noteCtrl.text);
+                              });
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Note editor if Follow-up is selected
+                  if (selectedTab == 'Follow-up') ...[
+                    const Text('Student Follow-up Note / Remarks:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: noteCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Discussed fee extension till Friday; wants quiet zone...',
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
+                      onChanged: (val) {
+                        setModalState(() {
+                          messageCtrl.text = generateMessage('Follow-up', val);
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // Editable Message Preview
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Message to be sent:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy)),
+                      Text('(Fully Editable)', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: messageCtrl,
+                    maxLines: 5,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.all(12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Action Buttons: Send & Copy
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: useWhatsApp ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 0,
+                            ),
+                            icon: Icon(useWhatsApp ? Icons.chat_bubble_outline_rounded : Icons.sms_outlined, size: 20),
+                            label: Text(
+                              useWhatsApp ? 'Send on WhatsApp' : 'Send via SMS',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                            ),
+                            onPressed: () async {
+                              final textToSend = messageCtrl.text.trim();
+                              if (noteCtrl.text.trim() != _student.note) {
+                                final updated = _student.copyWith(note: noteCtrl.text.trim());
+                                await _service.updateStudent(updated);
+                                _refreshStudent();
+                              }
+                              Navigator.pop(ctx);
+                              if (useWhatsApp) {
+                                _service.useWhatsAppCredit(1);
+                                final sent = await LibraryService.sendWhatsAppDirect(
+                                  phone: _student.phone,
+                                  message: textToSend,
+                                );
+                                if (!sent) {
+                                  Clipboard.setData(ClipboardData(text: textToSend));
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Could not open WhatsApp. Message copied to clipboard!')),
+                                    );
+                                  }
+                                }
+                              } else {
+                                final sent = await LibraryService.sendSmsDirect(
+                                  phone: _student.phone,
+                                  message: textToSend,
+                                );
+                                if (!sent) {
+                                  Clipboard.setData(ClipboardData(text: textToSend));
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Could not open SMS app. Message copied to clipboard!')),
+                                    );
+                                  }
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: IconButton(
+                          tooltip: 'Copy Message',
+                          icon: const Icon(Icons.copy_rounded, color: AppColors.textNavy),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: messageCtrl.text.trim()));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Message copied to clipboard!'), behavior: SnackBarBehavior.floating),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _openDialer() {

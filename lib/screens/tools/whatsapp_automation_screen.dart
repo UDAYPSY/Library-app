@@ -57,53 +57,38 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
   }
 
   Future<void> _openWhatsAppToStudent(String studentPhone, String message) async {
-    final cleanPhone = LibraryService.normalizePhone(studentPhone);
-    final phoneToUse = cleanPhone.isNotEmpty ? '91$cleanPhone' : '919457464850';
-    final uri = Uri.parse('https://wa.me/$phoneToUse?text=${Uri.encodeComponent(message)}');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri);
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open WhatsApp for $phoneToUse')),
-        );
-      }
+    final ok = await LibraryService.sendWhatsAppDirect(phone: studentPhone, message: message);
+    if (!ok && mounted) {
+      Clipboard.setData(ClipboardData(text: message));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not open WhatsApp for $studentPhone. Message copied to clipboard!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   Future<void> _openWhatsAppSupport(String message) async {
     final cleanPhone = _service.profile.adminPhone.replaceAll(RegExp(r'\D'), '');
-    final phoneToUse = cleanPhone.isNotEmpty ? '91$cleanPhone' : '919457464850';
-    final uri = Uri.parse('https://wa.me/$phoneToUse?text=${Uri.encodeComponent(message)}');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri);
-      }
-    } catch (_) {}
+    final phoneToUse = cleanPhone.isNotEmpty ? cleanPhone : '9457464850';
+    final ok = await LibraryService.sendWhatsAppDirect(phone: phoneToUse, message: message);
+    if (!ok && mounted) {
+      Clipboard.setData(ClipboardData(text: message));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Support text copied to clipboard!'), behavior: SnackBarBehavior.floating),
+      );
+    }
   }
 
-  String _formatTemplate(String tpl, {required StudentInfo student, int? amount, DateTime? dueDate}) {
-    final dueStr = dueDate != null
-        ? DateFormat('dd MMM yyyy').format(dueDate)
-        : (student.feeDueDate != null ? DateFormat('dd MMM yyyy').format(student.feeDueDate!) : 'Due Soon');
-    final dueAmt = amount ?? (student.effectiveDues > 0 ? student.effectiveDues : student.monthlyFee);
-
-    return tpl
-        .replaceAll('{student_name}', student.name)
-        .replaceAll('{seat_number}', student.seatNumber != null ? '${student.seatNumber}' : 'Unallocated')
-        .replaceAll('{shift}', student.shift)
-        .replaceAll('{due_amount}', '$dueAmt')
-        .replaceAll('{due_date}', dueStr)
-        .replaceAll('{amount}', '$dueAmt')
-        .replaceAll('{mode}', student.paymentMode)
-        .replaceAll('{valid_until}', dueStr)
-        .replaceAll('{library_name}', _service.profile.libraryName);
+  String _formatTemplate(String tpl, {required StudentInfo student, int? amount, DateTime? dueDate, String? customNote}) {
+    return _service.formatTemplate(
+      tpl,
+      student: student,
+      amount: amount,
+      dueDate: dueDate,
+      customNote: customNote,
+    );
   }
 
   void _sendAllDueReminders() {
@@ -316,7 +301,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: ['Reminder', 'Welcome', 'Receipt'].map((t) {
+                        children: ['Follow-up', 'Reminder', 'Welcome', 'Receipt'].map((t) {
                           final isSel = templateType == t;
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
@@ -354,7 +339,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                       )
                     else
                       SizedBox(
-                        height: 260,
+                        height: 270,
                         child: ListView.separated(
                           itemCount: filtered.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
@@ -370,24 +355,59 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                                 ),
                               ),
                               title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textNavy)),
-                              subtitle: Text('Seat #${s.seatNumber ?? "—"} • ${s.phone} • Status: ${s.status}', style: const TextStyle(fontSize: 11)),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.send_rounded, color: Color(0xFF10B981)),
-                                tooltip: 'Send WhatsApp',
-                                onPressed: () {
-                                  Navigator.pop(ctx);
-                                  _service.useWhatsAppCredit(1);
-                                  setState(() {
-                                    _credits = _service.profile.whatsappCredits;
-                                    _messagesSent = _service.profile.messagesSentCount;
-                                  });
-                                  String rawTpl = _service.profile.reminderTemplate;
-                                  if (templateType == 'Welcome') rawTpl = _service.profile.welcomeTemplate;
-                                  if (templateType == 'Receipt') rawTpl = _service.profile.receiptTemplate;
+                              subtitle: Text(
+                                'Seat #${s.seatNumber ?? "—"} • ${s.phone}${s.note.isNotEmpty ? "\nNote: ${s.note}" : ""}',
+                                style: const TextStyle(fontSize: 11),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // SMS Button
+                                  IconButton(
+                                    icon: const Icon(Icons.sms_outlined, color: Color(0xFF0284C7), size: 20),
+                                    tooltip: 'Send SMS',
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      String rawTpl = _service.profile.followupTemplate;
+                                      if (templateType == 'Reminder') rawTpl = _service.profile.reminderTemplate;
+                                      if (templateType == 'Welcome') rawTpl = _service.profile.welcomeTemplate;
+                                      if (templateType == 'Receipt') rawTpl = _service.profile.receiptTemplate;
 
-                                  final msg = _formatTemplate(rawTpl, student: s);
-                                  _openWhatsAppToStudent(s.phone, msg);
-                                },
+                                      final msg = _formatTemplate(rawTpl, student: s);
+                                      final ok = await LibraryService.sendSmsDirect(phone: s.phone, message: msg);
+                                      if (!ok) {
+                                        Clipboard.setData(ClipboardData(text: msg));
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Could not open SMS. Message for ${s.name} copied to clipboard!')),
+                                          );
+                                        }
+                                      }
+                                    },
+                                  ),
+                                  // WhatsApp Button
+                                  IconButton(
+                                    icon: const Icon(Icons.send_rounded, color: Color(0xFF10B981), size: 20),
+                                    tooltip: 'Send WhatsApp',
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      _service.useWhatsAppCredit(1);
+                                      setState(() {
+                                        _credits = _service.profile.whatsappCredits;
+                                        _messagesSent = _service.profile.messagesSentCount;
+                                      });
+                                      String rawTpl = _service.profile.followupTemplate;
+                                      if (templateType == 'Reminder') rawTpl = _service.profile.reminderTemplate;
+                                      if (templateType == 'Welcome') rawTpl = _service.profile.welcomeTemplate;
+                                      if (templateType == 'Receipt') rawTpl = _service.profile.receiptTemplate;
+
+                                      final msg = _formatTemplate(rawTpl, student: s);
+                                      _openWhatsAppToStudent(s.phone, msg);
+                                    },
+                                  ),
+                                ],
                               ),
                             );
                           },
@@ -407,6 +427,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
     final welcomeCtrl = TextEditingController(text: _service.profile.welcomeTemplate);
     final reminderCtrl = TextEditingController(text: _service.profile.reminderTemplate);
     final receiptCtrl = TextEditingController(text: _service.profile.receiptTemplate);
+    final followupCtrl = TextEditingController(text: _service.profile.followupTemplate);
 
     showModalBottomSheet(
       context: context,
@@ -434,8 +455,18 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Available dynamic tags: {student_name}, {seat_number}, {due_amount}, {due_date}, {library_name}, {shift}, {mode}',
-                style: TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.w700),
+                'Available dynamic tags:\n{student_name}, {seat_number}, {due_amount}, {due_date}, {library_name}, {shift}, {note}, {mode}, {phone}',
+                style: TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.w700, height: 1.3),
+              ),
+              const SizedBox(height: 14),
+              const Text('Follow-up Note Template (Uses Student Note)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
+              const SizedBox(height: 4),
+              const Text('📌 Tip: {note} automatically pulls remarks & follow-up notes from the student profile.', style: TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontStyle: FontStyle.italic)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: followupCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'Follow-up template with {note}...'),
               ),
               const SizedBox(height: 14),
               const Text('Welcome Note Template', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textNavy)),
@@ -475,6 +506,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                       welcomeTpl: welcomeCtrl.text.trim(),
                       reminderTpl: reminderCtrl.text.trim(),
                       receiptTpl: receiptCtrl.text.trim(),
+                      followupTpl: followupCtrl.text.trim(),
                     );
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -487,6 +519,321 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _openFollowupMessengerSheet([StudentInfo? initialStudent]) {
+    StudentInfo? selectedStudent = initialStudent;
+    String search = '';
+    TextEditingController? noteCtrl;
+    TextEditingController? messageCtrl;
+
+    void initControllers(StudentInfo s, StateSetter setModalState) {
+      selectedStudent = s;
+      noteCtrl = TextEditingController(text: s.note);
+      final initialMsg = _service.formatTemplate(
+        _service.profile.followupTemplate,
+        student: s,
+        customNote: s.note,
+      );
+      messageCtrl = TextEditingController(text: initialMsg);
+      noteCtrl!.addListener(() {
+        final newMsg = _service.formatTemplate(
+          _service.profile.followupTemplate,
+          student: s,
+          customNote: noteCtrl!.text,
+        );
+        setModalState(() {
+          messageCtrl!.text = newMsg;
+        });
+      });
+    }
+
+    if (initialStudent != null) {
+      noteCtrl = TextEditingController(text: initialStudent.note);
+      final initialMsg = _service.formatTemplate(
+        _service.profile.followupTemplate,
+        student: initialStudent,
+        customNote: initialStudent.note,
+      );
+      messageCtrl = TextEditingController(text: initialMsg);
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) {
+          final all = _service.currentStudents;
+          final filtered = all.where((s) {
+            final q = search.trim().toLowerCase();
+            if (q.isEmpty) return true;
+            return s.name.toLowerCase().contains(q) ||
+                s.phone.contains(q) ||
+                (s.seatNumber != null && '${s.seatNumber}'.contains(q));
+          }).toList();
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.assignment_ind_rounded, color: Color(0xFF0D9488), size: 22),
+                          SizedBox(width: 8),
+                          Text(
+                            'Follow-up Messenger',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                          ),
+                        ],
+                      ),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const Text(
+                    'Send customized follow-up reminders incorporating student notes.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 14),
+
+                  if (selectedStudent == null) ...[
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search student for follow-up...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
+                      onChanged: (v) => setModalState(() => search = v),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 260,
+                      child: filtered.isEmpty
+                          ? const Center(child: Text('No students found', style: TextStyle(color: Color(0xFF94A3B8))))
+                          : ListView.separated(
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              itemBuilder: (_, i) {
+                                final st = filtered[i];
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: CircleAvatar(
+                                    backgroundColor: const Color(0xFFCCFBF1),
+                                    child: Text(
+                                      st.name.isNotEmpty ? st.name[0].toUpperCase() : 'S',
+                                      style: const TextStyle(color: Color(0xFF0D9488), fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                  title: Text(st.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textNavy)),
+                                  subtitle: Text(
+                                    'Seat #${st.seatNumber ?? "—"} • ${st.shift} • Note: ${st.note.isNotEmpty ? st.note : "None"}',
+                                    style: const TextStyle(fontSize: 11),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+                                  onTap: () {
+                                    setModalState(() {
+                                      initControllers(st, setModalState);
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDFA),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF99F6E4)),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: const Color(0xFF0D9488),
+                            child: Text(
+                              selectedStudent!.name.isNotEmpty ? selectedStudent!.name[0].toUpperCase() : 'S',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedStudent!.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.textNavy),
+                                ),
+                                Text(
+                                  'Seat #${selectedStudent!.seatNumber ?? "—"} (${selectedStudent!.shift}) • Due: ₹${selectedStudent!.effectiveDues > 0 ? selectedStudent!.effectiveDues : selectedStudent!.monthlyFee}',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF0F766E), fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => setModalState(() => selectedStudent = null),
+                            child: const Text('Change', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0D9488))),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    const Text('Student Follow-up Note / Remarks:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.textNavy)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: noteCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Requested 2 days extension; Exam approaching...',
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
+                      onChanged: (val) {
+                        setModalState(() {
+                          messageCtrl?.text = _service.formatTemplate(
+                            _service.profile.followupTemplate,
+                            student: selectedStudent!,
+                            customNote: val,
+                          );
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Personalized Follow-up Message:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.textNavy)),
+                        Text('(Editable)', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: messageCtrl,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                            label: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                            onPressed: () async {
+                              final textToSend = messageCtrl?.text.trim() ?? '';
+                              if (noteCtrl != null && noteCtrl!.text.trim() != selectedStudent!.note) {
+                                await _service.updateStudent(selectedStudent!.copyWith(note: noteCtrl!.text.trim()));
+                              }
+                              _service.useWhatsAppCredit(1);
+                              setState(() {
+                                _credits = _service.profile.whatsappCredits;
+                                _messagesSent = _service.profile.messagesSentCount;
+                              });
+                              Navigator.pop(ctx);
+                              final ok = await LibraryService.sendWhatsAppDirect(
+                                phone: selectedStudent!.phone,
+                                message: textToSend,
+                              );
+                              if (!ok) {
+                                Clipboard.setData(ClipboardData(text: textToSend));
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Could not open WhatsApp. Message copied to clipboard!')),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0284C7),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(Icons.sms_outlined, size: 18),
+                            label: const Text('SMS', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                            onPressed: () async {
+                              final textToSend = messageCtrl?.text.trim() ?? '';
+                              if (noteCtrl != null && noteCtrl!.text.trim() != selectedStudent!.note) {
+                                await _service.updateStudent(selectedStudent!.copyWith(note: noteCtrl!.text.trim()));
+                              }
+                              Navigator.pop(ctx);
+                              final ok = await LibraryService.sendSmsDirect(
+                                phone: selectedStudent!.phone,
+                                message: textToSend,
+                              );
+                              if (!ok) {
+                                Clipboard.setData(ClipboardData(text: textToSend));
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Could not open SMS. Message copied to clipboard!')),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: 'Copy Message',
+                          icon: const Icon(Icons.copy_rounded, color: AppColors.textNavy),
+                          onPressed: () {
+                            final textToSend = messageCtrl?.text.trim() ?? '';
+                            Clipboard.setData(ClipboardData(text: textToSend));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Message copied to clipboard!'), behavior: SnackBarBehavior.floating),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -909,6 +1256,22 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                       icon: const Icon(Icons.person_search_rounded, size: 18),
                       label: const Text('Choose Specific Students', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                       onPressed: _openChooseSpecificStudentsSheet,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0D9488),
+                        backgroundColor: const Color(0xFFF0FDFA),
+                        side: const BorderSide(color: Color(0xFF99F6E4)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.assignment_ind_rounded, size: 18),
+                      label: const Text('Follow-up with Student Notes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                      onPressed: () => _openFollowupMessengerSheet(),
                     ),
                   ),
                 ],

@@ -1157,5 +1157,33 @@ void main() {
       expect(paysMulti.first.amount, equals(600));
       expect(paysMulti.first.shift, equals('Evening Shift'));
     });
+
+    test('Follow-up template and {note} interpolation format properly', () {
+      final service = LibraryService();
+      final dummyStudent = StudentInfo(
+        id: 'st_followup_test',
+        name: 'Aarav Sharma',
+        phone: '9876543210',
+        seatNumber: 42,
+        shift: 'Morning Shift',
+        monthlyFee: 800,
+        duesAmount: 300,
+        note: 'Requested 3 days fee extension for exams',
+      );
+
+      service.saveWhatsAppSettings(
+        followupTpl: 'Hi {student_name}, note on file: {note}. Due: ₹{due_amount}.',
+      );
+
+      final formatted = service.formatTemplate(
+        service.profile.followupTemplate,
+        student: dummyStudent,
+      );
+
+      expect(formatted.contains('Aarav Sharma'), isTrue);
+      expect(formatted.contains('Requested 3 days fee extension for exams'), isTrue);
+      expect(formatted.contains('₹300'), isTrue);
+    });
   });
 }
+

@@ -41,6 +41,7 @@ class LibraryProfile {
   String welcomeTemplate;
   String reminderTemplate;
   String receiptTemplate;
+  String followupTemplate;
   DateTime? trialStartedAt;
   DateTime? subscriptionExpiresAt;
 
@@ -78,6 +79,7 @@ class LibraryProfile {
     this.welcomeTemplate = 'Hello {student_name}, welcome to {library_name}! Your reserved seat is Seat S-{seat_number} ({shift}). Happy studying!',
     this.reminderTemplate = 'Dear {student_name}, this is a gentle reminder that your seat fee of ₹{due_amount} at {library_name} is due on {due_date}. Thank you!',
     this.receiptTemplate = 'Payment Received! Dear {student_name}, we have received ₹{amount} via {mode} for your seat renewal at {library_name}. Valid until {valid_until}.',
+    this.followupTemplate = 'Hello {student_name}, this is a follow-up from {library_name} regarding your seat S-{seat_number} ({shift}).\n\n📌 Note: {note}\n\nDue Amount: ₹{due_amount} (Date: {due_date}). Please confirm your renewal or share your update.',
     this.trialStartedAt,
     this.subscriptionExpiresAt,
   });
@@ -105,6 +107,7 @@ class LibraryProfile {
     String? welcomeTemplate,
     String? reminderTemplate,
     String? receiptTemplate,
+    String? followupTemplate,
     DateTime? trialStartedAt,
     DateTime? subscriptionExpiresAt,
   }) {
@@ -131,6 +134,7 @@ class LibraryProfile {
       welcomeTemplate: welcomeTemplate ?? this.welcomeTemplate,
       reminderTemplate: reminderTemplate ?? this.reminderTemplate,
       receiptTemplate: receiptTemplate ?? this.receiptTemplate,
+      followupTemplate: followupTemplate ?? this.followupTemplate,
       trialStartedAt: trialStartedAt ?? this.trialStartedAt,
       subscriptionExpiresAt: subscriptionExpiresAt ?? this.subscriptionExpiresAt,
     );
@@ -160,6 +164,7 @@ class LibraryProfile {
       'welcome_template': welcomeTemplate,
       'reminder_template': reminderTemplate,
       'receipt_template': receiptTemplate,
+      'followup_template': followupTemplate,
       'trial_started_at': trialStartedAt?.toIso8601String(),
       'subscription_expires_at': subscriptionExpiresAt?.toIso8601String(),
     };
@@ -189,6 +194,7 @@ class LibraryProfile {
       welcomeTemplate: map['welcome_template'] ?? 'Hello {student_name}, welcome to {library_name}! Your reserved seat is Seat S-{seat_number} ({shift}). Happy studying!',
       reminderTemplate: map['reminder_template'] ?? 'Dear {student_name}, this is a gentle reminder that your seat fee of ₹{due_amount} at {library_name} is due on {due_date}. Thank you!',
       receiptTemplate: map['receipt_template'] ?? 'Payment Received! Dear {student_name}, we have received ₹{amount} via {mode} for your seat renewal at {library_name}. Valid until {valid_until}.',
+      followupTemplate: map['followup_template'] ?? 'Hello {student_name}, this is a follow-up from {library_name} regarding your seat S-{seat_number} ({shift}).\n\n📌 Note: {note}\n\nDue Amount: ₹{due_amount} (Date: {due_date}). Please confirm your renewal or share your update.',
       trialStartedAt: map['trial_started_at'] != null ? DateTime.tryParse(map['trial_started_at']) : null,
       subscriptionExpiresAt: map['subscription_expires_at'] != null ? DateTime.tryParse(map['subscription_expires_at']) : null,
     );

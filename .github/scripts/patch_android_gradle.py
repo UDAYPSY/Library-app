@@ -34,11 +34,39 @@ def patch_gradle_files():
             f.write(content)
         print(f"Successfully patched {file_path}")
 
-    # Print out patched file for verification in CI logs
-    for file_path in gradle_files:
-        print(f"\n=== Content of {file_path} ===")
-        with open(file_path, 'r', encoding='utf-8') as f:
-            print(f.read())
+def patch_manifest():
+    manifest_paths = ['android/app/src/main/AndroidManifest.xml']
+    queries_block = """    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="sms" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
+</manifest>"""
+    for path in manifest_paths:
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            if '<queries>' not in content and '</manifest>' in content:
+                content = content.replace('</manifest>', queries_block)
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print(f"Injected <queries> into {path}")
 
 if __name__ == '__main__':
     patch_gradle_files()
+    patch_manifest()
