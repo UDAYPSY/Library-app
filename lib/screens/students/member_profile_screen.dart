@@ -431,7 +431,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
         },
       ),
     );
-
+  }
 
   void _openDialer() {
     final cleanPhone = LibraryService.normalizePhone(_student.phone);
