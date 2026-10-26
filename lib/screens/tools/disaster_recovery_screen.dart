@@ -59,7 +59,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                 ? 'Automatic Google Drive sync scheduled for daily export.'
                 : 'Automatic sync paused. Manual backup remains active anytime.',
           ),
-          backgroundColor: AppColors.primaryIndigo,
+          backgroundColor: AppColors.primaryTeal,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -74,7 +74,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.mark_email_read_outlined, color: AppColors.primaryIndigo),
+            Icon(Icons.mark_email_read_outlined, color: AppColors.primaryTeal),
             SizedBox(width: 10),
             Text('Backup Google Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ],
@@ -106,7 +106,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryIndigo,
+              backgroundColor: AppColors.primaryTeal,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -182,7 +182,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
             actions: [
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryIndigo,
+                  backgroundColor: AppColors.primaryTeal,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -279,7 +279,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
             actions: [
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryIndigo,
+                  backgroundColor: AppColors.primaryTeal,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -411,7 +411,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                             actions: [
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryIndigo,
+                                  backgroundColor: AppColors.primaryTeal,
                                   foregroundColor: Colors.white,
                                 ),
                                 onPressed: () {
@@ -474,7 +474,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(color: AppColors.primaryIndigo),
+                  CircularProgressIndicator(color: AppColors.primaryTeal),
                   SizedBox(height: 16),
                   Text('Processing disaster recovery operation...',
                       style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
@@ -654,10 +654,10 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                                 children: [
                                   Text(
                                     _backupEmail.isNotEmpty ? _backupEmail : 'Set Google Account',
-                                    style: const TextStyle(fontSize: 13, color: AppColors.primaryIndigo, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(fontSize: 13, color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(width: 4),
-                                  const Icon(Icons.edit_outlined, size: 14, color: AppColors.primaryIndigo),
+                                  const Icon(Icons.edit_outlined, size: 14, color: AppColors.primaryTeal),
                                 ],
                               ),
                             ),
