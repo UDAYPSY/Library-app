@@ -586,6 +586,212 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showSecurityModal() {
+    final currentPassCtrl = TextEditingController();
+    final newPassCtrl = TextEditingController();
+    final confirmPassCtrl = TextEditingController();
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 24,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.shield_rounded, color: Color(0xFF2563EB), size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'Security & Authentication',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                        ),
+                      ],
+                    ),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Cloud isolation status and master administrative credentials.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+
+                // Cloud Tenant & Security Status Badge
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _service.isFirebaseConnected ? Icons.verified_user_rounded : Icons.cloud_off_rounded,
+                            color: _service.isFirebaseConnected ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _service.isFirebaseConnected ? 'Cloud Tenant Isolated (Firestore)' : 'Local Storage Mode',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textNavy),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Cloud Tenant ID: ${_service.tenantId}',
+                        style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF1E40AF), fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Auth Email: ${_service.currentUserEmail.isNotEmpty ? _service.currentUserEmail : _service.profile.adminEmail} • Role: ${_service.currentUserRole}',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                const Text('Change Master Admin Password', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textNavy)),
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: currentPassCtrl,
+                  obscureText: obscureCurrent,
+                  decoration: InputDecoration(
+                    labelText: 'Current Password',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureCurrent ? Icons.visibility_off : Icons.visibility, size: 20),
+                      onPressed: () => setModalState(() => obscureCurrent = !obscureCurrent),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newPassCtrl,
+                  obscureText: obscureNew,
+                  decoration: InputDecoration(
+                    labelText: 'New Password (min 6 characters)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureNew ? Icons.visibility_off : Icons.visibility, size: 20),
+                      onPressed: () => setModalState(() => obscureNew = !obscureNew),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPassCtrl,
+                  obscureText: obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility, size: 20),
+                      onPressed: () => setModalState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.lock_reset_rounded),
+                    label: const Text('Update Master Password', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    onPressed: () async {
+                      final curr = currentPassCtrl.text.trim();
+                      final newP = newPassCtrl.text.trim();
+                      final conf = confirmPassCtrl.text.trim();
+
+                      if (curr.isEmpty || newP.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please fill all password fields')),
+                        );
+                        return;
+                      }
+                      if (newP.length < 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('New password must be at least 6 characters')),
+                        );
+                        return;
+                      }
+                      if (newP != conf) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('New passwords do not match')),
+                        );
+                        return;
+                      }
+
+                      final ok = await _service.changeAdminPassword(
+                        currentPassword: curr,
+                        newPassword: newP,
+                      );
+                      if (ok) {
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Master password updated successfully in cloud and local vault!'),
+                              backgroundColor: Color(0xFF16A34A),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Incorrect current password. Please try again.'),
+                              backgroundColor: Color(0xFFDC2626),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAddBranchDialog() {
     final nameCtrl = TextEditingController();
     final addrCtrl = TextEditingController();
@@ -1848,6 +2054,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'User Management',
                   subtitle: 'Add or remove staff accounts',
                   onTap: _showUserManagementModal,
+                ),
+                _settingsTile(
+                  icon: Icons.shield_outlined,
+                  iconBg: const Color(0xFFEFF6FF),
+                  iconColor: const Color(0xFF2563EB),
+                  title: 'Security & Master Password',
+                  subtitle: 'Cloud Auth UID & Admin Password change',
+                  onTap: _showSecurityModal,
                 ),
                 _settingsTile(
                   icon: Icons.auto_fix_high_rounded,

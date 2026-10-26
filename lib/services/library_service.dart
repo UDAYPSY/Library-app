@@ -728,7 +728,12 @@ class LibraryService {
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
   // Multi-Tenant Cloud Firestore Isolation
-  String get tenantId => profile.libraryId.isNotEmpty ? profile.libraryId : 'default_library';
+  String get tenantId {
+    if (isFirebaseConnected && FirebaseAuth.instance.currentUser != null) {
+      return FirebaseAuth.instance.currentUser!.uid;
+    }
+    return profile.libraryId.isNotEmpty ? profile.libraryId : 'default_library';
+  }
 
   CollectionReference<Map<String, dynamic>> _tenantCol(String collectionName) {
     return _db.collection('libraries').doc(tenantId).collection(collectionName);
@@ -753,8 +758,18 @@ class LibraryService {
         currentUserEmail = map['email'] ?? '';
         currentUserRole = map['role'] ?? 'Admin';
         currentUserName = map['name'] ?? profile.adminName;
+        if (map['library_id'] != null && (map['library_id'] as String).isNotEmpty) {
+          profile.libraryId = map['library_id'];
+        }
         isAuthenticated = true;
       } catch (_) {}
+    }
+    if (isFirebaseConnected && FirebaseAuth.instance.currentUser != null) {
+      final fbUser = FirebaseAuth.instance.currentUser!;
+      currentUserId = fbUser.uid;
+      profile.libraryId = fbUser.uid;
+      currentUserEmail = fbUser.email ?? currentUserEmail;
+      isAuthenticated = true;
     }
   }
 
@@ -782,6 +797,7 @@ class LibraryService {
         );
         if (credential.user != null) {
           currentUserId = credential.user!.uid;
+          profile.libraryId = credential.user!.uid; // Strictly bound to Firebase Auth UID
           currentUserEmail = credential.user!.email ?? cleanId;
           currentUserRole = (cleanId.toLowerCase() == profile.adminEmail.toLowerCase())
               ? 'Admin'
@@ -795,6 +811,7 @@ class LibraryService {
               'email': currentUserEmail,
               'role': currentUserRole,
               'name': currentUserName,
+              'library_id': profile.libraryId,
             }),
           );
           return AuthResult(
@@ -936,7 +953,7 @@ class LibraryService {
         );
         if (credential.user != null) {
           currentUserId = credential.user!.uid;
-          profile.libraryId = 'lib_${credential.user!.uid.substring(0, 8)}';
+          profile.libraryId = credential.user!.uid;
         }
       } on FirebaseAuthException catch (e) {
         String msg = 'Registration failed: ${e.message ?? e.code}';
@@ -954,6 +971,9 @@ class LibraryService {
       profile.adminPhone = phone.trim();
     }
     currentUserId ??= 'admin_${DateTime.now().millisecondsSinceEpoch}';
+    if (profile.libraryId == 'lib_patna_central' || profile.libraryId.isEmpty) {
+      profile.libraryId = currentUserId!;
+    }
     currentUserName = profile.adminName;
     currentUserEmail = cleanEmail;
     currentUserRole = 'Admin';
@@ -1003,13 +1023,13 @@ class LibraryService {
       );
       final uid = credential.user?.uid ?? '';
       currentUserId = uid;
+      if (uid.isNotEmpty) {
+        profile.libraryId = uid;
+      }
       currentUserRole = 'Admin';
       currentUserEmail = credential.user?.email ?? email.trim();
       currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Administrator';
       isAuthenticated = true;
-      if (profile.libraryId.isEmpty) {
-        profile = profile.copyWith(libraryId: uid);
-      }
       await LocalStorageService.saveString(
         'app_active_session',
         json.encode({
@@ -1017,6 +1037,7 @@ class LibraryService {
           'email': currentUserEmail,
           'role': currentUserRole,
           'name': currentUserName,
+          'library_id': profile.libraryId,
         }),
       );
       return {'success': true, 'role': 'Admin', 'uid': uid};

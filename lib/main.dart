@@ -109,10 +109,12 @@ void main() async {
     // Task 1.2: Check active FirebaseAuth user for auto-login session
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      LibraryService().currentUserId = currentUser.uid;
-      LibraryService().currentUserEmail = currentUser.email ?? '';
-      LibraryService().currentUserRole = 'Admin';
-      LibraryService().isAuthenticated = true;
+      final svc = LibraryService();
+      svc.currentUserId = currentUser.uid;
+      svc.profile.libraryId = currentUser.uid;
+      svc.currentUserEmail = currentUser.email ?? '';
+      svc.currentUserRole = 'Admin';
+      svc.isAuthenticated = true;
     }
   } catch (e) {
     debugPrint('Firebase init note: $e');
