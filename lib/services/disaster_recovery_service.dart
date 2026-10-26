@@ -142,7 +142,7 @@ class DisasterRecoveryService {
         p.shift,
         p.amount,
         p.paymentMode,
-        p.tenurePeriod,
+        p.durationMonths != null ? '${p.durationMonths} Month(s)' : 'Monthly',
         p.notes,
       ].map(_cleanCsvField).join(','));
     }
@@ -181,7 +181,6 @@ class DisasterRecoveryService {
       'Category',
       'Amount (INR)',
       'Payment Mode',
-      'Added By',
       'Notes',
     ];
     buffer.writeln(expenseHeaders.map(_cleanCsvField).join(','));
@@ -193,8 +192,7 @@ class DisasterRecoveryService {
         e.category,
         e.amount,
         e.paymentMode,
-        e.addedBy,
-        e.notes,
+        e.note,
       ].map(_cleanCsvField).join(','));
     }
 
