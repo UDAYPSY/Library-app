@@ -11,6 +11,7 @@ import '../../services/library_service.dart';
 import '../../services/theme_service.dart';
 import '../login_screen.dart';
 import '../shifts/shift_system_screen.dart';
+import '../tools/disaster_recovery_screen.dart';
 import '../tools/library_branding_screen.dart';
 import '../tools/reports_exports_screen.dart';
 import '../tools/share_qr_screen.dart';
@@ -2062,6 +2063,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Security & Master Password',
                   subtitle: 'Cloud Auth UID & Admin Password change',
                   onTap: _showSecurityModal,
+                ),
+                _settingsTile(
+                  icon: Icons.cloud_sync_rounded,
+                  iconBg: const Color(0xFFFEF3C7),
+                  iconColor: const Color(0xFFD97706),
+                  title: 'Google Drive & Cloud Recovery',
+                  subtitle: 'Auto-sync Excel snapshots & 1-click disaster recovery',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DisasterRecoveryScreen()),
+                  ),
                 ),
                 _settingsTile(
                   icon: Icons.auto_fix_high_rounded,

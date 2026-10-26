@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/models/library_models.dart';
+import 'package:library_manager/services/disaster_recovery_service.dart';
 import 'package:library_manager/services/library_service.dart';
 
 void main() {
@@ -1215,6 +1216,66 @@ void main() {
       expect(withRemark.contains('Valid starting tomorrow morning'), isTrue);
       expect(withRemark.contains('Internal Log'), isFalse);
     });
+
+    test('DisasterRecoveryService generates multi-section Excel snapshot and performs lossless database restoration', () async {
+      final recovery = DisasterRecoveryService(service: service);
+
+      // Seed student with active dues
+      final testStudent = StudentInfo(
+        id: 'std_recovery_1',
+        name: 'Vikas Sharma',
+        phone: '9876501234',
+        shift: 'Full Day',
+        seatNumber: 15,
+        monthlyFee: 1000,
+        duesAmount: 500,
+        status: 'Active',
+      );
+      await service.addStudent(testStudent);
+
+      // Seed payment
+      final testPayment = PaymentTransaction(
+        id: 'rec_pay_01',
+        studentId: testStudent.id,
+        studentName: testStudent.name,
+        studentPhone: testStudent.phone,
+        amount: 1000,
+        date: DateTime(2026, 1, 15),
+        paymentMode: 'UPI',
+        shift: 'Full Day',
+        seatNumber: 15,
+      );
+      await service.addPayment(testPayment);
+
+      // 1. Generate master snapshot
+      final snapshot = recovery.generateMasterExcelSnapshot();
+      expect(snapshot.contains('# TRACKMYLIBRARY MASTER DISASTER RECOVERY & AUDIT ARCHIVE'), isTrue);
+      expect(snapshot.contains('### SECTION 1: ALL REGISTERED STUDENTS & MEMBERS ###'), isTrue);
+      expect(snapshot.contains('### SECTION 2: PAYMENT & FEE COLLECTION TRANSACTIONS ###'), isTrue);
+      expect(snapshot.contains('### SECTION 3: PENDING DUES & DEFAULTERS ###'), isTrue);
+      expect(snapshot.contains('### SECTION 4: OPERATING EXPENSES ###'), isTrue);
+      expect(snapshot.contains('# SYSTEM_RESTORE_PAYLOAD_BEGIN'), isTrue);
+      expect(snapshot.contains('# SYSTEM_RESTORE_PAYLOAD_END'), isTrue);
+      expect(snapshot.contains('Vikas Sharma'), isTrue);
+      expect(snapshot.contains('9876501234'), isTrue);
+      expect(snapshot.contains('S-15'), isTrue);
+
+      // 2. Clear state entirely to simulate device loss / accident
+      await service.clearAllData();
+      expect(service.currentStudents.isEmpty, isTrue);
+      expect(service.currentPayments.isEmpty, isTrue);
+
+      // 3. Losslessly restore from master snapshot
+      final restoreResult = await recovery.restoreFromBackupContent(snapshot);
+      expect(restoreResult['success'], isTrue);
+      expect(service.currentStudents.length, equals(1));
+      expect(service.currentStudents.first.name, equals('Vikas Sharma'));
+      expect(service.currentStudents.first.seatNumber, equals(15));
+      expect(service.currentStudents.first.effectiveDues, equals(500));
+      expect(service.currentPayments.length, equals(1));
+      expect(service.currentPayments.first.id, equals('rec_pay_01'));
+    });
   });
 }
+
 

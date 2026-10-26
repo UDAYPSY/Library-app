@@ -714,6 +714,33 @@ class LibraryService {
   List<PaymentTransaction> get currentPayments => List.unmodifiable(_mockPayments);
   List<ExpenseItem> get currentExpenses => List.unmodifiable(_mockExpenses);
 
+  // Disaster recovery and sync accessors
+  List<StudentInfo> get mockStudentsList => _mockStudents;
+  List<PaymentTransaction> get mockPaymentsList => _mockPayments;
+  List<ExpenseItem> get mockExpensesList => _mockExpenses;
+  void syncSeatsWithStudents() {
+    _syncSeatsWithStudents();
+    if (!_mockSeatsController.isClosed) {
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    }
+  }
+  Future<void> saveLocalState() => _saveLocalState();
+  void notifyStudentsChanged() {
+    if (!_mockStudentsController.isClosed) {
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    }
+  }
+  void notifyPaymentsChanged() {
+    if (!_mockPaymentsController.isClosed) {
+      _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+    }
+  }
+  void notifyExpensesChanged() {
+    if (!_mockExpensesController.isClosed) {
+      _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+    }
+  }
+
   PaymentTransaction? getLastPaymentForStudent({String? studentId, String? phone, String? name}) {
     final normPhone = phone != null ? normalizePhone(phone) : null;
     for (var p in _mockPayments) {
@@ -726,6 +753,7 @@ class LibraryService {
 
   bool get isFirebaseConnected => Firebase.apps.isNotEmpty;
   FirebaseFirestore get _db => FirebaseFirestore.instance;
+  FirebaseFirestore get db => _db;
 
   // Multi-Tenant Cloud Firestore Isolation
   String get tenantId {
