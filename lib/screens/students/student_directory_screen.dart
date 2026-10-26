@@ -620,79 +620,232 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   }
 
 
-    void _openNoteSheet(StudentInfo st) {
+  void _openNoteSheet(StudentInfo st) {
     final noteCtrl = TextEditingController(text: st.note);
+    final hasExistingNote = st.note.trim().isNotEmpty;
+    bool isEditing = !hasExistingNote;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card(context),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(Icons.sticky_note_2_rounded, color: Color(0xFFF59E0B)),
-                    const SizedBox(width: 8),
-                    Text('Notes for ${st.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.sticky_note_2_rounded, color: Color(0xFFD97706), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Student Note',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.text(ctx),
+                              ),
+                            ),
+                            Text(
+                              st.name,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textMutedColor(ctx),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, color: AppColors.textMutedColor(ctx)),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
                   ],
                 ),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                const SizedBox(height: 16),
+
+                // If student has an existing note and not in edit mode, show detailed note view
+                if (hasExistingNote && !isEditing) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.isDark(ctx) ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.isDark(ctx) ? const Color(0xFF334155) : const Color(0xFFFEF3C7),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.description_outlined, color: Color(0xFFD97706), size: 16),
+                            SizedBox(width: 6),
+                            Text(
+                              'DETAILED NOTE',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                                color: Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          st.note,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.isDark(ctx) ? Colors.amber.shade200 : const Color(0xFF78350F),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFD97706),
+                            side: const BorderSide(color: Color(0xFFFDE68A)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Edit / Update Note', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            setSheetState(() {
+                              isEditing = true;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  TextField(
+                    controller: noteCtrl,
+                    maxLines: 4,
+                    autofocus: true,
+                    style: TextStyle(fontSize: 14, color: AppColors.text(ctx)),
+                    decoration: InputDecoration(
+                      hintText: 'Enter student notes, special remarks or follow-up details...',
+                      hintStyle: TextStyle(fontSize: 13, color: AppColors.textMutedColor(ctx)),
+                      filled: true,
+                      fillColor: AppColors.isDark(ctx) ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFFEF3C7)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: AppColors.isDark(ctx) ? const Color(0xFF334155) : const Color(0xFFFEF3C7),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      if (hasExistingNote) ...[
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFEF4444),
+                            side: const BorderSide(color: Color(0xFFFECACA)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            await _service.updateStudent(
+                              studentId: st.id,
+                              name: st.name,
+                              phone: st.phone,
+                              shift: st.shift,
+                              seatNumber: st.seatNumber,
+                              note: '',
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Note removed'), behavior: SnackBarBehavior.floating),
+                              );
+                            }
+                          },
+                          child: const Text('Clear', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryTeal,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              await _service.updateStudent(
+                                studentId: st.id,
+                                name: st.name,
+                                phone: st.phone,
+                                shift: st.shift,
+                                seatNumber: st.seatNumber,
+                                note: noteCtrl.text.trim(),
+                              );
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Note updated!'), behavior: SnackBarBehavior.floating),
+                                );
+                              }
+                            },
+                            child: const Text('Save Note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteCtrl,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Enter student notes or remarks...',
-                filled: true,
-                fillColor: const Color(0xFFFFFBEB),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFEF3C7))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFEF3C7))),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryTeal,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await _service.updateStudent(
-                    studentId: st.id,
-                    name: st.name,
-                    phone: st.phone,
-                    shift: st.shift,
-                    seatNumber: st.seatNumber,
-                    note: noteCtrl.text.trim(),
-                  );
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Note updated!'), behavior: SnackBarBehavior.floating),
-                    );
-                  }
-                },
-                child: const Text('Save Note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1228,13 +1381,59 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                     ),
                                                   ),
                                                 ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.sticky_note_2_rounded,
-                                                  color: Color(0xFFF59E0B),
-                                                  size: 20,
-                                                ),
-                                                onPressed: () => _openNoteSheet(st),
+                                              Builder(
+                                                builder: (context) {
+                                                  final hasNote = st.note.trim().isNotEmpty;
+                                                  return Tooltip(
+                                                    message: hasNote ? 'View Note' : 'Add Note',
+                                                    child: InkWell(
+                                                      onTap: () => _openNoteSheet(st),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(6),
+                                                        decoration: BoxDecoration(
+                                                          color: hasNote
+                                                              ? (AppColors.isDark(context)
+                                                                  ? const Color(0xFF78350F).withOpacity(0.3)
+                                                                  : const Color(0xFFFEF3C7))
+                                                              : Colors.transparent,
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          border: hasNote
+                                                              ? Border.all(
+                                                                  color: AppColors.isDark(context)
+                                                                      ? const Color(0xFFD97706).withOpacity(0.5)
+                                                                      : const Color(0xFFFDE68A),
+                                                                  width: 1,
+                                                                )
+                                                              : null,
+                                                        ),
+                                                        child: Stack(
+                                                          clipBehavior: Clip.none,
+                                                          children: [
+                                                            Icon(
+                                                              hasNote ? Icons.sticky_note_2_rounded : Icons.sticky_note_2_outlined,
+                                                              color: hasNote ? const Color(0xFFD97706) : AppColors.textMutedColor(context),
+                                                              size: 20,
+                                                            ),
+                                                            if (hasNote)
+                                                              Positioned(
+                                                                top: -1,
+                                                                right: -1,
+                                                                child: Container(
+                                                                  width: 6,
+                                                                  height: 6,
+                                                                  decoration: const BoxDecoration(
+                                                                    color: Color(0xFFD97706),
+                                                                    shape: BoxShape.circle,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
                                               ),
                                               PopupMenuButton<String>(
                                                 icon: const Icon(Icons.more_vert, color: AppColors.textMuted, size: 20),
@@ -1272,55 +1471,6 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                             ],
                                           ),
                                         ],
-                                      ),
-                                      const SizedBox(height: 12),
-
-                                      // Note Card Banner (Image 1)
-                                      InkWell(
-                                        onTap: () => _openNoteSheet(st),
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFFFBEB),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: const Color(0xFFFEF3C7)),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              const Icon(Icons.description_outlined, color: Color(0xFFD97706), size: 16),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text(
-                                                      'NOTE',
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.w900,
-                                                        letterSpacing: 0.5,
-                                                        color: Color(0xFFD97706),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      st.note.isNotEmpty
-                                                          ? st.note
-                                                          : 'Enrolled for ${st.shift}',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w700,
-                                                        color: AppColors.textNavy,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFFD97706), size: 18),
-                                            ],
-                                          ),
-                                        ),
                                       ),
                                       const SizedBox(height: 12),
 
