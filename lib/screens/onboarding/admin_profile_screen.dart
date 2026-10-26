@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../services/library_service.dart';
+import '../../services/local_storage_service.dart';
 import 'seat_setup_screen.dart';
 import '../login_screen.dart';
 
@@ -47,7 +48,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       _phoneCtrl.text.replaceAll(RegExp(r'\D'), '').length >= 10;
   bool get _isPassValid => _passCtrl.text.length >= 6;
 
-  void _onCreateAccount() {
+  void _onCreateAccount() async {
     setState(() => _showErrors = true);
 
     if (!_isNameValid || !_isEmailValid || !_isPhoneValid || !_isPassValid) {
@@ -57,7 +58,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _service.profile.adminName = _nameCtrl.text.trim();
     _service.profile.adminEmail = _emailCtrl.text.trim();
     _service.profile.adminPhone = _phoneCtrl.text.trim();
+    await LocalStorageService.saveString('app_admin_password', _passCtrl.text.trim());
 
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const SeatSetupScreen()),

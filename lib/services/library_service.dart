@@ -804,11 +804,12 @@ class LibraryService {
           );
         }
       } on FirebaseAuthException catch (e) {
-        String msg = 'Authentication failed.';
+        String msg = 'Authentication failed: ${e.message ?? e.code}';
         if (e.code == 'user-not-found') msg = 'No account found with this email.';
         if (e.code == 'wrong-password' || e.code == 'invalid-credential') msg = 'Incorrect password. Please verify and retry.';
         if (e.code == 'invalid-email') msg = 'The email address is badly formatted.';
         if (e.code == 'user-disabled') msg = 'This user account has been disabled.';
+        if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
         return AuthResult(success: false, message: msg);
       } catch (_) {}
     }
@@ -937,9 +938,10 @@ class LibraryService {
           profile.libraryId = 'lib_${credential.user!.uid.substring(0, 8)}';
         }
       } on FirebaseAuthException catch (e) {
-        String msg = 'Registration failed.';
-        if (e.code == 'email-already-in-use') msg = 'This email is already registered. Please sign in.';
-        if (e.code == 'weak-password') msg = 'The password is too weak.';
+        String msg = 'Registration failed: ${e.message ?? e.code}';
+        if (e.code == 'email-already-in-use') msg = 'This email is already registered. Please sign in directly from the login screen.';
+        if (e.code == 'weak-password') msg = 'The password is too weak (min 6 characters required).';
+        if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
         return AuthResult(success: false, message: msg);
       } catch (_) {}
     }
@@ -1062,9 +1064,10 @@ class LibraryService {
           message: 'Password reset link sent to your registered email.',
         );
       } on FirebaseAuthException catch (e) {
-        String msg = 'Password reset failed.';
+        String msg = 'Password reset failed: ${e.message ?? e.code}';
         if (e.code == 'user-not-found') msg = 'No account found with this email.';
         if (e.code == 'invalid-email') msg = 'Invalid email address format.';
+        if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
         return AuthResult(success: false, message: msg);
       } catch (e) {
         return AuthResult(success: false, message: 'Password recovery error: $e');
