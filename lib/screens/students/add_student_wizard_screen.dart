@@ -133,6 +133,10 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int get _studentEffectivePaidCoverage {
     if (widget.studentToEdit == null) return 0;
     final s = widget.studentToEdit!;
+    if (!_isStudentInPaidActiveTenure && s.feeDueDate != null && s.feeDueDate!.isBefore(DateTime.now())) {
+      // Previous tenure has already completed/expired; only carry forward unspent advance credit minus dues
+      return (s.advanceAmount - s.duesAmount).clamp(0, 9999999);
+    }
     final tenureMonths = _existingStudentTenureMonths;
     final monthlyFee = _studentCurrentShiftMonthlyFee;
 
@@ -778,6 +782,39 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
             validUntil: _validUntilDate,
             durationMonths: _selectedDurationMonths,
           );
+        }
+
+        // CRITICAL SYNC: In case of shift change, adjust last tenure purchase cost in payments tab
+        // Downgrade -> reduce last payment amount, crediting the excess to advance
+        // Upgrade (using advance) -> restore last payment amount, consuming the advance
+        if (isShiftChanged) {
+          final newTenureCost = fixedMonthly * _effectiveTenureMonths;
+          final oldTenureCost = oldMonthly * _effectiveTenureMonths;
+          if (finalAdvanceAmount > s.advanceAmount || oldTenureCost > newTenureCost) {
+            // Downgrade: new advance > old advance → credit earned
+            final advanceCredited = (finalAdvanceAmount > s.advanceAmount)
+                ? (finalAdvanceAmount - s.advanceAmount)
+                : (oldTenureCost - newTenureCost);
+            await _service.adjustLastPaymentForShiftChange(
+              studentId: s.id,
+              phone: phone,
+              studentName: name,
+              newShift: _selectedShift.name,
+              targetTenureCost: newTenureCost,
+              advanceCredited: advanceCredited,
+            );
+          } else if (finalAdvanceAmount == 0 && s.advanceAmount > 0) {
+            // Upgrade consuming advance credit
+            final advanceConsumed = (newTenureCost - oldTenureCost).clamp(0, s.advanceAmount);
+            await _service.adjustLastPaymentForShiftChange(
+              studentId: s.id,
+              phone: phone,
+              studentName: name,
+              newShift: _selectedShift.name,
+              targetTenureCost: newTenureCost,
+              advanceConsumed: advanceConsumed,
+            );
+          }
         }
 
         await _service.updateStudent(

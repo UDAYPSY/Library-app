@@ -1045,5 +1045,117 @@ void main() {
       expect(st.note.contains('Seat changed: S-15 → S-16'), isTrue);
       expect(st.note.contains('Due payment of ₹250 collected'), isTrue);
     });
+    test('Shift downgrade updates last tenure payment amount in payments ledger', () async {
+      // 1. Register student paying 1000/mo Full Day
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 19,
+        studentName: 'Payment Adjust Student',
+        phone: '9911223344',
+        shift: 'Full Day',
+        feeAmount: 1000,
+        monthlyFee: 1000,
+        duesAmount: 0,
+      );
+      var st = service.findStudentByPhone('9911223344')!;
+      expect(st.monthlyFee, equals(1000));
+
+      // Payment for 1000 was recorded
+      final paysBefore = service.currentPayments
+          .where((p) => p.studentId == st.id || p.studentPhone == st.phone || p.studentName == st.name)
+          .toList();
+      expect(paysBefore.isNotEmpty, isTrue);
+      expect(paysBefore.first.amount, equals(1000));
+
+      // 2. Downgrade to Morning (700/mo) → 300 advance credit should be created
+      //    and last payment amount should be reduced to 700
+      await service.updateStudent(
+        studentId: st.id,
+        name: st.name,
+        phone: st.phone,
+        shift: 'Morning Shift',
+        monthlyFee: 700,
+        duesAmount: 0,
+        advanceAmount: 300, // 1000 - 700 = 300 excess
+        status: 'ACTIVE',
+        note: 'Shift downgraded: Full Day → Morning Shift. ₹300 excess credit remains.',
+      );
+
+      // 3. Trigger adjustLastPaymentForShiftChange explicitly (simulating what wizard does)
+      await service.adjustLastPaymentForShiftChange(
+        studentId: st.id,
+        phone: st.phone,
+        studentName: st.name,
+        newShift: 'Morning Shift',
+        targetTenureCost: 700,
+        advanceCredited: 300,
+      );
+
+      // 4. Verify last payment amount reduced from 1000 → 700 in ledger
+      final paysAfter = service.currentPayments
+          .where((p) => p.studentId == st.id || p.studentPhone == st.phone || p.studentName == st.name)
+          .toList();
+      expect(paysAfter.isNotEmpty, isTrue);
+      expect(paysAfter.first.amount, equals(700)); // Reduced from 1000 to 700!
+
+      // 5. Now upgrade back using advance: advance consumed, payment restored
+      await service.updateStudent(
+        studentId: st.id,
+        name: st.name,
+        phone: st.phone,
+        shift: 'Full Day',
+        monthlyFee: 1000,
+        duesAmount: 0,
+        advanceAmount: 0, // Advance consumed
+        status: 'ACTIVE',
+        note: 'Shift upgraded: Morning Shift → Full Day. ₹300 advance consumed.',
+      );
+
+      await service.adjustLastPaymentForShiftChange(
+        studentId: st.id,
+        phone: st.phone,
+        studentName: st.name,
+        newShift: 'Full Day',
+        targetTenureCost: 1000,
+        advanceConsumed: 300,
+      );
+
+      final paysUpgrade = service.currentPayments
+          .where((p) => p.studentId == st.id || p.studentPhone == st.phone || p.studentName == st.name)
+          .toList();
+      expect(paysUpgrade.isNotEmpty, isTrue);
+      expect(paysUpgrade.first.amount, equals(1000)); // Restored to 1000
+
+      // 6. Test downgrade with multiple payments: ensure newest payment is targeted
+      // Record a renewal payment of 1000 with newer date
+      await service.recordPayment(
+        studentId: st.id,
+        studentName: st.name,
+        phone: st.phone,
+        shift: 'Full Day',
+        amount: 1000,
+        date: DateTime.now().add(const Duration(days: 30)),
+        notes: 'Tenure renewal fee',
+      );
+
+      // Downgrade to 600 (excess credit 400)
+      await service.adjustLastPaymentForShiftChange(
+        studentId: st.id,
+        phone: st.phone,
+        studentName: st.name,
+        newShift: 'Evening Shift',
+        targetTenureCost: 600,
+        advanceCredited: 400,
+      );
+
+      final paysMulti = service.currentPayments
+          .where((p) => p.studentId == st.id || p.studentPhone == st.phone || p.studentName == st.name)
+          .toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+
+      expect(paysMulti.length, greaterThanOrEqualTo(2));
+      // Newest payment reduced to 600
+      expect(paysMulti.first.amount, equals(600));
+      expect(paysMulti.first.shift, equals('Evening Shift'));
+    });
   });
 }

@@ -580,6 +580,38 @@ class PaymentTransaction {
     this.durationMonths,
   });
 
+  PaymentTransaction copyWith({
+    String? id,
+    String? studentId,
+    String? studentName,
+    String? studentPhone,
+    int? seatNumber,
+    String? shift,
+    int? amount,
+    DateTime? date,
+    String? paymentMode,
+    String? notes,
+    DateTime? validFrom,
+    DateTime? validUntil,
+    int? durationMonths,
+  }) {
+    return PaymentTransaction(
+      id: id ?? this.id,
+      studentId: studentId ?? this.studentId,
+      studentName: studentName ?? this.studentName,
+      studentPhone: studentPhone ?? this.studentPhone,
+      seatNumber: seatNumber ?? this.seatNumber,
+      shift: shift ?? this.shift,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+      paymentMode: paymentMode ?? this.paymentMode,
+      notes: notes ?? this.notes,
+      validFrom: validFrom ?? this.validFrom,
+      validUntil: validUntil ?? this.validUntil,
+      durationMonths: durationMonths ?? this.durationMonths,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'payment_id': id,

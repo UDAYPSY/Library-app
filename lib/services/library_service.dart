@@ -1358,6 +1358,177 @@ class LibraryService {
     }
   }
 
+  // Adjust last tenure payment transaction when student's shift changes
+  // In case of downgrade: reduces last tenure purchase cost accordingly in payments tab & financial ledger
+  // In case of upgrade using advance: restores last tenure purchase cost by advance credit consumed
+  Future<void> adjustLastPaymentForShiftChange({
+    required String studentId,
+    String? phone,
+    String? studentName,
+    required String newShift,
+    required int targetTenureCost,
+    int advanceCredited = 0,
+    int advanceConsumed = 0,
+    String? noteDetails,
+  }) async {
+    ensureInitialized();
+    final normPhone = phone != null ? normalizePhone(phone) : null;
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+
+    if (isFirebaseConnected) {
+      try {
+        QuerySnapshot<Map<String, dynamic>> snap = await _tenantCol('payments')
+            .where('student_id', isEqualTo: studentId)
+            .get();
+
+        List<QueryDocumentSnapshot<Map<String, dynamic>>> docs = snap.docs;
+        if (docs.isEmpty && phone != null && phone.isNotEmpty) {
+          final phoneSnap = await _tenantCol('payments')
+              .where('student_phone', isEqualTo: phone)
+              .get();
+          docs = phoneSnap.docs;
+        }
+        if (docs.isEmpty && normPhone != null && normPhone.isNotEmpty && normPhone != phone) {
+          final normSnap = await _tenantCol('payments')
+              .where('student_phone', isEqualTo: normPhone)
+              .get();
+          docs = normSnap.docs;
+        }
+        if (docs.isEmpty && studentName != null && studentName.trim().isNotEmpty) {
+          final nameSnap = await _tenantCol('payments')
+              .where('student_name', isEqualTo: studentName.trim())
+              .get();
+          docs = nameSnap.docs;
+        }
+        if (docs.isEmpty) {
+          final allSnap = await _tenantCol('payments').limit(100).get();
+          docs = allSnap.docs.where((d) {
+            final data = d.data();
+            final sId = data['student_id']?.toString() ?? '';
+            final sPhone = data['student_phone']?.toString() ?? '';
+            final sName = data['student_name']?.toString() ?? '';
+            return (studentId.isNotEmpty && sId == studentId) ||
+                (normPhone != null && normPhone.isNotEmpty && normalizePhone(sPhone) == normPhone) ||
+                (studentName != null && studentName.trim().isNotEmpty && sName.trim().toLowerCase() == studentName.trim().toLowerCase());
+          }).toList();
+        }
+
+        if (docs.isNotEmpty) {
+          final sortedDocs = docs.toList()
+            ..sort((a, b) {
+              final aDate = a.data()['date'];
+              final bDate = b.data()['date'];
+              final aDt = aDate is Timestamp ? aDate.toDate() : (aDate is DateTime ? aDate : DateTime.now());
+              final bDt = bDate is Timestamp ? bDate.toDate() : (bDate is DateTime ? bDate : DateTime.now());
+              return bDt.compareTo(aDt);
+            });
+          final latestDoc = sortedDocs.first;
+          final curData = latestDoc.data();
+          final curShift = (curData['shift'] as String?) ?? '';
+
+          // If this payment was already adjusted for newShift, avoid duplicate adjustment
+          if (curShift.trim().toLowerCase() == newShift.trim().toLowerCase()) {
+            return;
+          }
+
+          final curAmount = (curData['amount'] as num?)?.toInt() ?? 0;
+          final curNotes = (curData['notes'] as String?) ?? '';
+
+          int updatedAmount = curAmount;
+          String adjustmentLog = '';
+          if (advanceCredited > 0) {
+            final diffAmount = (curAmount - advanceCredited).clamp(0, 9999999);
+            updatedAmount = (targetTenureCost > 0 && targetTenureCost < curAmount)
+                ? targetTenureCost
+                : diffAmount;
+            adjustmentLog = 'Shift downgraded to $newShift on $dateStr • Purchase cost adjusted from ₹$curAmount to ₹$updatedAmount (₹$advanceCredited credited to advance)';
+          } else if (advanceConsumed > 0) {
+            updatedAmount = (curAmount + advanceConsumed).clamp(0, targetTenureCost > 0 ? targetTenureCost : 9999999);
+            adjustmentLog = 'Shift upgraded to $newShift on $dateStr • Purchase cost adjusted from ₹$curAmount to ₹$updatedAmount (₹$advanceConsumed advance applied)';
+          } else {
+            updatedAmount = (targetTenureCost > 0 && targetTenureCost < curAmount) ? targetTenureCost : curAmount;
+            adjustmentLog = 'Shift updated to $newShift on $dateStr';
+          }
+
+          final updatedNotes = curNotes.isNotEmpty
+              ? '$curNotes • $adjustmentLog'
+              : adjustmentLog;
+
+          await _tenantCol('payments').doc(latestDoc.id).update({
+            'amount': updatedAmount,
+            'shift': newShift,
+            'notes': updatedNotes,
+          });
+
+          // Also keep in-memory _mockPayments and Stream in sync
+          final mIdx = _mockPayments.indexWhere((p) => p.id == latestDoc.id);
+          if (mIdx != -1) {
+            _mockPayments[mIdx] = _mockPayments[mIdx].copyWith(
+              amount: updatedAmount,
+              shift: newShift,
+              notes: updatedNotes,
+            );
+            _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+          }
+        }
+      } catch (_) {}
+    } else {
+      // In mock storage: find the MOST RECENT payment transaction by date for this student
+      int bestIdx = -1;
+      DateTime? latestDate;
+      for (int i = 0; i < _mockPayments.length; i++) {
+        final p = _mockPayments[i];
+        final matches = (studentId.isNotEmpty && p.studentId == studentId) ||
+            (normPhone != null && normalizePhone(p.studentPhone) == normPhone) ||
+            (studentName != null && studentName.trim().isNotEmpty && p.studentName.trim().toLowerCase() == studentName.trim().toLowerCase());
+        if (matches) {
+          if (latestDate == null || p.date.isAfter(latestDate)) {
+            latestDate = p.date;
+            bestIdx = i;
+          }
+        }
+      }
+
+      if (bestIdx != -1) {
+        final p = _mockPayments[bestIdx];
+
+        // If this payment was already adjusted for newShift, avoid duplicate adjustment
+        if (p.shift.trim().toLowerCase() == newShift.trim().toLowerCase()) {
+          return;
+        }
+
+        int updatedAmount = p.amount;
+        String adjustmentLog = '';
+        if (advanceCredited > 0) {
+          final diffAmount = (p.amount - advanceCredited).clamp(0, 9999999);
+          updatedAmount = (targetTenureCost > 0 && targetTenureCost < p.amount)
+              ? targetTenureCost
+              : diffAmount;
+          adjustmentLog = 'Shift downgraded to $newShift on $dateStr • Purchase cost adjusted from ₹${p.amount} to ₹$updatedAmount (₹$advanceCredited credited to advance)';
+        } else if (advanceConsumed > 0) {
+          updatedAmount = (p.amount + advanceConsumed).clamp(0, targetTenureCost > 0 ? targetTenureCost : 9999999);
+          adjustmentLog = 'Shift upgraded to $newShift on $dateStr • Purchase cost adjusted from ₹${p.amount} to ₹$updatedAmount (₹$advanceConsumed advance applied)';
+        } else {
+          updatedAmount = (targetTenureCost > 0 && targetTenureCost < p.amount) ? targetTenureCost : p.amount;
+          adjustmentLog = 'Shift updated to $newShift on $dateStr';
+        }
+
+        final updatedNotes = p.notes.isNotEmpty
+            ? '${p.notes} • $adjustmentLog'
+            : adjustmentLog;
+
+        _mockPayments[bestIdx] = p.copyWith(
+          amount: updatedAmount,
+          shift: newShift,
+          notes: updatedNotes,
+        );
+        _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+        await _saveLocalState();
+      }
+    }
+  }
+
   // Assign Seat to Existing Student (Enforces: 1 student can ONLY be on 1 seat)
   Future<void> assignSeatToExistingStudent({
     required int newSeatNumber,
@@ -2197,10 +2368,11 @@ class LibraryService {
       int? oldSeat;
       String oldStatus = '';
       String oldPhoto = '';
+      Map<String, dynamic> d = {};
       try {
         final snap = await studentDocRef.get();
         if (snap.exists) {
-          final d = snap.data() ?? {};
+          d = snap.data() ?? {};
           curNote = (d['note'] as String?) ?? '';
           oldShift = (d['shift'] as String?) ?? '';
           oldSeat = (d['seat_number'] as num?)?.toInt();
@@ -2212,6 +2384,30 @@ class LibraryService {
       String mergedNote = curNote;
       // 1. Audit shift change if modified
       if (oldShift.isNotEmpty && oldShift.toLowerCase() != shift.toLowerCase()) {
+        final curAdv = (d['advance_amount'] as num?)?.toInt() ?? 0;
+        final curMonthly = (d['monthly_fee'] as num?)?.toInt() ?? 0;
+        final newMonthly = monthlyFee ?? curMonthly;
+        if (advanceAmount != null && advanceAmount > curAdv) {
+          final advanceCredited = advanceAmount - curAdv;
+          await adjustLastPaymentForShiftChange(
+            studentId: studentId,
+            phone: phone,
+            studentName: name,
+            newShift: shift,
+            targetTenureCost: newMonthly,
+            advanceCredited: advanceCredited,
+          );
+        } else if (advanceAmount != null && advanceAmount == 0 && curAdv > 0) {
+          await adjustLastPaymentForShiftChange(
+            studentId: studentId,
+            phone: phone,
+            studentName: name,
+            newShift: shift,
+            targetTenureCost: newMonthly,
+            advanceConsumed: curAdv,
+          );
+        }
+
         final hasShiftLog = note != null && (note.toLowerCase().contains('shift upgraded') || note.toLowerCase().contains('shift downgraded') || note.toLowerCase().contains('shift changed') || note.toLowerCase().contains('shift updated'));
         if (!hasShiftLog) {
           mergedNote = appendNote(mergedNote, 'Shift changed: $oldShift → $shift on $dateStr.');
@@ -2289,6 +2485,28 @@ class LibraryService {
         String mergedNote = s.note;
         // 1. Audit shift change if modified
         if (oldShift.isNotEmpty && oldShift.toLowerCase() != shift.toLowerCase()) {
+          final newMonthly = monthlyFee ?? s.monthlyFee;
+          if (advanceAmount != null && advanceAmount > s.advanceAmount) {
+            final advanceCredited = advanceAmount - s.advanceAmount;
+            await adjustLastPaymentForShiftChange(
+              studentId: studentId,
+              phone: phone,
+              studentName: name,
+              newShift: shift,
+              targetTenureCost: newMonthly,
+              advanceCredited: advanceCredited,
+            );
+          } else if (advanceAmount != null && advanceAmount == 0 && s.advanceAmount > 0) {
+            await adjustLastPaymentForShiftChange(
+              studentId: studentId,
+              phone: phone,
+              studentName: name,
+              newShift: shift,
+              targetTenureCost: newMonthly,
+              advanceConsumed: s.advanceAmount,
+            );
+          }
+
           final hasShiftLog = note != null && (note.toLowerCase().contains('shift upgraded') || note.toLowerCase().contains('shift downgraded') || note.toLowerCase().contains('shift changed') || note.toLowerCase().contains('shift updated'));
           if (!hasShiftLog) {
             mergedNote = appendNote(mergedNote, 'Shift changed: $oldShift → $shift on $dateStr.');

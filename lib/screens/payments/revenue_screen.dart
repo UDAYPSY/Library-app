@@ -127,8 +127,9 @@ class _RevenueScreenState extends State<RevenueScreen> {
   Widget build(BuildContext context) {
     return StreamBuilder<List<PaymentTransaction>>(
       stream: _service.streamPayments(),
+      initialData: _service.currentPayments,
       builder: (context, snapshot) {
-        final allPayments = snapshot.data ?? [];
+        final allPayments = snapshot.data ?? _service.currentPayments;
 
         // Apply Search & Filters
         final query = _searchCtrl.text.trim().toLowerCase();
