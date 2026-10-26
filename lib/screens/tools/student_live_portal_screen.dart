@@ -55,14 +55,28 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = _service.profile;
-    final totalSeats = _service.totalSeatsCount;
-    int occupiedCount = 0;
-    for (int i = 1; i <= totalSeats; i++) {
-      if (_service.isSeatOccupied(i)) occupiedCount++;
-    }
-    final vacantCount = totalSeats - occupiedCount;
-    final occupancyPercent = totalSeats > 0 ? ((occupiedCount / totalSeats) * 100).round() : 0;
+    return StreamBuilder<List<StudentInfo>>(
+      stream: _service.streamStudents(),
+      initialData: _service.currentStudents,
+      builder: (context, studentSnapshot) {
+        final students = studentSnapshot.data ?? _service.currentStudents;
+        final profile = _service.profile;
+        final totalSeats = _service.totalSeatsCount;
+        final allLibraryShifts = ['All Shifts', ..._service.shifts.map((s) => s.name).toSet()];
+
+        int occupiedCount = 0;
+        for (int i = 1; i <= totalSeats; i++) {
+          final seatOccupants = students.where((s) => s.seatNumber == i && s.status != 'INACTIVE').toList();
+          final bool isOcc;
+          if (_selectedShift == 'All Shifts') {
+            isOcc = seatOccupants.isNotEmpty;
+          } else {
+            isOcc = seatOccupants.any((s) => LibraryService.doShiftsConflict(s.shift, _selectedShift, allShifts: _service.shifts));
+          }
+          if (isOcc) occupiedCount++;
+        }
+        final vacantCount = (totalSeats - occupiedCount).clamp(0, totalSeats);
+        final occupancyPercent = totalSeats > 0 ? ((occupiedCount / totalSeats) * 100).round() : 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -232,7 +246,50 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+
+                  // Shift Filter Chips Row
+                  SizedBox(
+                    height: 34,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: allLibraryShifts.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (ctx, i) {
+                        final sh = allLibraryShifts[i];
+                        final isSel = _selectedShift == sh;
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _selectedShift = sh;
+                              _selectedSeatForInquiry = null;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSel ? const Color(0xFF0D9488) : Colors.white.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isSel ? const Color(0xFF5EEAD4) : Colors.white12,
+                              ),
+                            ),
+                            child: Text(
+                              sh,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
+                                color: isSel ? Colors.white : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
                   // Visual Grid
                   ConstrainedBox(
@@ -248,7 +305,18 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                       itemCount: totalSeats,
                       itemBuilder: (ctx, idx) {
                         final seatNum = idx + 1;
-                        final isOcc = _service.isSeatOccupied(seatNum);
+                        final seatOccupants = students.where((s) => s.seatNumber == seatNum && s.status != 'INACTIVE').toList();
+                        final bool isOcc;
+                        final String occLabel;
+                        if (_selectedShift == 'All Shifts') {
+                          isOcc = seatOccupants.isNotEmpty;
+                          occLabel = seatOccupants.isNotEmpty
+                              ? seatOccupants.map((s) => s.shift.split(' ').first).join('/')
+                              : 'Free';
+                        } else {
+                          isOcc = seatOccupants.any((s) => LibraryService.doShiftsConflict(s.shift, _selectedShift, allShifts: _service.shifts));
+                          occLabel = isOcc ? 'Booked' : 'Free';
+                        }
                         final isSelected = _selectedSeatForInquiry == seatNum;
 
                         return InkWell(
@@ -257,6 +325,16 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                               setState(() {
                                 _selectedSeatForInquiry = seatNum;
                               });
+                            } else {
+                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Seat S-$seatNum is already occupied for ${_selectedShift == "All Shifts" ? seatOccupants.map((s) => s.shift).join(", ") : _selectedShift}.'),
+                                  backgroundColor: const Color(0xFFE11D48),
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
                             }
                           },
                           borderRadius: BorderRadius.circular(10),
@@ -290,12 +368,13 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                                     ),
                                   ),
                                   Text(
-                                    isOcc ? 'Occ' : (isSelected ? 'Selected' : 'Free'),
+                                    isOcc ? occLabel : (isSelected ? 'Selected' : 'Free'),
                                     style: TextStyle(
                                       fontSize: 8,
                                       fontWeight: FontWeight.w700,
                                       color: isOcc ? const Color(0xFF475569) : const Color(0xFF6EE7B7),
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -462,6 +541,8 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 

@@ -1115,9 +1115,13 @@ class LibraryService {
           .orderBy('joined_at', descending: true)
           .snapshots()
           .map((snapshot) {
-        return snapshot.docs
+        final list = snapshot.docs
             .map((d) => StudentInfo.fromFirestore(d.id, d.data()))
             .toList();
+        _mockStudents.clear();
+        _mockStudents.addAll(list);
+        _syncSeatsWithStudents();
+        return list;
       });
     } else {
       Timer.run(() {
@@ -2480,6 +2484,101 @@ class LibraryService {
       if (sectionName != null) updates['section_name'] = sectionName;
       if (photoBase64 != null) updates['photo_base64'] = photoBase64;
       await studentDocRef.update(updates);
+
+      // CRITICAL: Synchronize Seats collection in Firestore so Seats Tab & Live Seat Map reflect the new shift & occupants immediately
+      final targetSeat = seatNumber ?? oldSeat;
+      if (targetSeat != null) {
+        final seatDocRef = _tenantCol('seats').doc('seat_$targetSeat');
+        if (status == 'INACTIVE') {
+          final remaining = _mockStudents.where(
+            (s) => s.seatNumber == targetSeat && s.id != studentId && s.status != 'INACTIVE',
+          ).toList();
+          if (remaining.isNotEmpty) {
+            final rem = remaining.first;
+            await seatDocRef.set({
+              'seat_number': targetSeat,
+              'is_occupied': true,
+              'student_id': rem.id,
+              'student_name': remaining.map((r) => r.name).join(', '),
+              'shift': remaining.map((r) => r.shift).toSet().join(', '),
+              'last_updated_by': 'Admin',
+            }, SetOptions(merge: true));
+          } else {
+            await seatDocRef.set({
+              'seat_number': targetSeat,
+              'is_occupied': false,
+              'student_id': null,
+              'student_name': null,
+              'shift': null,
+              'last_updated_by': 'Admin',
+            }, SetOptions(merge: true));
+          }
+        } else {
+          final otherOccupants = _mockStudents.where(
+            (s) => s.seatNumber == targetSeat && s.id != studentId && s.status != 'INACTIVE',
+          ).toList();
+          final allNames = [name, ...otherOccupants.map((o) => o.name)].join(', ');
+          final allShifts = [shift, ...otherOccupants.map((o) => o.shift)].toSet().join(', ');
+
+          await seatDocRef.set({
+            'seat_number': targetSeat,
+            'is_occupied': true,
+            'student_id': studentId,
+            'student_name': allNames,
+            'shift': allShifts,
+            'last_updated_by': 'Admin',
+          }, SetOptions(merge: true));
+        }
+      }
+
+      // If seat changed from oldSeat to targetSeat, vacate oldSeat
+      if (oldSeat != null && targetSeat != null && oldSeat != targetSeat) {
+        final oldSeatDocRef = _tenantCol('seats').doc('seat_$oldSeat');
+        final remainingOnOld = _mockStudents.where(
+          (s) => s.seatNumber == oldSeat && s.id != studentId && s.status != 'INACTIVE',
+        ).toList();
+        if (remainingOnOld.isNotEmpty) {
+          final rem = remainingOnOld.first;
+          await oldSeatDocRef.set({
+            'seat_number': oldSeat,
+            'is_occupied': true,
+            'student_id': rem.id,
+            'student_name': remainingOnOld.map((r) => r.name).join(', '),
+            'shift': remainingOnOld.map((r) => r.shift).toSet().join(', '),
+            'last_updated_by': 'Admin',
+          }, SetOptions(merge: true));
+        } else {
+          await oldSeatDocRef.set({
+            'seat_number': oldSeat,
+            'is_occupied': false,
+            'student_id': null,
+            'student_name': null,
+            'shift': null,
+            'last_updated_by': 'Admin',
+          }, SetOptions(merge: true));
+        }
+      }
+
+      // Also update in-memory cache and controller so all local screens update immediately
+      final mIdx = _mockStudents.indexWhere((s) => s.id == studentId);
+      if (mIdx != -1) {
+        _mockStudents[mIdx] = _mockStudents[mIdx].copyWith(
+          name: name,
+          phone: phone,
+          shift: shift,
+          seatNumber: targetSeat,
+          note: mergedNote,
+          monthlyFee: monthlyFee ?? _mockStudents[mIdx].monthlyFee,
+          duesAmount: duesAmount ?? _mockStudents[mIdx].duesAmount,
+          advanceAmount: advanceAmount ?? _mockStudents[mIdx].advanceAmount,
+          status: status ?? _mockStudents[mIdx].status,
+          feeDueDate: feeDueDate ?? _mockStudents[mIdx].feeDueDate,
+          updatedAt: now,
+        );
+        _syncSeatsWithStudents();
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+        await _saveLocalState();
+      }
       return true;
     } else {
       final idx = _mockStudents.indexWhere((s) => s.id == studentId);

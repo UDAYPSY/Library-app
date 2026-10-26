@@ -1648,13 +1648,19 @@ class _SeatsScreenState extends State<SeatsScreen> {
                               cardInitials = 'GS';
                             }
 
+                            final primaryStudent = seatStudents.isNotEmpty ? seatStudents.first : null;
+
                             final displayName = isMultiOccupant
                                 ? seatStudents.map((s) => s.name.trim().split(' ').first).join(' & ')
-                                : (seat.studentName.isNotEmpty ? seat.studentName.toUpperCase() : 'OCCUPIED');
+                                : (primaryStudent != null
+                                    ? primaryStudent.name.toUpperCase()
+                                    : (seat.studentName.isNotEmpty ? seat.studentName.toUpperCase() : 'OCCUPIED'));
 
                             final displayShift = isMultiOccupant
                                 ? seatStudents.map((s) => s.shift.split(' ').first).join(' • ')
-                                : seat.shift.toUpperCase();
+                                : (primaryStudent != null
+                                    ? primaryStudent.shift.toUpperCase()
+                                    : seat.shift.toUpperCase());
 
                             return InkWell(
                               onTap: () => _showSeatOccupiedModal(seat, seats, students),
