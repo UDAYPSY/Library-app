@@ -334,7 +334,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                               final textToSend = messageCtrl.text.trim();
                               if (noteCtrl.text.trim() != _student.note) {
                                 final updated = _student.copyWith(note: noteCtrl.text.trim());
-                                await _service.updateStudent(updated);
+                                await _service.updateStudentInfo(updated);
                                 _refreshStudent();
                               }
                               Navigator.pop(ctx);

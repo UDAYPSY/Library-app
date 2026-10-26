@@ -759,7 +759,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                             onPressed: () async {
                               final textToSend = messageCtrl?.text.trim() ?? '';
                               if (noteCtrl != null && noteCtrl!.text.trim() != selectedStudent!.note) {
-                                await _service.updateStudent(selectedStudent!.copyWith(note: noteCtrl!.text.trim()));
+                                await _service.updateStudentInfo(selectedStudent!.copyWith(note: noteCtrl!.text.trim()));
                               }
                               _service.useWhatsAppCredit(1);
                               setState(() {
@@ -796,7 +796,7 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
                             onPressed: () async {
                               final textToSend = messageCtrl?.text.trim() ?? '';
                               if (noteCtrl != null && noteCtrl!.text.trim() != selectedStudent!.note) {
-                                await _service.updateStudent(selectedStudent!.copyWith(note: noteCtrl!.text.trim()));
+                                await _service.updateStudentInfo(selectedStudent!.copyWith(note: noteCtrl!.text.trim()));
                               }
                               Navigator.pop(ctx);
                               final ok = await LibraryService.sendSmsDirect(

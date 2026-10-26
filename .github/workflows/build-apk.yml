@@ -80,9 +80,10 @@ jobs:
           git checkout -B ci-error-log
           [ -f apk_build.log ] && cp apk_build.log CI_FAILURE.txt || echo "No apk_build.log" > CI_FAILURE.txt
           [ -f aab_build.log ] && cp aab_build.log CI_AAB_FAILURE.txt || true
-          [ -f test_run.log ] && cp test_run.log CI_TEST_FAILURE.txt || true
-          git add -f CI_FAILURE.txt CI_AAB_FAILURE.txt CI_TEST_FAILURE.txt
-          git commit -m "ci: build failure diagnostics [skip ci]"
+          [ -f CI_FAILURE.txt ] && git add -f CI_FAILURE.txt || true
+          [ -f CI_AAB_FAILURE.txt ] && git add -f CI_AAB_FAILURE.txt || true
+          [ -f CI_TEST_FAILURE.txt ] && git add -f CI_TEST_FAILURE.txt || true
+          git commit -m "ci: build failure diagnostics [skip ci]" || true
           git push -f origin ci-error-log || true
 
       - name: Upload Build Log Artifact

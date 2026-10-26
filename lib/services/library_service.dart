@@ -2353,6 +2353,30 @@ class LibraryService {
     }
   }
 
+  // Update Student details via StudentInfo object directly
+  Future<bool> updateStudentInfo(StudentInfo s) {
+    return updateStudent(
+      studentId: s.id,
+      name: s.name,
+      phone: s.phone,
+      shift: s.shift,
+      seatNumber: s.seatNumber,
+      note: s.note,
+      monthlyFee: s.monthlyFee,
+      duesAmount: s.duesAmount,
+      advanceAmount: s.advanceAmount,
+      status: s.status,
+      feeDueDate: s.feeDueDate,
+      fatherName: s.fatherName,
+      address: s.address,
+      aadhaarNumber: s.aadhaarNumber,
+      preparationFor: s.preparationFor,
+      gender: s.gender,
+      sectionName: s.sectionName,
+      photoBase64: s.photoBase64,
+    );
+  }
+
   // Update Student details (Name, Phone, Shift, Seat, Note, Status, Due Date, etc.)
   Future<bool> updateStudent({
     required String studentId,
