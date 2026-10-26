@@ -735,6 +735,11 @@ class LibraryService {
       _mockPaymentsController.add(List.unmodifiable(_mockPayments));
     }
   }
+  Future<void> addPayment(PaymentTransaction p) async {
+    _mockPayments.add(p);
+    notifyPaymentsChanged();
+    await _saveLocalState();
+  }
   void notifyExpensesChanged() {
     if (!_mockExpensesController.isClosed) {
       _mockExpensesController.add(List.unmodifiable(_mockExpenses));
