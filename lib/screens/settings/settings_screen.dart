@@ -1920,7 +1920,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 24),
 
               // SECTION: RESOURCES (Image 3)
-              _sectionHeader('RESOURCES'),
+              _sectionHeader('LEGAL & RESOURCES'),
               const SizedBox(height: 10),
               _cardGroup([
                 _settingsTile(
@@ -1929,8 +1929,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   iconColor: const Color(0xFF0284C7),
                   title: 'Official Website',
                   subtitle: 'TrackMyLibrary.in',
-                  showDivider: false,
                   onTap: () => _launchUrl('https://trackmylibrary.in'),
+                ),
+                _settingsTile(
+                  icon: Icons.policy_outlined,
+                  iconBg: const Color(0xFFECFDF5),
+                  iconColor: const Color(0xFF0D9488),
+                  title: 'Privacy Policy',
+                  subtitle: 'DPDP Act 2023 & student data security',
+                  onTap: () => _launchUrl('https://udaypsy.github.io/Library-app/privacy-policy.html'),
+                ),
+                _settingsTile(
+                  icon: Icons.description_outlined,
+                  iconBg: const Color(0xFFFEF3C7),
+                  iconColor: const Color(0xFFD97706),
+                  title: 'Terms of Service',
+                  subtitle: 'User license & library service agreement',
+                  showDivider: false,
+                  onTap: () => _launchUrl('https://udaypsy.github.io/Library-app/terms.html'),
                 ),
               ]),
               const SizedBox(height: 24),

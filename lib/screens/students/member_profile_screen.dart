@@ -28,6 +28,20 @@ class MemberProfileScreen extends StatefulWidget {
 class _MemberProfileScreenState extends State<MemberProfileScreen> {
   final LibraryService _service = LibraryService();
   late StudentInfo _student;
+  bool _showFullAadhaar = false;
+
+  String _formatAadhaar(String raw) {
+    final clean = raw.replaceAll(RegExp(r'\D'), '');
+    if (clean.length < 4) return raw;
+    if (_showFullAadhaar) {
+      if (clean.length == 12) {
+        return '${clean.substring(0, 4)} ${clean.substring(4, 8)} ${clean.substring(8, 12)}';
+      }
+      return raw;
+    }
+    final last4 = clean.substring(clean.length - 4);
+    return '•••• •••• $last4';
+  }
 
   @override
   void initState() {
@@ -343,9 +357,9 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: source,
-        maxWidth: 600,
-        maxHeight: 600,
-        imageQuality: 80,
+        maxWidth: 400,
+        maxHeight: 400,
+        imageQuality: 70,
       );
       if (image != null) {
         final bytes = await image.readAsBytes();
@@ -1611,11 +1625,28 @@ _Powered by TrackMyLibrary_
                           ),
                           const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
 
-                          // Aadhaar Number (Image 3 & 4)
+                          // Aadhaar Number (DPDP Act Masked with Reveal Toggle)
                           _personalInfoRow(
                             icon: Icons.credit_card_outlined,
-                            label: 'Aadhaar Number',
-                            value: _student.aadhaarNumber.isNotEmpty ? _student.aadhaarNumber : 'Not provided',
+                            label: 'Aadhaar Number (Protected)',
+                            value: _student.aadhaarNumber.isNotEmpty
+                                ? _formatAadhaar(_student.aadhaarNumber)
+                                : 'Not provided',
+                            trailing: _student.aadhaarNumber.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      _showFullAadhaar ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                      size: 20,
+                                      color: const Color(0xFF64748B),
+                                    ),
+                                    tooltip: _showFullAadhaar ? 'Hide Aadhaar' : 'Show full Aadhaar',
+                                    onPressed: () {
+                                      setState(() {
+                                        _showFullAadhaar = !_showFullAadhaar;
+                                      });
+                                    },
+                                  )
+                                : null,
                           ),
                           const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
 
@@ -2055,6 +2086,7 @@ _Powered by TrackMyLibrary_
     required String value,
     Color? iconBgColor,
     Color? iconColor,
+    Widget? trailing,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -2090,6 +2122,7 @@ _Powered by TrackMyLibrary_
               ],
             ),
           ),
+          if (trailing != null) trailing,
         ],
       ),
     );

@@ -33,7 +33,7 @@ jobs:
       - name: Scaffolding and Dependencies
         run: |
           cp pubspec.yaml pubspec.yaml.bak
-          flutter create --org com.example.library_manager --project-name library_manager --platforms android .
+          flutter create --org com.trackmylibrary --project-name trackmylibrary --platforms android .
           cp pubspec.yaml.bak pubspec.yaml
           rm -f test/widget_test.dart
           python3 .github/scripts/patch_android_gradle.py
@@ -56,7 +56,7 @@ jobs:
             echo "KEYSTORE_BASE64 not configured, skipping custom keystore decode."
           fi
 
-      - name: Compile Release APK
+      - name: Compile Release APK and Play Store App Bundle (.aab)
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -64,20 +64,24 @@ jobs:
         run: |
           set -e -o pipefail
           flutter build apk --release --no-tree-shake-icons -v 2>&1 | tee apk_build.log
-          echo "=== APK files built ==="
+          flutter build appbundle --release --no-tree-shake-icons -v 2>&1 | tee aab_build.log
+          echo "=== Built Artifacts ==="
           ls -la build/app/outputs/flutter-apk/ || true
+          ls -la build/app/outputs/bundle/release/ || true
 
       - name: Save Failure Diagnostics
         if: failure()
         run: |
           echo "==================== BUILD FAILED ===================="
           tail -n 250 apk_build.log || true
+          tail -n 250 aab_build.log || true
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B ci-error-log
           [ -f apk_build.log ] && cp apk_build.log CI_FAILURE.txt || echo "No apk_build.log" > CI_FAILURE.txt
+          [ -f aab_build.log ] && cp aab_build.log CI_AAB_FAILURE.txt || true
           [ -f test_run.log ] && cp test_run.log CI_TEST_FAILURE.txt || true
-          git add -f CI_FAILURE.txt CI_TEST_FAILURE.txt
+          git add -f CI_FAILURE.txt CI_AAB_FAILURE.txt CI_TEST_FAILURE.txt
           git commit -m "ci: build failure diagnostics [skip ci]"
           git push -f origin ci-error-log || true
 
@@ -86,28 +90,40 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apk-build-log
-          path: apk_build.log
+          path: |
+            apk_build.log
+            aab_build.log
           if-no-files-found: ignore
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: library-manager-apk
+          name: trackmylibrary-apk
           path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
 
-      - name: Publish Release with APK Asset
+      - name: Upload Android App Bundle (Play Store AAB)
+        uses: actions/upload-artifact@v4
+        with:
+          name: trackmylibrary-aab
+          path: build/app/outputs/bundle/release/*.aab
+          if-no-files-found: warn
+
+      - name: Publish Release with APK and AAB Assets
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: latest
-          name: "Library Manager Latest Release APK"
+          name: "TrackMyLibrary Latest Release"
           body: |
-            ### 📱 Library Manager Android APK
-            Automated release build with the latest fee management, shift-wise seat allotment, and data synchronization features.
+            ### 📱 TrackMyLibrary Production Release
+            Automated production build with student directory, shift management, fee ledger, and cloud synchronization.
             
-            - **Direct Download**: Download `app-release.apk` below directly to your device.
-          files: build/app/outputs/flutter-apk/*.apk
+            - **Google Play Store Bundle**: `app-release.aab` (Upload to Google Play Console).
+            - **Direct Device APK**: `app-release.apk` (Install directly on Android phones/tablets).
+          files: |
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/bundle/release/*.aab
           prerelease: false
           make_latest: true
         env:
@@ -130,7 +146,7 @@ jobs:
       - name: Scaffolding and Dependencies
         run: |
           cp pubspec.yaml pubspec.yaml.bak
-          flutter create --org com.example.library_manager --project-name library_manager --platforms web .
+          flutter create --org com.trackmylibrary --project-name trackmylibrary --platforms web .
           cp pubspec.yaml.bak pubspec.yaml
           rm -f test/widget_test.dart
           flutter pub get

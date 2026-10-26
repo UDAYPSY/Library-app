@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../constants/app_colors.dart';
 import '../models/library_models.dart';
 import '../services/library_service.dart';
@@ -898,6 +899,47 @@ Future<void> showCollectPaymentModal(
                     }),
                   ],
                 ),
+                if (selectedMethod == 'UPI') ...[
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () {
+                      final amount = int.tryParse(dueAmountCtrl.text.trim()) ?? 0;
+                      if (amount <= 0) {
+                        ScaffoldMessenger.of(sheetContext).showSnackBar(
+                          const SnackBar(content: Text('Enter a valid fee amount first')),
+                        );
+                        return;
+                      }
+                      _showUpiQrDialog(sheetContext, student, amount, service.profile.libraryName);
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.qr_code_2_rounded, color: Color(0xFF16A34A), size: 20),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Show Dynamic UPI QR (Student can scan to pay)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF15803D),
+                              ),
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: Color(0xFF16A34A), size: 18),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Notes (Optional)
@@ -1142,6 +1184,101 @@ Widget _methodButton(String label, IconData icon, bool isSelected, bool isDark, 
           ],
         ),
       ),
+    ),
+  );
+}
+
+void _showUpiQrDialog(BuildContext context, StudentInfo student, int amount, String libraryName) {
+  final cleanName = Uri.encodeComponent(libraryName.isNotEmpty ? libraryName : 'Library');
+  final cleanNote = Uri.encodeComponent('Fee: ${student.name}');
+  final upiUri = 'upi://pay?pa=9457464850@upi&pn=$cleanName&am=$amount&cu=INR&tn=$cleanNote';
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.qr_code_rounded, color: Color(0xFF0D9488)),
+                  SizedBox(width: 8),
+                  Text('Scan to Pay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            student.name,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: Text(
+              '₹$amount',
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF16A34A),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+              ],
+            ),
+            child: QrImageView(
+              data: upiUri,
+              size: 200,
+              version: QrVersions.auto,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Scan with GPay, PhonePe, Paytm, or BHIM',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
+      actions: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Done', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ),
+      ],
     ),
   );
 }

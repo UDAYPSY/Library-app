@@ -12,14 +12,19 @@ class LocalStoreImpl {
     try {
       Directory dir = Directory.systemTemp;
       if (Platform.isAndroid) {
-        final appFilesDir = Directory('/data/data/com.example.library_manager/files');
-        if (await appFilesDir.exists()) {
-          dir = appFilesDir;
-        } else {
-          final altAppDir = Directory('/data/user/0/com.example.library_manager/files');
-          if (await altAppDir.exists()) {
-            dir = altAppDir;
-          }
+        final prodDir = Directory('/data/data/com.trackmylibrary.app/files');
+        final altProdDir = Directory('/data/user/0/com.trackmylibrary.app/files');
+        final legacyDir = Directory('/data/data/com.example.library_manager/files');
+        final altLegacyDir = Directory('/data/user/0/com.example.library_manager/files');
+
+        if (await prodDir.exists()) {
+          dir = prodDir;
+        } else if (await altProdDir.exists()) {
+          dir = altProdDir;
+        } else if (await legacyDir.exists()) {
+          dir = legacyDir;
+        } else if (await altLegacyDir.exists()) {
+          dir = altLegacyDir;
         }
       }
       _storageFile = File('${dir.path}/app_local_store.json');

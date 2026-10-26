@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart'
 ///
 /// To connect your own live Firebase project:
 /// 1. Go to https://console.firebase.google.com/
-/// 2. Create a project and register an Android app (package: com.example.library_manager)
+/// 2. Create a project and register an Android app (package: com.trackmylibrary.app)
 ///    or Web app.
 /// 3. Replace the placeholder values below with your credentials.
 class DefaultFirebaseOptions {
@@ -55,6 +55,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '100000000000',
     projectId: 'demo-library-project',
     storageBucket: 'demo-library-project.appspot.com',
-    iosBundleId: 'com.example.libraryManager',
+    iosBundleId: 'com.trackmylibrary.app',
   );
 }
