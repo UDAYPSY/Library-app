@@ -9,6 +9,7 @@ import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding/welcome_carousel_screen.dart';
 import 'screens/tools/student_live_portal_screen.dart';
+import 'services/disaster_recovery_service.dart';
 import 'services/library_service.dart';
 
 import 'constants/app_theme.dart';
@@ -115,6 +116,7 @@ void main() async {
       svc.currentUserEmail = currentUser.email ?? '';
       svc.currentUserRole = 'Admin';
       svc.isAuthenticated = true;
+      DisasterRecoveryService(service: svc).runAutomatedBackupCycle();
     }
   } catch (e) {
     debugPrint('Firebase init note: $e');

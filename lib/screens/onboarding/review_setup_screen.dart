@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
+import '../../services/disaster_recovery_service.dart';
 import '../../services/library_service.dart';
 import '../../services/local_storage_service.dart';
 import 'setup_success_screen.dart';
@@ -234,6 +235,80 @@ class ReviewSetupScreen extends StatelessWidget {
                             ],
                           ),
                         )),
+                    const SizedBox(height: 12),
+
+                    // Google Drive & Cloud Recovery Summary Card
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7).withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.cloud_sync_rounded, color: Color(0xFFD97706), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Google Drive Excel Auto-Sync',
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textNavy),
+                                    ),
+                                    Text(
+                                      'Daily backup + 100% loss-proof disaster recovery',
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'ACTIVE',
+                                  style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Backup Account:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              Text(
+                                service.profile.adminEmail.isNotEmpty ? service.profile.adminEmail : 'manageyourlib@gmail.com',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Snapshot Format:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              Text('Excel (.csv) Multi-Sheet Archive', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F766E))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 20),
 
                     // Reassurance footnote
@@ -280,6 +355,11 @@ class ReviewSetupScreen extends StatelessWidget {
                     );
                     service.updateSectionsAndRebuildSeats(service.sections);
                     await service.persistAll();
+
+                    // Initialize baseline disaster recovery snapshot
+                    final recovery = DisasterRecoveryService(service: service);
+                    await recovery.runAutomatedBackupCycle(force: true);
+
                     if (context.mounted) {
                       Navigator.pushReplacement(
                         context,

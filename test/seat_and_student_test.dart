@@ -1275,7 +1275,26 @@ void main() {
       expect(service.currentPayments.length, equals(1));
       expect(service.currentPayments.first.id, equals('rec_pay_01'));
     });
+
+    test('runAutomatedBackupCycle saves timestamped snapshot content into local storage for background recovery', () async {
+      final recovery = DisasterRecoveryService(service: service);
+      await recovery.setAutoBackupEnabled(true);
+      await recovery.setBackupEmail('library_backup@gmail.com');
+
+      expect(await recovery.isAutoBackupEnabled(), isTrue);
+      expect(await recovery.getBackupEmail(), equals('library_backup@gmail.com'));
+
+      final ok = await recovery.runAutomatedBackupCycle(force: true);
+      expect(ok, isTrue);
+
+      final cachedSnapshot = await recovery.getLatestAutoBackupContent();
+      expect(cachedSnapshot, isNotNull);
+      expect(cachedSnapshot!.contains('# TRACKMYLIBRARY MASTER DISASTER RECOVERY & AUDIT ARCHIVE'), isTrue);
+      expect(await recovery.getLastBackupStatus(), equals('Auto-Synced (Excel)'));
+      expect(await recovery.getLastBackupTime(), isNotNull);
+    });
   });
 }
+
 
 

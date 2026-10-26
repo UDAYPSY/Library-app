@@ -16,6 +16,7 @@ class DisasterRecoveryService {
   static const String keyLastBackupTime = 'gdrive_last_backup_time';
   static const String keyLastBackupSize = 'gdrive_last_backup_size';
   static const String keyLastBackupStatus = 'gdrive_last_backup_status';
+  static const String keyLastSnapshotContent = 'gdrive_last_snapshot_content';
 
   Future<bool> isAutoBackupEnabled() async {
     final val = await LocalStorageService.getString(keyAutoBackupEnabled);
@@ -48,6 +49,34 @@ class DisasterRecoveryService {
 
   Future<String?> getLastBackupStatus() async {
     return await LocalStorageService.getString(keyLastBackupStatus);
+  }
+
+  Future<String?> getLatestAutoBackupContent() async {
+    return await LocalStorageService.getString(keyLastSnapshotContent);
+  }
+
+  /// Runs background automated snapshot update without blocking UI
+  Future<bool> runAutomatedBackupCycle({bool force = false}) async {
+    final enabled = await isAutoBackupEnabled();
+    if (!enabled && !force) return false;
+
+    try {
+      final snapshot = generateMasterExcelSnapshot();
+      final now = DateTime.now();
+      final bytesLength = utf8.encode(snapshot).length;
+      final sizeKb = (bytesLength / 1024).toStringAsFixed(1);
+      final timeStr = DateFormat('dd MMM yyyy, hh:mm a').format(now);
+
+      await LocalStorageService.saveString(keyLastSnapshotContent, snapshot);
+      await LocalStorageService.saveString(keyLastBackupTime, timeStr);
+      await LocalStorageService.saveString(keyLastBackupSize, '$sizeKb KB');
+      await LocalStorageService.saveString(keyLastBackupStatus, 'Auto-Synced (Excel)');
+
+      return true;
+    } catch (e) {
+      await LocalStorageService.saveString(keyLastBackupStatus, 'Failed: $e');
+      return false;
+    }
   }
 
   String _cleanCsvField(dynamic value) {

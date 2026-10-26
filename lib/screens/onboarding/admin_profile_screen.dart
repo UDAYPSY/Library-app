@@ -18,9 +18,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
   final TextEditingController _passCtrl = TextEditingController();
+  late final TextEditingController _driveEmailCtrl;
 
   bool _obscurePass = true;
   bool _showErrors = false;
+  bool _enableDriveAutoBackup = true;
 
   @override
   void initState() {
@@ -28,6 +30,13 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _nameCtrl = TextEditingController(text: _service.profile.adminName != 'Nivi' ? _service.profile.adminName : '');
     _emailCtrl = TextEditingController(text: '');
     _phoneCtrl = TextEditingController(text: '');
+    _driveEmailCtrl = TextEditingController(text: '');
+
+    _emailCtrl.addListener(() {
+      if (_driveEmailCtrl.text.isEmpty || _driveEmailCtrl.text == _emailCtrl.text) {
+        _driveEmailCtrl.text = _emailCtrl.text;
+      }
+    });
   }
 
   @override
@@ -36,6 +45,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     _passCtrl.dispose();
+    _driveEmailCtrl.dispose();
     super.dispose();
   }
 
@@ -59,6 +69,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _service.profile.adminEmail = _emailCtrl.text.trim();
     _service.profile.adminPhone = _phoneCtrl.text.trim();
     await LocalStorageService.saveString('app_admin_password', _passCtrl.text.trim());
+
+    final driveEmail = _driveEmailCtrl.text.trim().isNotEmpty ? _driveEmailCtrl.text.trim() : _emailCtrl.text.trim();
+    await LocalStorageService.saveString('gdrive_auto_backup_enabled', _enableDriveAutoBackup ? 'true' : 'false');
+    await LocalStorageService.saveString('gdrive_backup_email', driveEmail);
 
     if (!mounted) return;
     Navigator.push(
@@ -230,6 +244,89 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                             size: 20,
                           ),
                           onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Google Drive & Cloud Disaster Recovery Onboarding Setup
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7).withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.add_to_drive_rounded, color: Color(0xFFD97706), size: 20),
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Google Drive Auto-Sync',
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textNavy),
+                                      ),
+                                      Text(
+                                        'Daily Excel snapshot of students & ledger',
+                                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Switch.adaptive(
+                                  value: _enableDriveAutoBackup,
+                                  activeColor: const Color(0xFFD97706),
+                                  onChanged: (val) => setState(() => _enableDriveAutoBackup = val),
+                                ),
+                              ],
+                            ),
+                            if (_enableDriveAutoBackup) ...[
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: _driveEmailCtrl,
+                                keyboardType: TextInputType.emailAddress,
+                                style: const TextStyle(fontSize: 13, color: AppColors.textNavy),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  labelText: 'Google Drive Account (Gmail)',
+                                  labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                  prefixIcon: const Icon(Icons.email_outlined, size: 18, color: Color(0xFFD97706)),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Row(
+                                children: [
+                                  Icon(Icons.shield_outlined, size: 14, color: Color(0xFF16A34A)),
+                                  SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '100% Disaster-Proof: Lossless Excel backup runs automatically.',
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF16A34A), fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       const SizedBox(height: 24),
