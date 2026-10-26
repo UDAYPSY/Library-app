@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "984519580974",
+    "project_id": "trackmylib-171b7",
+    "storage_bucket": "trackmylib-171b7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:984519580974:android:28f76102d394eff794eebf",
+        "android_client_info": {
+          "package_name": "com.trackmylibrary.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "984519580974-ionoon1d9uns3v20fhkt9pgosmu837pa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtB6XKqzqYJgcJ26G6_vOwudqW5Ox2E9s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "984519580974-ionoon1d9uns3v20fhkt9pgosmu837pa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

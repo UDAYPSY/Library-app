@@ -1126,14 +1126,15 @@ class LibraryService {
     }
   }
 
-  // Real-time expenses stream
-  Stream<List<ExpenseItem>> streamExpenses() {
+  // Real-time expenses stream with optional limit
+  Stream<List<ExpenseItem>> streamExpenses({int? limit}) {
     ensureInitialized();
     if (isFirebaseConnected) {
-      return _tenantCol('expenses')
-          .orderBy('date', descending: true)
-          .snapshots()
-          .map((snapshot) {
+      var query = _tenantCol('expenses').orderBy('date', descending: true);
+      if (limit != null && limit > 0) {
+        query = query.limit(limit);
+      }
+      return query.snapshots().map((snapshot) {
         return snapshot.docs
             .map((d) => ExpenseItem.fromFirestore(d.id, d.data()))
             .toList();
@@ -1141,7 +1142,10 @@ class LibraryService {
     } else {
       Timer.run(() {
         if (!_mockExpensesController.isClosed) {
-          _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+          final items = (limit != null && limit > 0)
+              ? _mockExpenses.take(limit).toList()
+              : _mockExpenses;
+          _mockExpensesController.add(List.unmodifiable(items));
         }
       });
       return _mockExpensesController.stream;
@@ -1199,18 +1203,24 @@ class LibraryService {
     }
   }
 
-  // Stream Payment Transactions
-  Stream<List<PaymentTransaction>> streamPayments() {
+  // Stream Payment Transactions with optional limit
+  Stream<List<PaymentTransaction>> streamPayments({int? limit}) {
     if (isFirebaseConnected) {
-      return _tenantCol('payments')
-          .orderBy('date', descending: true)
-          .snapshots()
-          .map((snapshot) => snapshot.docs
-              .map((doc) => PaymentTransaction.fromFirestore(doc.id, doc.data()))
-              .toList());
+      var query = _tenantCol('payments').orderBy('date', descending: true);
+      if (limit != null && limit > 0) {
+        query = query.limit(limit);
+      }
+      return query.snapshots().map((snapshot) => snapshot.docs
+          .map((doc) => PaymentTransaction.fromFirestore(doc.id, doc.data()))
+          .toList());
     } else {
       ensureInitialized();
-      Future.microtask(() => _mockPaymentsController.add(List.unmodifiable(_mockPayments)));
+      Future.microtask(() {
+        final items = (limit != null && limit > 0)
+            ? _mockPayments.take(limit).toList()
+            : _mockPayments;
+        _mockPaymentsController.add(List.unmodifiable(items));
+      });
       return _mockPaymentsController.stream;
     }
   }

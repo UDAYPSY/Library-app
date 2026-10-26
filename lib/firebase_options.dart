@@ -33,28 +33,29 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDemoPlaceholderKeyForBuild000000',
-    appId: '1:100000000000:web:demo000000000000000000',
-    messagingSenderId: '100000000000',
-    projectId: 'demo-library-project',
-    authDomain: 'demo-library-project.firebaseapp.com',
-    storageBucket: 'demo-library-project.appspot.com',
+    apiKey: 'AIzaSyCMuQVapymALYnE3jJDbHM4hINLX6fAotU',
+    appId: '1:984519580974:web:a497c0a098c52ff694eebf',
+    messagingSenderId: '984519580974',
+    projectId: 'trackmylib-171b7',
+    authDomain: 'trackmylib-171b7.firebaseapp.com',
+    storageBucket: 'trackmylib-171b7.firebasestorage.app',
+    measurementId: 'G-VVQ884B8RB',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDemoPlaceholderKeyForBuild000000',
-    appId: '1:100000000000:android:demo000000000000000000',
-    messagingSenderId: '100000000000',
-    projectId: 'demo-library-project',
-    storageBucket: 'demo-library-project.appspot.com',
+    apiKey: 'AIzaSyAtB6XKqzqYJgcJ26G6_vOwudqW5Ox2E9s',
+    appId: '1:984519580974:android:28f76102d394eff794eebf',
+    messagingSenderId: '984519580974',
+    projectId: 'trackmylib-171b7',
+    storageBucket: 'trackmylib-171b7.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDemoPlaceholderKeyForBuild000000',
-    appId: '1:100000000000:ios:demo000000000000000000',
-    messagingSenderId: '100000000000',
-    projectId: 'demo-library-project',
-    storageBucket: 'demo-library-project.appspot.com',
+    apiKey: 'AIzaSyCMuQVapymALYnE3jJDbHM4hINLX6fAotU',
+    appId: '1:984519580974:ios:a497c0a098c52ff694eebf',
+    messagingSenderId: '984519580974',
+    projectId: 'trackmylib-171b7',
+    storageBucket: 'trackmylib-171b7.firebasestorage.app',
     iosBundleId: 'com.trackmylibrary.app',
   );
 }
