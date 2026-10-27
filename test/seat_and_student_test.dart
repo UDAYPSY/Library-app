@@ -1506,7 +1506,7 @@ void main() {
       expect(student, isNotNull);
       expect(student!.name, equals('Priya Patel'));
       expect(student.seatNumber, equals(40));
-      expect(student.status, equals('PAID'));
+      expect(student.status, equals('ACTIVE'));
 
       // Verify seat is now occupied
       expect(service.isSeatOccupied(40), isTrue);
