@@ -569,7 +569,7 @@ class LibraryService {
     _mockStudents.clear();
     _mockPayments.clear();
     _mockExpenses.clear();
-    _mockStaff.clear();
+    staffList.clear();
     _mockSeats = List.generate(
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
@@ -578,7 +578,6 @@ class LibraryService {
     _mockPaymentsController.add(List.unmodifiable(_mockPayments));
     _mockExpensesController.add(List.unmodifiable(_mockExpenses));
     _mockSeatsController.add(List.unmodifiable(_mockSeats));
-    _mockStaffController.add(List.unmodifiable(_mockStaff));
     await LocalStorageService.remove('app_library_students');
     await LocalStorageService.remove('app_library_payments');
     await LocalStorageService.remove('app_library_expenses');
@@ -624,12 +623,12 @@ class LibraryService {
     _mockStudents.clear();
     _mockPayments.clear();
     _mockExpenses.clear();
-    _mockStaff.clear();
+    staffList.clear();
     _mockSeats = List.generate(
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
     );
-    _profile = const LibraryProfile();
+    profile = LibraryProfile();
     isAuthenticated = false;
     currentUserId = null;
     currentUserRole = 'Admin';
@@ -641,8 +640,6 @@ class LibraryService {
     _mockPaymentsController.add(List.unmodifiable(_mockPayments));
     _mockExpensesController.add(List.unmodifiable(_mockExpenses));
     _mockSeatsController.add(List.unmodifiable(_mockSeats));
-    _mockStaffController.add(List.unmodifiable(_mockStaff));
-    _profileController.add(_profile);
 
     // Completely wipe persistent storage keys
     final keysToRemove = [
