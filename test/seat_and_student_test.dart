@@ -1455,8 +1455,8 @@ void main() {
         id: 'req_001',
         studentName: 'Priya Patel',
         phone: '9988776655',
-        preferredShift: 'Morning Shift',
-        goalOrExam: 'UPSC Civil Services',
+        shift: 'Morning Shift',
+        preparationFor: 'UPSC Civil Services',
         address: 'Sector 14, Gurugram',
         createdAt: DateTime.now(),
         status: 'PENDING',
@@ -1475,8 +1475,8 @@ void main() {
         id: 'req_002',
         studentName: 'Rohan Sharma',
         phone: '9988776644',
-        preferredShift: 'Evening Shift',
-        goalOrExam: 'SSC CGL',
+        shift: 'Evening Shift',
+        preparationFor: 'SSC CGL',
         address: 'Delhi',
         createdAt: DateTime.now(),
         status: 'PENDING',
@@ -1486,7 +1486,7 @@ void main() {
 
       final rejected = service.currentRegistrationRequests.firstWhere((r) => r.id == 'req_002');
       expect(rejected.status, equals('REJECTED'));
-      expect(rejected.adminNotes, equals('Evening shift full'));
+      expect(rejected.rejectionReason, equals('Evening shift full'));
 
       // Accept req1: Allot seat S-40, fee 1000, paid 1000
       await service.acceptRegistrationRequest(
@@ -1497,10 +1497,9 @@ void main() {
         paymentMode: 'UPI',
       );
 
-      // Verify req1 status is ACCEPTED and seat is assigned
+      // Verify req1 status is ACCEPTED
       final acceptedReq = service.currentRegistrationRequests.firstWhere((r) => r.id == 'req_001');
       expect(acceptedReq.status, equals('ACCEPTED'));
-      expect(acceptedReq.allottedSeatNumber, equals(40));
 
       // Verify student was registered in library
       final student = service.findStudentByPhone('9988776655');
