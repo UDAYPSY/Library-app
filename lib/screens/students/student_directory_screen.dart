@@ -2449,7 +2449,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
         builder: (modalCtx, setModalState) {
           final occupiedSeatNumbers = _service.currentStudents
               .where((s) => s.status != 'INACTIVE' && s.seatNumber != null)
-              .where((s) => _service.doShiftsConflict(s.shift, selectedShift, allShifts: _service.shifts))
+              .where((s) => LibraryService.doShiftsConflict(s.shift, selectedShift, allShifts: _service.shifts))
               .map((s) => s.seatNumber!)
               .toSet();
 

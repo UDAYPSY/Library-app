@@ -212,7 +212,7 @@ class _StudentSelfRegistrationScreenState
     final profile = _service.profile;
     final libName = profile.libraryName.isNotEmpty ? profile.libraryName : 'Oxford Study Library';
     final city = profile.city.isNotEmpty ? profile.city : 'Central Branch';
-    final address = profile.address.isNotEmpty ? profile.address : city;
+    final address = city;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

@@ -51,6 +51,7 @@ class LibraryProfile {
   }
 
   bool get hasCustomLogo => (logoBase64 != null && logoBase64!.isNotEmpty) || (logoUrl != null && logoUrl!.isNotEmpty);
+  String get address => city;
   int whatsappCredits;
   int messagesSentCount;
   bool whatsappNotifications;
