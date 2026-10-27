@@ -1509,8 +1509,7 @@ void main() {
       expect(student.status, equals('PAID'));
 
       // Verify seat is now occupied
-      final seat40 = service.seats.firstWhere((s) => s.seatNumber == 40);
-      expect(seat40.isOccupied, isTrue);
+      expect(service.isSeatOccupied(40), isTrue);
 
       // Verify initial fee payment was recorded
       final payment = service.getLastPaymentForStudent(studentId: student.id, phone: '9988776655', name: 'Priya Patel');
