@@ -1698,10 +1698,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showDeleteAccountDialog() {
-    if (!_service.isAdmin) {
+    if (_service.isReceptionist) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Access Denied: Only Library Administrator can wipe library data.'),
+          content: Text('Access Denied: Only Library Administrator can delete the account.'),
           backgroundColor: Color(0xFFEF4444),
           behavior: SnackBarBehavior.floating,
         ),
@@ -1712,14 +1712,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Account?', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEF4444))),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 28),
+            SizedBox(width: 8),
+            Text('Delete Account?', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEF4444))),
+          ],
+        ),
         content: const Text(
-          'This action is irreversible. All student records, seat maps, expense history, and WhatsApp automation settings will be permanently wiped.',
+          'This action is irreversible. All student profiles, fee transactions, expense records, seat allocation maps, library settings, and login credentials will be permanently erased.',
+          style: TextStyle(fontSize: 14, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Keep Account', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1729,17 +1736,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              await _service.clearAllData();
+
+              // Show blocking progress indicator
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => PopScope(
+                  canPop: false,
+                  child: AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    content: const Row(
+                      children: [
+                        CircularProgressIndicator(color: Color(0xFFEF4444)),
+                        SizedBox(width: 20),
+                        Expanded(
+                          child: Text(
+                            'Permanently deleting account and wiping data...',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+
+              try {
+                await _service.deleteAccountPermanently();
+              } catch (_) {}
+
               if (context.mounted) {
+                // Dismiss blocking indicator
+                Navigator.of(context, rootNavigator: true).pop();
+
+                // Navigate to login screen
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                   (route) => false,
                 );
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('All library data has been wiped.'),
+                    content: Text('Your library account and all associated data have been permanently deleted.'),
                     backgroundColor: Color(0xFFEF4444),
+                    behavior: SnackBarBehavior.floating,
                   ),
                 );
               }

@@ -203,6 +203,19 @@ class LibraryService {
     _saveLocalState();
   }
 
+  bool deleteShift(String shiftId) {
+    ensureInitialized();
+    final idx = shifts.indexWhere((s) => s.id == shiftId);
+    if (idx != -1) {
+      final target = shifts[idx];
+      if (target.isSystemSlot) return false;
+      shifts.removeAt(idx);
+      _saveLocalState();
+      return true;
+    }
+    return false;
+  }
+
   int get totalSeatsCount {
     int total = 0;
     for (var s in sections) {
@@ -540,9 +553,23 @@ class LibraryService {
 
 
   Future<void> clearAllData() async {
+    if (isFirebaseConnected) {
+      try {
+        final collections = ['students', 'seats', 'payments', 'expenses', 'staff'];
+        for (final col in collections) {
+          final snaps = await _tenantCol(col).get();
+          final batch = _db.batch();
+          for (final doc in snaps.docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+        }
+      } catch (_) {}
+    }
     _mockStudents.clear();
     _mockPayments.clear();
     _mockExpenses.clear();
+    _mockStaff.clear();
     _mockSeats = List.generate(
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
@@ -551,9 +578,103 @@ class LibraryService {
     _mockPaymentsController.add(List.unmodifiable(_mockPayments));
     _mockExpensesController.add(List.unmodifiable(_mockExpenses));
     _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    _mockStaffController.add(List.unmodifiable(_mockStaff));
     await LocalStorageService.remove('app_library_students');
     await LocalStorageService.remove('app_library_payments');
     await LocalStorageService.remove('app_library_expenses');
+    await LocalStorageService.remove('app_library_staff');
+  }
+
+  // Permanently delete user account, wipe cloud tenant data, delete Firebase user, and purge all local storage
+  Future<void> deleteAccountPermanently() async {
+    ensureInitialized();
+
+    if (isFirebaseConnected) {
+      try {
+        final collections = ['students', 'seats', 'payments', 'expenses', 'staff', 'settings', 'backups'];
+        for (final col in collections) {
+          final snaps = await _tenantCol(col).get();
+          final batch = _db.batch();
+          for (final doc in snaps.docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+        }
+
+        // Delete parent library doc if it exists
+        try {
+          await _db.collection('libraries').doc(tenantId).delete();
+        } catch (_) {}
+
+        // Delete Firebase user auth account if possible, or sign out
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            await user.delete();
+          }
+        } catch (_) {
+          try {
+            await FirebaseAuth.instance.signOut();
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    // Reset all in-memory state
+    _mockStudents.clear();
+    _mockPayments.clear();
+    _mockExpenses.clear();
+    _mockStaff.clear();
+    _mockSeats = List.generate(
+      totalSeatsCount,
+      (index) => SeatInfo(seatNumber: index + 1),
+    );
+    _profile = const LibraryProfile();
+    isAuthenticated = false;
+    currentUserId = null;
+    currentUserRole = 'Admin';
+    currentUserName = '';
+    currentUserEmail = '';
+
+    // Notify all UI streams of complete reset
+    _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+    _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+    _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    _mockStaffController.add(List.unmodifiable(_mockStaff));
+    _profileController.add(_profile);
+
+    // Completely wipe persistent storage keys
+    final keysToRemove = [
+      'app_active_session',
+      'app_library_profile',
+      'app_library_students',
+      'app_library_payments',
+      'app_library_expenses',
+      'app_library_staff',
+      'app_library_sections',
+      'app_library_shifts',
+      'app_admin_password',
+      'gdrive_auto_backup_enabled',
+      'gdrive_backup_frequency',
+      'gdrive_last_backup_time',
+      'gdrive_account_email',
+    ];
+    for (final k in keysToRemove) {
+      await LocalStorageService.remove(k);
+    }
+  }
+
+  bool deleteSection(String sectionName) {
+    ensureInitialized();
+    if (sections.length <= 1) return false;
+    final idx = sections.indexWhere((s) => s.name.toLowerCase() == sectionName.toLowerCase());
+    if (idx != -1) {
+      sections.removeAt(idx);
+      updateSectionsAndRebuildSeats(sections);
+      return true;
+    }
+    return false;
   }
 
   void updateSectionsAndRebuildSeats(List<SectionConfig> newSections) {
@@ -750,8 +871,12 @@ class LibraryService {
     final normPhone = phone != null ? normalizePhone(phone) : null;
     for (var p in _mockPayments) {
       if (studentId != null && studentId.isNotEmpty && p.studentId == studentId) return p;
-      if (normPhone != null && normPhone.isNotEmpty && normalizePhone(p.studentPhone) == normPhone) return p;
-      if (name != null && name.trim().isNotEmpty && p.studentName.trim().toLowerCase() == name.trim().toLowerCase()) return p;
+      if ((studentId == null || studentId.isEmpty) &&
+          normPhone != null &&
+          normPhone.isNotEmpty &&
+          normalizePhone(p.studentPhone) == normPhone) {
+        return p;
+      }
     }
     return null;
   }
@@ -1257,12 +1382,65 @@ class LibraryService {
   Future<void> deleteExpense(String expenseId) async {
     ensureInitialized();
     if (isFirebaseConnected) {
-      await _tenantCol('expenses').doc(expenseId).delete();
-    } else {
-      _mockExpenses.removeWhere((e) => e.id == expenseId);
-      _mockExpensesController.add(List.unmodifiable(_mockExpenses));
-      await _saveLocalState();
+      try {
+        await _tenantCol('expenses').doc(expenseId).delete();
+      } catch (_) {}
     }
+    _mockExpenses.removeWhere((e) => e.id == expenseId);
+    _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+    await _saveLocalState();
+  }
+
+  // Delete / Void Payment Transaction with optional student dues reinstatement
+  Future<void> deletePayment(String paymentId, {bool reinstateStudentDues = false}) async {
+    ensureInitialized();
+    PaymentTransaction? targetPay;
+    try {
+      targetPay = _mockPayments.firstWhere((p) => p.id == paymentId);
+    } catch (_) {}
+
+    if (isFirebaseConnected) {
+      try {
+        await _tenantCol('payments').doc(paymentId).delete();
+        if (reinstateStudentDues && targetPay != null && targetPay.studentId.isNotEmpty) {
+          final studentDoc = await _tenantCol('students').doc(targetPay.studentId).get();
+          if (studentDoc.exists) {
+            final data = studentDoc.data() ?? {};
+            final curDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
+            final restoredDues = curDues + targetPay.amount;
+            final now = DateTime.now();
+            final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+            final curNote = (data['note'] as String?) ?? '';
+            final voidLog = 'Payment of ₹${targetPay.amount} voided/deleted on $dateStr (₹${targetPay.amount} added back to pending dues).';
+            await _tenantCol('students').doc(targetPay.studentId).update({
+              'dues_amount': restoredDues,
+              'status': 'DUES',
+              'note': appendNote(curNote, voidLog),
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (reinstateStudentDues && targetPay != null && targetPay.studentId.isNotEmpty) {
+      final sIdx = _mockStudents.indexWhere((s) => s.id == targetPay!.studentId);
+      if (sIdx != -1) {
+        final st = _mockStudents[sIdx];
+        final now = DateTime.now();
+        final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+        final voidLog = 'Payment of ₹${targetPay.amount} voided/deleted on $dateStr (₹${targetPay.amount} added back to pending dues).';
+        _mockStudents[sIdx] = st.copyWith(
+          duesAmount: st.duesAmount + targetPay.amount,
+          status: 'DUES',
+          note: appendNote(st.note, voidLog),
+        );
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+    }
+
+    _mockPayments.removeWhere((p) => p.id == paymentId);
+    _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+    await _saveLocalState();
   }
 
   // Stream Payment Transactions with optional limit
@@ -1373,8 +1551,10 @@ class LibraryService {
       // Reconcile dues & activity log in student if registered
       final matchIdx = _mockStudents.indexWhere((s) =>
           (studentId != null && studentId.isNotEmpty && s.id == studentId) ||
-          (phone != null && phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(phone)) ||
-          (s.name.toLowerCase() == studentName.toLowerCase()));
+          ((studentId == null || studentId.isEmpty) &&
+              phone != null &&
+              phone.isNotEmpty &&
+              normalizePhone(s.phone) == normalizePhone(phone)));
 
       if (matchIdx != -1) {
         final s = _mockStudents[matchIdx];
@@ -1455,23 +1635,17 @@ class LibraryService {
             .get();
 
         List<QueryDocumentSnapshot<Map<String, dynamic>>> docs = snap.docs;
-        if (docs.isEmpty && phone != null && phone.isNotEmpty) {
+        if (docs.isEmpty && studentId.isEmpty && phone != null && phone.isNotEmpty) {
           final phoneSnap = await _tenantCol('payments')
               .where('student_phone', isEqualTo: phone)
               .get();
           docs = phoneSnap.docs;
         }
-        if (docs.isEmpty && normPhone != null && normPhone.isNotEmpty && normPhone != phone) {
+        if (docs.isEmpty && studentId.isEmpty && normPhone != null && normPhone.isNotEmpty && normPhone != phone) {
           final normSnap = await _tenantCol('payments')
               .where('student_phone', isEqualTo: normPhone)
               .get();
           docs = normSnap.docs;
-        }
-        if (docs.isEmpty && studentName != null && studentName.trim().isNotEmpty) {
-          final nameSnap = await _tenantCol('payments')
-              .where('student_name', isEqualTo: studentName.trim())
-              .get();
-          docs = nameSnap.docs;
         }
         if (docs.isEmpty) {
           final allSnap = await _tenantCol('payments').limit(100).get();
@@ -1479,10 +1653,8 @@ class LibraryService {
             final data = d.data();
             final sId = data['student_id']?.toString() ?? '';
             final sPhone = data['student_phone']?.toString() ?? '';
-            final sName = data['student_name']?.toString() ?? '';
             return (studentId.isNotEmpty && sId == studentId) ||
-                (normPhone != null && normPhone.isNotEmpty && normalizePhone(sPhone) == normPhone) ||
-                (studentName != null && studentName.trim().isNotEmpty && sName.trim().toLowerCase() == studentName.trim().toLowerCase());
+                (studentId.isEmpty && normPhone != null && normPhone.isNotEmpty && normalizePhone(sPhone) == normPhone);
           }).toList();
         }
 
@@ -1552,8 +1724,7 @@ class LibraryService {
       for (int i = 0; i < _mockPayments.length; i++) {
         final p = _mockPayments[i];
         final matches = (studentId.isNotEmpty && p.studentId == studentId) ||
-            (normPhone != null && normalizePhone(p.studentPhone) == normPhone) ||
-            (studentName != null && studentName.trim().isNotEmpty && p.studentName.trim().toLowerCase() == studentName.trim().toLowerCase());
+            (studentId.isEmpty && normPhone != null && normalizePhone(p.studentPhone) == normPhone);
         if (matches) {
           if (latestDate == null || p.date.isAfter(latestDate)) {
             latestDate = p.date;
@@ -2164,62 +2335,64 @@ class LibraryService {
         : 'Member moved to Inactive on $dateStr.';
 
     if (isFirebaseConnected) {
-      final batch = _db.batch();
-      final studentDocRef = _tenantCol('students').doc(studentId);
-
-      String updatedNote = '';
       try {
-        final snap = await studentDocRef.get();
-        if (snap.exists) {
-          final curNote = (snap.data()?['note'] as String?) ?? '';
-          updatedNote = appendNote(curNote, inactiveLog);
-        }
-      } catch (_) {}
+        final batch = _db.batch();
+        final studentDocRef = _tenantCol('students').doc(studentId);
 
-      batch.update(studentDocRef, {
-        'status': 'INACTIVE',
-        'seat_number': null,
-        if (updatedNote.isNotEmpty) 'note': updatedNote,
-      });
-      if (seatNumber != null) {
-        final otherStudents = _mockStudents.where(
-          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
-        ).toList();
-        final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
-        if (otherStudents.isNotEmpty) {
-          final rem = otherStudents.first;
-          batch.update(seatDocRef, {
-            'is_occupied': true,
-            'student_id': rem.id,
-            'student_name': rem.name,
-            'shift': rem.shift,
-          });
-        } else {
-          batch.update(seatDocRef, {
-            'is_occupied': false,
-            'student_id': null,
-            'student_name': null,
-            'shift': null,
-          });
+        String updatedNote = '';
+        try {
+          final snap = await studentDocRef.get();
+          if (snap.exists) {
+            final curNote = (snap.data()?['note'] as String?) ?? '';
+            updatedNote = appendNote(curNote, inactiveLog);
+          }
+        } catch (_) {}
+
+        batch.update(studentDocRef, {
+          'status': 'INACTIVE',
+          'seat_number': null,
+          if (updatedNote.isNotEmpty) 'note': updatedNote,
+        });
+        if (seatNumber != null) {
+          final otherStudents = _mockStudents.where(
+            (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+          ).toList();
+          final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
+          if (otherStudents.isNotEmpty) {
+            final rem = otherStudents.first;
+            batch.update(seatDocRef, {
+              'is_occupied': true,
+              'student_id': rem.id,
+              'student_name': rem.name,
+              'shift': rem.shift,
+            });
+          } else {
+            batch.update(seatDocRef, {
+              'is_occupied': false,
+              'student_id': null,
+              'student_name': null,
+              'shift': null,
+            });
+          }
         }
-      }
-      await batch.commit();
-    } else {
-      final idx = _mockStudents.indexWhere((s) => s.id == studentId);
-      if (idx != -1) {
-        final s = _mockStudents[idx];
-        final updatedNote = appendNote(s.note, inactiveLog);
-        _mockStudents[idx] = s.copyWith(
-          status: 'INACTIVE',
-          seatNumber: null,
-          clearSeatNumber: true,
-          note: updatedNote,
-        );
-      }
-      _syncSeatsWithStudents();
-      _mockStudentsController.add(List.unmodifiable(_mockStudents));
-      _saveLocalState();
+        await batch.commit();
+      } catch (_) {}
     }
+
+    final idx = _mockStudents.indexWhere((s) => s.id == studentId);
+    if (idx != -1) {
+      final s = _mockStudents[idx];
+      final updatedNote = appendNote(s.note, inactiveLog);
+      _mockStudents[idx] = s.copyWith(
+        status: 'INACTIVE',
+        seatNumber: null,
+        clearSeatNumber: true,
+        note: updatedNote,
+      );
+    }
+    _syncSeatsWithStudents();
+    _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    await _saveLocalState();
   }
 
   // Delete Student alias to markStudentInactive (moves student to INACTIVE tab)
@@ -2227,42 +2400,55 @@ class LibraryService {
     await markStudentInactive(studentId, seatNumber);
   }
 
-  // Permanently purge student from records
+  // Permanently purge student from records and delete associated payments
   Future<void> permanentlyDeleteStudent(String studentId, int? seatNumber) async {
     ensureInitialized();
     if (isFirebaseConnected) {
-      final batch = _db.batch();
-      final studentDocRef = _tenantCol('students').doc(studentId);
-      batch.delete(studentDocRef);
-      if (seatNumber != null) {
-        final otherStudents = _mockStudents.where(
-          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
-        ).toList();
-        final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
-        if (otherStudents.isNotEmpty) {
-          final rem = otherStudents.first;
-          batch.update(seatDocRef, {
-            'is_occupied': true,
-            'student_id': rem.id,
-            'student_name': rem.name,
-            'shift': rem.shift,
-          });
-        } else {
-          batch.update(seatDocRef, {
-            'is_occupied': false,
-            'student_id': null,
-            'student_name': null,
-            'shift': null,
-          });
+      try {
+        final batch = _db.batch();
+        final studentDocRef = _tenantCol('students').doc(studentId);
+        batch.delete(studentDocRef);
+
+        // Delete all payment records linked to this student from Firestore
+        try {
+          final paySnap = await _tenantCol('payments').where('student_id', isEqualTo: studentId).get();
+          for (final pDoc in paySnap.docs) {
+            batch.delete(pDoc.reference);
+          }
+        } catch (_) {}
+
+        if (seatNumber != null) {
+          final otherStudents = _mockStudents.where(
+            (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+          ).toList();
+          final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
+          if (otherStudents.isNotEmpty) {
+            final rem = otherStudents.first;
+            batch.update(seatDocRef, {
+              'is_occupied': true,
+              'student_id': rem.id,
+              'student_name': rem.name,
+              'shift': rem.shift,
+            });
+          } else {
+            batch.update(seatDocRef, {
+              'is_occupied': false,
+              'student_id': null,
+              'student_name': null,
+              'shift': null,
+            });
+          }
         }
-      }
-      await batch.commit();
-    } else {
-      _mockStudents.removeWhere((s) => s.id == studentId);
-      _syncSeatsWithStudents();
-      _mockStudentsController.add(List.unmodifiable(_mockStudents));
-      _saveLocalState();
+        await batch.commit();
+      } catch (_) {}
     }
+
+    _mockStudents.removeWhere((s) => s.id == studentId);
+    _mockPayments.removeWhere((p) => p.studentId == studentId);
+    _syncSeatsWithStudents();
+    _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+    await _saveLocalState();
   }
 
   // Mark Student as Trial

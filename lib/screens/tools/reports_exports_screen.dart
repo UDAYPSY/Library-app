@@ -163,11 +163,9 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
         category = 'Veteran (> 1 Year)';
       }
       final sPhoneNorm = LibraryService.normalizePhone(s.phone);
-      final sNameLower = s.name.trim().toLowerCase();
       final totalPaid = allPayments.where((p) {
-        if (p.studentId.isNotEmpty && p.studentId == s.id) return true;
+        if (p.studentId.isNotEmpty) return p.studentId == s.id;
         if (sPhoneNorm.isNotEmpty && p.studentPhone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == sPhoneNorm) return true;
-        if (sNameLower.isNotEmpty && p.studentName.trim().toLowerCase() == sNameLower) return true;
         return false;
       }).fold<int>(0, (sum, p) => sum + p.amount);
 
@@ -1110,12 +1108,10 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
       final months = ((now.year - joined.year) * 12 + (now.month - joined.month)).clamp(0, 120);
       final days = now.difference(joined).inDays.clamp(0, 99999);
       final sPhoneNorm = LibraryService.normalizePhone(s.phone);
-      final sNameLower = s.name.trim().toLowerCase();
 
       final totalPaid = payments.where((p) {
-        if (p.studentId.isNotEmpty && p.studentId == s.id) return true;
+        if (p.studentId.isNotEmpty) return p.studentId == s.id;
         if (sPhoneNorm.isNotEmpty && p.studentPhone.isNotEmpty && LibraryService.normalizePhone(p.studentPhone) == sPhoneNorm) return true;
-        if (sNameLower.isNotEmpty && p.studentName.trim().toLowerCase() == sNameLower) return true;
         return false;
       }).fold<int>(0, (sum, p) => sum + p.amount);
 

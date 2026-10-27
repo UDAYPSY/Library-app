@@ -582,33 +582,130 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
   }
 
   void _confirmDeleteStudent() {
+    final isInactive = _student.status == 'INACTIVE';
+
+    if (isInactive) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 24),
+              SizedBox(width: 8),
+              Text('Permanently Delete?', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEF4444))),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to permanently delete ${_student.name}? This will completely wipe all member data and cannot be undone.',
+            style: const TextStyle(fontSize: 14, color: AppColors.textNavy),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                await _service.permanentlyDeleteStudent(_student.id, _student.seatNumber);
+                Navigator.pop(ctx);
+                if (mounted) {
+                  Navigator.pop(context, true);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${_student.name} permanently deleted from records.'),
+                      backgroundColor: Colors.black87,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Delete Permanently', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Deactivate Member', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEF4444))),
-        content: Text('Are you sure you want to move ${_student.name} to inactive members? Their seat #${_student.seatNumber ?? ''} will be freed.'),
+        title: const Text('Remove Student', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'How would you like to remove ${_student.name}?',
+              style: const TextStyle(fontSize: 14, color: AppColors.textNavy, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.archive_outlined, color: Color(0xFFD97706), size: 20),
+                    ),
+                    title: const Text('Move to Inactive Tab', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text('Frees Seat #${_student.seatNumber ?? "—"} while preserving past payment and membership history for future renewal.', style: const TextStyle(fontSize: 11)),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _service.markStudentInactive(_student.id, _student.seatNumber);
+                      if (mounted) {
+                        Navigator.pop(context, true);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${_student.name} moved to Inactive and seat freed.'), backgroundColor: const Color(0xFFD97706)),
+                        );
+                      }
+                    },
+                  ),
+                  const Divider(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 20),
+                    ),
+                    title: const Text('Permanently Delete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFEF4444))),
+                    subtitle: const Text('Completely purges this student record from the database. Cannot be undone.', style: TextStyle(fontSize: 11)),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _service.permanentlyDeleteStudent(_student.id, _student.seatNumber);
+                      if (mounted) {
+                        Navigator.pop(context, true);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${_student.name} permanently deleted.'), backgroundColor: Colors.black87),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () async {
-              await _service.markStudentInactive(_student.id, _student.seatNumber);
-              Navigator.pop(ctx); // close dialog
-              if (mounted) {
-                Navigator.pop(context, true); // exit profile
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${_student.name} moved to Inactive'), backgroundColor: const Color(0xFFEF4444)),
-                );
-              }
-            },
-            child: const Text('Deactivate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -2065,17 +2162,16 @@ _Powered by TrackMyLibrary_
                       builder: (context, paySnap) {
                         final allPayments = paySnap.data ?? _service.currentPayments;
                         final studentPhoneNorm = LibraryService.normalizePhone(_student.phone);
-                        final studentNameLower = _student.name.trim().toLowerCase();
 
                         final studentPayments = allPayments.where((p) {
-                          if (p.studentId.isNotEmpty && p.studentId == _student.id) return true;
+                          // Primary match: unique student ID
+                          if (p.studentId.isNotEmpty) {
+                            return p.studentId == _student.id;
+                          }
+                          // Fallback ONLY for legacy payments without studentId: match normalized phone
                           if (studentPhoneNorm.isNotEmpty &&
                               p.studentPhone.isNotEmpty &&
                               LibraryService.normalizePhone(p.studentPhone) == studentPhoneNorm) {
-                            return true;
-                          }
-                          if (studentNameLower.isNotEmpty &&
-                              p.studentName.trim().toLowerCase() == studentNameLower) {
                             return true;
                           }
                           return false;

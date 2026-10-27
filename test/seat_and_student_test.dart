@@ -1334,6 +1334,121 @@ void main() {
       expect(restored.upiId, equals('oxfordlibrary@okhdfcbank'));
       expect(restored.effectiveUpiId, equals('oxfordlibrary@okhdfcbank'));
     });
+
+    test('Students with identical names do NOT share payment transactions', () async {
+      // Register first student with name "Rahul Verma"
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 31,
+        studentName: 'Rahul Verma',
+        phone: '9876511111',
+        shift: 'Morning Shift',
+        deviceUserId: 'Admin',
+        studentId: 'std_rahul_v1',
+        feeAmount: 800,
+        duesAmount: 0,
+        status: 'ACTIVE',
+      );
+
+      // Record payment for first Rahul
+      await service.recordPayment(
+        studentId: 'std_rahul_v1',
+        studentName: 'Rahul Verma',
+        phone: '9876511111',
+        seatNumber: 31,
+        shift: 'Morning Shift',
+        amount: 800,
+        paymentMode: 'UPI',
+        notes: 'June Month Fee',
+      );
+
+      // Register second student with same name "Rahul Verma" on a different seat
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 32,
+        studentName: 'Rahul Verma',
+        phone: '9876522222',
+        shift: 'Evening Shift',
+        deviceUserId: 'Admin',
+        studentId: 'std_rahul_v2',
+        feeAmount: 900,
+        duesAmount: 900,
+        status: 'DUES',
+      );
+
+      // Verify payment for Rahul 1
+      final p1 = service.getLastPaymentForStudent(studentId: 'std_rahul_v1', phone: '9876511111', name: 'Rahul Verma');
+      expect(p1, isNotNull);
+      expect(p1!.studentId, equals('std_rahul_v1'));
+      expect(p1.amount, equals(800));
+
+      // Verify Rahul 2 has NO payments recorded
+      final p2 = service.getLastPaymentForStudent(studentId: 'std_rahul_v2', phone: '9876522222', name: 'Rahul Verma');
+      expect(p2, isNull);
+
+      // Verify filtering payments strictly by studentId
+      final rahul2Payments = service.currentPayments.where((p) => p.studentId == 'std_rahul_v2').toList();
+      expect(rahul2Payments, isEmpty);
+    });
+
+    test('Permanently deleting a student purges their payments and prevents transfer to future same-named student', () async {
+      // Register a student
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 33,
+        studentName: 'Amit Sharma',
+        phone: '9876533333',
+        shift: 'Full Day',
+        deviceUserId: 'Admin',
+        studentId: 'std_amit_old',
+        feeAmount: 1200,
+        duesAmount: 0,
+        status: 'ACTIVE',
+      );
+
+      await service.recordPayment(
+        studentId: 'std_amit_old',
+        studentName: 'Amit Sharma',
+        phone: '9876533333',
+        seatNumber: 33,
+        shift: 'Full Day',
+        amount: 1200,
+        paymentMode: 'Cash',
+      );
+
+      expect(service.currentPayments.any((p) => p.studentId == 'std_amit_old'), isTrue);
+
+      // Permanently delete old Amit Sharma
+      await service.permanentlyDeleteStudent('std_amit_old', 33);
+
+      // Verify payments for std_amit_old were purged
+      expect(service.currentPayments.any((p) => p.studentId == 'std_amit_old'), isFalse);
+      expect(service.findStudentByPhone('9876533333'), isNull);
+
+      // Register new student who happens to also be named "Amit Sharma"
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 34,
+        studentName: 'Amit Sharma',
+        phone: '9876544444',
+        shift: 'Full Day',
+        deviceUserId: 'Admin',
+        studentId: 'std_amit_new',
+        feeAmount: 1200,
+        duesAmount: 1200,
+        status: 'DUES',
+      );
+
+      final newAmitPay = service.getLastPaymentForStudent(studentId: 'std_amit_new', phone: '9876544444', name: 'Amit Sharma');
+      expect(newAmitPay, isNull);
+    });
+
+    test('deleteAccountPermanently completely wipes state and logs out', () async {
+      await service.deleteAccountPermanently();
+
+      expect(service.mockStudentsList, isEmpty);
+      expect(service.currentPayments, isEmpty);
+      expect(service.mockExpensesList, isEmpty);
+      expect(service.staffList, isEmpty);
+      expect(service.isAuthenticated, isFalse);
+      expect(service.currentUserId, isNull);
+    });
   });
 }
 

@@ -552,33 +552,36 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
 
   void _confirmDeleteStudent(StudentInfo s) {
     final isInactive = s.status == 'INACTIVE';
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          isInactive ? 'Permanently Delete Student' : 'Move to Inactive Tab',
-          style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy),
-        ),
-        content: Text(
-          isInactive
-              ? 'Are you sure you want to permanently delete ${s.name}? This student record will be completely removed.'
-              : 'Are you sure you want to remove ${s.name}? They will be moved to the INACTIVE tab and their seat (${s.seatNumber != null ? "Seat #${s.seatNumber}" : "unallocated"}) will be vacated. You can restore them anytime from the INACTIVE tab.',
-          style: const TextStyle(fontSize: 14, color: AppColors.textNavy),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+
+    if (isInactive) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 24),
+              SizedBox(width: 8),
+              Text('Permanently Delete?', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEF4444))),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text(
+            'Are you sure you want to permanently delete ${s.name}? This will completely remove all student records from the database.',
+            style: const TextStyle(fontSize: 14, color: AppColors.textNavy),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
             ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              if (isInactive) {
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
                 await _service.permanentlyDeleteStudent(s.id, s.seatNumber);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -589,20 +592,86 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     ),
                   );
                 }
-              } else {
-                await _service.markStudentInactive(s.id, s.seatNumber);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${s.name} moved to Inactive tab and seat vacated.'),
-                      backgroundColor: Colors.black87,
-                      behavior: SnackBarBehavior.floating,
+              },
+              child: const Text('Delete Permanently', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Remove Student', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'How would you like to remove ${s.name}?',
+              style: const TextStyle(fontSize: 14, color: AppColors.textNavy, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.archive_outlined, color: Color(0xFFD97706), size: 20),
                     ),
-                  );
-                }
-              }
-            },
-            child: Text(isInactive ? 'Delete Permanently' : 'Move to Inactive', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    title: const Text('Move to Inactive Tab', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text('Frees Seat #${s.seatNumber ?? "—"} while preserving past payment and membership history for future renewal.', style: const TextStyle(fontSize: 11)),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _service.markStudentInactive(s.id, s.seatNumber);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${s.name} moved to Inactive and seat freed.'), backgroundColor: const Color(0xFFD97706)),
+                        );
+                      }
+                    },
+                  ),
+                  const Divider(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 20),
+                    ),
+                    title: const Text('Permanently Delete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFEF4444))),
+                    subtitle: const Text('Completely purges this student record from the database. Cannot be undone.', style: TextStyle(fontSize: 11)),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _service.permanentlyDeleteStudent(s.id, s.seatNumber);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${s.name} permanently deleted.'), backgroundColor: Colors.black87),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
