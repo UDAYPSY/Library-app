@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,6 +9,7 @@ import '../../services/library_service.dart';
 import '../../services/excel_import_service.dart';
 import '../../services/file_export_service.dart';
 import '../../widgets/collect_payment_modal.dart';
+import '../tools/share_qr_screen.dart';
 import 'add_student_wizard_screen.dart';
 import 'member_profile_screen.dart';
 
@@ -28,6 +30,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
 
   final List<Map<String, dynamic>> _statusFilters = [
     {'label': 'RECENT', 'icon': Icons.access_time_rounded},
+    {'label': 'QR REQUESTS', 'icon': Icons.qr_code_scanner_rounded},
     {'label': 'PAID', 'icon': Icons.check_rounded},
     {'label': 'DUES', 'icon': Icons.error_outline_rounded},
     {'label': 'REMAINING', 'icon': Icons.account_balance_wallet_outlined},
@@ -1286,10 +1289,12 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Content Area (Image 2: Empty state OR Student Cards)
+                    // Content Area (Image 2: Empty state OR Student Cards OR QR Requests)
                     Expanded(
-                      child: filteredStudents.isEmpty
-                          ? Center(
+                      child: _selectedStatusFilter == 'QR REQUESTS'
+                          ? _buildQrRequestsView()
+                          : filteredStudents.isEmpty
+                              ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -2056,4 +2061,634 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     );
   }
 
+  // -------------------------------------------------------------
+  // QR STUDENT ADMISSION REQUESTS & APPROVAL WORKFLOW
+  // -------------------------------------------------------------
+
+  Widget _buildQrRequestsView() {
+    return StreamBuilder<List<RegistrationRequest>>(
+      stream: _service.streamRegistrationRequests(),
+      builder: (context, snapshot) {
+        final allReqs = snapshot.data ?? _service.currentRegistrationRequests;
+        final query = _searchCtrl.text.trim().toLowerCase();
+        final reqs = allReqs.where((r) {
+          if (query.isNotEmpty) {
+            final matchesName = r.studentName.toLowerCase().contains(query);
+            final matchesPhone = r.phone.contains(query);
+            if (!matchesName && !matchesPhone) return false;
+          }
+          if (_selectedShiftFilter != 'ALL SHIFTS') {
+            if (r.shift.toUpperCase() != _selectedShiftFilter) return false;
+          }
+          return true;
+        }).toList();
+
+        if (reqs.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDFA),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFCCFBF1), width: 2),
+                    ),
+                    child: const Icon(Icons.qr_code_scanner_rounded, size: 48, color: Color(0xFF0D9488)),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No QR Admission Requests',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'When students scan your reception desk QR code with their mobile camera, their admission requests appear here for instant seat allotment.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.5),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D6E66),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ShareQrScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.qr_code_rounded, size: 18),
+                    label: const Text('View Desk QR Poster', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                  const SizedBox(height: 60),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
+          itemCount: reqs.length,
+          itemBuilder: (ctx, i) {
+            final req = reqs[i];
+            return _buildRegistrationRequestCard(req);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRegistrationRequestCard(RegistrationRequest req) {
+    final isPending = req.status == 'PENDING';
+    final isAccepted = req.status == 'ACCEPTED';
+
+    Color statusBg = const Color(0xFFFEF3C7);
+    Color statusColor = const Color(0xFFD97706);
+    String statusText = 'PENDING ALLOTMENT';
+    if (isAccepted) {
+      statusBg = const Color(0xFFECFDF5);
+      statusColor = const Color(0xFF059669);
+      statusText = 'SEAT ALLOTTED';
+    } else if (req.status == 'REJECTED') {
+      statusBg = const Color(0xFFFEF2F2);
+      statusColor = const Color(0xFFEF4444);
+      statusText = 'DECLINED';
+    }
+
+    final dateStr = DateFormat('dd MMM, hh:mm a').format(req.createdAt);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card(context),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorderColor(context)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.isDark(context) ? Colors.black26 : const Color(0x06000000),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top row: Photo + Name + Status Pill
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: req.photoBase64 != null && req.photoBase64!.isNotEmpty
+                    ? Image.memory(
+                        base64Decode(req.photoBase64!),
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: 50,
+                        height: 50,
+                        color: const Color(0xFF0D9488).withOpacity(0.12),
+                        child: Center(
+                          child: Text(
+                            req.studentName.isNotEmpty ? req.studentName[0].toUpperCase() : 'S',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0D9488)),
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            req.studentName,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.text(context),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusBg,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Applied $dateStr',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSubtleColor(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Details grid: Phone, Shift, Goal
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.isDark(context) ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.phone_rounded, size: 14, color: Color(0xFF0D9488)),
+                        const SizedBox(width: 6),
+                        Text(
+                          '+91 ${req.phone}',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.text(context)),
+                        ),
+                      ],
+                    ),
+                    InkWell(
+                      onTap: () {
+                        final text = 'Hello ${req.studentName}, thank you for your admission request at ${_service.profile.libraryName}.';
+                        LibraryService.sendWhatsAppDirect(phone: req.phone, message: text);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.chat_bubble_rounded, size: 12, color: Color(0xFF10B981)),
+                            SizedBox(width: 4),
+                            Text('WhatsApp', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.schedule_rounded, size: 14, color: Color(0xFF64748B)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              req.shift,
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.text(context)),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.school_rounded, size: 14, color: Color(0xFF64748B)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              req.preparationFor,
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.text(context)),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (req.fatherName.isNotEmpty || req.address.isNotEmpty) ...[
+                  const Divider(height: 14),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${req.fatherName.isNotEmpty ? "C/o ${req.fatherName} • " : ""}${req.address}',
+                          style: TextStyle(fontSize: 11, color: AppColors.textSubtleColor(context)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Actions Row (for PENDING requests)
+          if (isPending) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D6E66),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () => _showSeatAllotmentSheet(req),
+                    icon: const Icon(Icons.chair_alt_rounded, size: 18),
+                    label: const Text('Allot Seat & Accept', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    side: const BorderSide(color: Color(0xFFFECACA)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (dCtx) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        title: const Text('Decline Request?', style: TextStyle(fontWeight: FontWeight.bold)),
+                        content: Text('Are you sure you want to decline admission request for ${req.studentName}?'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancel')),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+                            onPressed: () => Navigator.pop(dCtx, true),
+                            child: const Text('Decline'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await _service.rejectRegistrationRequest(req.id);
+                    }
+                  },
+                  child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showSeatAllotmentSheet(RegistrationRequest req) {
+    String selectedShift = req.shift;
+    int? selectedSeatNumber;
+
+    final shiftConfig = _service.shifts.firstWhere(
+      (s) => s.name.toLowerCase() == selectedShift.toLowerCase(),
+      orElse: () => ShiftConfig(
+        id: 'default',
+        name: selectedShift,
+        startsAt: '06:00 AM',
+        endsAt: '10:00 PM',
+        monthlyFee: 1000,
+      ),
+    );
+
+    final feeCtrl = TextEditingController(text: '${shiftConfig.monthlyFee}');
+    final paidCtrl = TextEditingController(text: '${shiftConfig.monthlyFee}');
+    String selectedPaymentMode = 'UPI';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) {
+          final occupiedSeatNumbers = _service.currentStudents
+              .where((s) => s.status != 'INACTIVE' && s.seatNumber != null)
+              .where((s) => _service.doShiftsConflict(s.shift, selectedShift, allShifts: _service.shifts))
+              .map((s) => s.seatNumber!)
+              .toSet();
+
+          final availableSeats = List.generate(_service.totalSeatsCount, (i) => i + 1)
+              .where((seatNum) => !occupiedSeatNumbers.contains(seatNum))
+              .toList();
+
+          if (selectedSeatNumber == null && availableSeats.isNotEmpty) {
+            selectedSeatNumber = availableSeats.first;
+          }
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(modalCtx).viewInsets.bottom + 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0FDFA),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.chair_alt_rounded, color: Color(0xFF0D9488), size: 22),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Allot Seat & Accept', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                              Text(req.studentName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0D9488))),
+                            ],
+                          ),
+                        ],
+                      ),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const Divider(height: 24),
+
+                  // Shift selection
+                  const Text('Selected Shift', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: _service.shifts.any((s) => s.name == selectedShift) ? selectedShift : (_service.shifts.isNotEmpty ? _service.shifts.first.name : 'Full Day'),
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: _service.shifts.map((s) => DropdownMenuItem(value: s.name, child: Text('${s.name} (${s.startsAt} - ${s.endsAt})'))).toList(),
+                    onChanged: (newShift) {
+                      if (newShift != null) {
+                        setModalState(() {
+                          selectedShift = newShift;
+                          selectedSeatNumber = null;
+                          final match = _service.shifts.firstWhere((s) => s.name == newShift, orElse: () => shiftConfig);
+                          feeCtrl.text = '${match.monthlyFee}';
+                          paidCtrl.text = '${match.monthlyFee}';
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Seat Selection
+                  const Text('Assign Vacant Seat *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                  const SizedBox(height: 6),
+                  availableSeats.isEmpty
+                      ? Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(12)),
+                          child: const Text('No vacant seats available for this shift. Please choose another shift or add more seats.', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600)),
+                        )
+                      : DropdownButtonFormField<int>(
+                          value: availableSeats.contains(selectedSeatNumber) ? selectedSeatNumber : availableSeats.first,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          items: availableSeats.map((seatNum) {
+                            return DropdownMenuItem<int>(
+                              value: seatNum,
+                              child: Text('Seat S-$seatNum (Vacant)'),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setModalState(() => selectedSeatNumber = val);
+                          },
+                        ),
+                  const SizedBox(height: 14),
+
+                  // Fee Details Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Monthly Fee (₹)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: feeCtrl,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              decoration: InputDecoration(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Fee Paid Today (₹)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: paidCtrl,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              decoration: InputDecoration(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Payment Mode
+                  const Text('Payment Mode', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: selectedPaymentMode,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: ['UPI', 'Cash', 'Card', 'Bank Transfer', 'Cheque'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                    onChanged: (val) {
+                      if (val != null) setModalState(() => selectedPaymentMode = val);
+                    },
+                  ),
+                  const SizedBox(height: 22),
+
+                  // Confirm Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D6E66),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 2,
+                      ),
+                      onPressed: (availableSeats.isEmpty || selectedSeatNumber == null)
+                          ? null
+                          : () async {
+                              final fee = int.tryParse(feeCtrl.text.trim()) ?? 1000;
+                              final paid = int.tryParse(paidCtrl.text.trim()) ?? fee;
+                              Navigator.pop(ctx);
+
+                              await _service.acceptRegistrationRequest(
+                                requestId: req.id,
+                                seatNumber: selectedSeatNumber!,
+                                monthlyFee: fee,
+                                feePaid: paid,
+                                paymentMode: selectedPaymentMode,
+                                shiftOverride: selectedShift,
+                              );
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Seat S-$selectedSeatNumber successfully allotted to ${req.studentName}!'),
+                                    backgroundColor: const Color(0xFF0D6E66),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+
+                                // Offer to send Welcome WhatsApp message
+                                final welcomeMsg = 'Hello ${req.studentName}, your admission at ${_service.profile.libraryName} is approved! You have been allotted Seat S-$selectedSeatNumber ($selectedShift). Welcome!';
+                                showDialog(
+                                  context: context,
+                                  builder: (dCtx) => AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    title: const Row(
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 24),
+                                        SizedBox(width: 8),
+                                        Text('Seat Allotted!', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                    content: Text('Send instant welcome and seat allotment confirmation to ${req.studentName} on WhatsApp?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(dCtx),
+                                        child: const Text('Later'),
+                                      ),
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF25D366),
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pop(dCtx);
+                                          LibraryService.sendWhatsAppDirect(phone: req.phone, message: welcomeMsg);
+                                        },
+                                        icon: const Icon(Icons.chat_bubble_rounded, size: 16),
+                                        label: const Text('Send WhatsApp'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                            },
+                      icon: const Icon(Icons.check_circle_rounded, size: 18),
+                      label: const Text('Confirm & Allot Seat', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }

@@ -837,4 +837,122 @@ class LibraryBranch {
   }
 }
 
+class RegistrationRequest {
+  final String id;
+  final String studentName;
+  final String phone;
+  final String fatherName;
+  final String address;
+  final String aadhaarNumber;
+  final String preparationFor;
+  final String gender;
+  final String shift;
+  final String? photoBase64;
+  final DateTime createdAt;
+  final String status; // 'PENDING', 'ACCEPTED', 'REJECTED'
+  final String libraryId;
+  final String? rejectionReason;
+  final int? preferredMonthlyFee;
+
+  const RegistrationRequest({
+    required this.id,
+    required this.studentName,
+    required this.phone,
+    this.fatherName = '',
+    this.address = '',
+    this.aadhaarNumber = '',
+    this.preparationFor = 'Competitive Exams',
+    this.gender = 'Male',
+    this.shift = 'Full Day',
+    this.photoBase64,
+    required this.createdAt,
+    this.status = 'PENDING',
+    this.libraryId = '',
+    this.rejectionReason,
+    this.preferredMonthlyFee,
+  });
+
+  RegistrationRequest copyWith({
+    String? id,
+    String? studentName,
+    String? phone,
+    String? fatherName,
+    String? address,
+    String? aadhaarNumber,
+    String? preparationFor,
+    String? gender,
+    String? shift,
+    String? photoBase64,
+    DateTime? createdAt,
+    String? status,
+    String? libraryId,
+    String? rejectionReason,
+    int? preferredMonthlyFee,
+  }) {
+    return RegistrationRequest(
+      id: id ?? this.id,
+      studentName: studentName ?? this.studentName,
+      phone: phone ?? this.phone,
+      fatherName: fatherName ?? this.fatherName,
+      address: address ?? this.address,
+      aadhaarNumber: aadhaarNumber ?? this.aadhaarNumber,
+      preparationFor: preparationFor ?? this.preparationFor,
+      gender: gender ?? this.gender,
+      shift: shift ?? this.shift,
+      photoBase64: photoBase64 ?? this.photoBase64,
+      createdAt: createdAt ?? this.createdAt,
+      status: status ?? this.status,
+      libraryId: libraryId ?? this.libraryId,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      preferredMonthlyFee: preferredMonthlyFee ?? this.preferredMonthlyFee,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'student_name': studentName,
+      'phone': phone,
+      'father_name': fatherName,
+      'address': address,
+      'aadhaar_number': aadhaarNumber,
+      'preparation_for': preparationFor,
+      'gender': gender,
+      'shift': shift,
+      'photo_base64': photoBase64,
+      'created_at': createdAt.toIso8601String(),
+      'status': status,
+      'library_id': libraryId,
+      if (rejectionReason != null) 'rejection_reason': rejectionReason,
+      if (preferredMonthlyFee != null) 'preferred_monthly_fee': preferredMonthlyFee,
+    };
+  }
+
+  factory RegistrationRequest.fromMap(Map<String, dynamic> map) {
+    DateTime parseDate(dynamic val) {
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      return DateTime.now();
+    }
+
+    return RegistrationRequest(
+      id: map['id'] ?? '',
+      studentName: map['student_name'] ?? map['name'] ?? '',
+      phone: map['phone'] ?? '',
+      fatherName: map['father_name'] ?? '',
+      address: map['address'] ?? '',
+      aadhaarNumber: map['aadhaar_number'] ?? '',
+      preparationFor: map['preparation_for'] ?? 'Competitive Exams',
+      gender: map['gender'] ?? 'Male',
+      shift: map['shift'] ?? 'Full Day',
+      photoBase64: map['photo_base64'] as String?,
+      createdAt: parseDate(map['created_at']),
+      status: map['status'] ?? 'PENDING',
+      libraryId: map['library_id'] ?? '',
+      rejectionReason: map['rejection_reason'] as String?,
+      preferredMonthlyFee: (map['preferred_monthly_fee'] as num?)?.toInt(),
+    );
+  }
+}
+
 

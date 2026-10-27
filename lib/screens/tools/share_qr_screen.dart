@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import '../public/student_self_registration_screen.dart';
 import 'student_live_portal_screen.dart';
 
 class ShareQrScreen extends StatefulWidget {
@@ -18,11 +19,19 @@ class ShareQrScreen extends StatefulWidget {
 class _ShareQrScreenState extends State<ShareQrScreen> {
   final LibraryService _service = LibraryService();
   int _qrSeed = 42;
+  int _selectedQrMode = 0; // 0 = Desk Self-Admission QR, 1 = Live Seat Availability
 
-  String get _publicUrl {
+  String get _registrationUrl {
+    final tenant = _service.tenantId;
+    return 'https://udaypsy.github.io/Library-app/#/join?lib=$tenant';
+  }
+
+  String get _portalUrl {
     final slug = _service.profile.libraryName.toLowerCase().replaceAll(RegExp(r'\s+'), '-');
     return 'https://trackmylibrary.in/live/$slug';
   }
+
+  String get _publicUrl => _selectedQrMode == 0 ? _registrationUrl : _portalUrl;
 
   void _regenerateQR() {
     setState(() {
@@ -30,7 +39,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('New QR Code synchronized with live student portal!'),
+        content: Text('QR Code re-synchronized with live portal!'),
         backgroundColor: Color(0xFF0D6E66),
         behavior: SnackBarBehavior.floating,
       ),
@@ -38,7 +47,10 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
   }
 
   Future<void> _shareOnWhatsApp() async {
-    final text = 'Check live seat availability at ${_service.profile.libraryName} before visiting:\n$_publicUrl';
+    final libName = _service.profile.libraryName;
+    final text = _selectedQrMode == 0
+        ? 'Welcome to $libName! Scan or click this link to submit your student admission application & choose your shift:\n$_publicUrl'
+        : 'Check live seat availability at $libName before visiting:\n$_publicUrl';
     final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
     try {
       if (await canLaunchUrl(uri)) {
@@ -50,13 +62,23 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
   }
 
   void _openPublicPreview() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const StudentLivePortalScreen()),
-    );
+    if (_selectedQrMode == 0) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StudentSelfRegistrationScreen(libraryId: _service.tenantId),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentLivePortalScreen()),
+      );
+    }
   }
 
   void _shareOrDownload() {
+    final isAdmission = _selectedQrMode == 0;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -70,7 +92,10 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Share Live Seat QR Code', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                Text(
+                  isAdmission ? 'Share Admission Desk QR' : 'Share Live Seat QR Code',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                ),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
               ],
             ),
@@ -83,15 +108,15 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                 decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12)),
                 child: const Icon(Icons.link_rounded, color: Color(0xFF16A34A)),
               ),
-              title: const Text('Copy Live Web Link', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              title: Text(isAdmission ? 'Copy Admission Portal Link' : 'Copy Live Web Link', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               subtitle: Text(_publicUrl, style: const TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
               onTap: () {
                 Navigator.pop(ctx);
                 Clipboard.setData(ClipboardData(text: _publicUrl));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Live student seat link copied to clipboard!'),
-                    backgroundColor: Color(0xFF0D6E66),
+                  SnackBar(
+                    content: Text(isAdmission ? 'Admission link copied to clipboard!' : 'Live student seat link copied to clipboard!'),
+                    backgroundColor: const Color(0xFF0D6E66),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
@@ -106,7 +131,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                 child: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF10B981)),
               ),
               title: const Text('Share to WhatsApp Status / Group', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              subtitle: const Text('Post live seat link for all aspirants to view', style: TextStyle(fontSize: 11)),
+              subtitle: Text(isAdmission ? 'Post QR admission link for aspirants to register' : 'Post live seat link for all aspirants to view', style: const TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(ctx);
                 _shareOnWhatsApp();
@@ -124,14 +149,25 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
               subtitle: const Text('View and copy formatted notice for printing at reception gate', style: TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(ctx);
-                final posterText = '===================================\n'
-                    '        ${_service.profile.libraryName.toUpperCase()}\n'
-                    '     ${_service.profile.city}\n'
-                    '===================================\n'
-                    'SCAN TO CHECK LIVE SEAT AVAILABILITY\n'
-                    'URL: $_publicUrl\n'
-                    'Helpline: ${_service.profile.adminPhone}\n'
-                    '===================================';
+                final posterText = isAdmission
+                    ? '===================================\n'
+                      '        ${_service.profile.libraryName.toUpperCase()}\n'
+                      '     ${_service.profile.city}\n'
+                      '===================================\n'
+                      'SCAN TO JOIN / STUDENT SELF-ADMISSION\n'
+                      'Scan this QR code with your phone camera\n'
+                      'to apply for admission & choose your shift!\n\n'
+                      'Portal: $_publicUrl\n'
+                      'Helpline: ${_service.profile.adminPhone}\n'
+                      '==================================='
+                    : '===================================\n'
+                      '        ${_service.profile.libraryName.toUpperCase()}\n'
+                      '     ${_service.profile.city}\n'
+                      '===================================\n'
+                      'SCAN TO CHECK LIVE SEAT AVAILABILITY\n'
+                      'URL: $_publicUrl\n'
+                      'Helpline: ${_service.profile.adminPhone}\n'
+                      '===================================';
                 Clipboard.setData(ClipboardData(text: posterText));
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -150,6 +186,8 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmission = _selectedQrMode == 0;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -160,7 +198,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Share QR Code',
+          'Library QR Codes',
           style: TextStyle(color: AppColors.textNavy, fontWeight: FontWeight.w800, fontSize: 17),
         ),
         centerTitle: false,
@@ -170,6 +208,88 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Mode Selector Toggle (Self-Admission vs Live Seat Availability)
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedQrMode = 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _selectedQrMode == 0 ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: _selectedQrMode == 0
+                              ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 2))]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.person_add_alt_1_rounded,
+                              size: 16,
+                              color: _selectedQrMode == 0 ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Desk Self-Admission',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: _selectedQrMode == 0 ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedQrMode = 1),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _selectedQrMode == 1 ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: _selectedQrMode == 1
+                              ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 2))]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.event_seat_rounded,
+                              size: 16,
+                              color: _selectedQrMode == 1 ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Live Seat Availability',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: _selectedQrMode == 1 ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // DIGITAL ACCESS Pill
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -178,14 +298,14 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFF99F6E4)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.qr_code_rounded, size: 14, color: Color(0xFF0D9488)),
-                  SizedBox(width: 5),
+                  Icon(isAdmission ? Icons.how_to_reg_rounded : Icons.qr_code_rounded, size: 14, color: const Color(0xFF0D9488)),
+                  const SizedBox(width: 5),
                   Text(
-                    'DIGITAL ACCESS',
-                    style: TextStyle(
+                    isAdmission ? 'STUDENT SELF-REGISTRATION' : 'DIGITAL ACCESS',
+                    style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.8,
@@ -198,29 +318,31 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
             const SizedBox(height: 12),
 
             // Title & Subtitle
-            const Text(
-              'Seat Availability QR Code',
-              style: TextStyle(
-                fontSize: 26,
+            Text(
+              isAdmission ? 'Student Admission Desk QR' : 'Seat Availability QR Code',
+              style: const TextStyle(
+                fontSize: 24,
                 fontWeight: FontWeight.w900,
                 color: AppColors.textNavy,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Generate a unique QR code for your library. Students can scan this to check real-time seat availability without logging in.',
-              style: TextStyle(
-                fontSize: 14,
+            Text(
+              isAdmission
+                  ? 'Print and place this QR poster at your reception desk. New students scan with their phone camera to submit admission details & request a seat.'
+                  : 'Generate a unique QR code for your library. Students can scan this to check real-time seat availability without logging in.',
+              style: const TextStyle(
+                fontSize: 13,
                 color: Color(0xFF64748B),
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Big QR Code Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(28),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
@@ -233,8 +355,8 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                 children: [
                   // Real Scannable ISO QR Code Image
                   Container(
-                    width: 220,
-                    height: 220,
+                    width: 210,
+                    height: 210,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
@@ -245,7 +367,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                       child: QrImageView(
                         data: _publicUrl,
                         version: QrVersions.auto,
-                        size: 196.0,
+                        size: 186.0,
                         backgroundColor: Colors.white,
                         eyeStyle: const QrEyeStyle(
                           eyeShape: QrEyeShape.square,
@@ -275,7 +397,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                         Expanded(
                           child: Text(
                             _publicUrl,
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF0D9488), fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -296,20 +418,20 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                   // PREVIEW PAGE [↗]
                   InkWell(
                     onTap: _openPublicPreview,
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'PREVIEW PAGE',
-                          style: TextStyle(
+                          isAdmission ? 'TEST ADMISSION PORTAL' : 'PREVIEW LIVE SEATS',
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.8,
                             color: Color(0xFF0D6E66),
                           ),
                         ),
-                        SizedBox(width: 4),
-                        Icon(Icons.open_in_new_rounded, size: 16, color: Color(0xFF0D6E66)),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.open_in_new_rounded, size: 16, color: Color(0xFF0D6E66)),
                       ],
                     ),
                   ),
@@ -318,90 +440,89 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Feature Checkmarks
-            _featureRow('Public access for students (no login required)'),
-            const SizedBox(height: 12),
-            _featureRow('High-resolution for high-quality printing'),
-            const SizedBox(height: 12),
-            _featureRow('Real-time data synchronization every 30s'),
-            const SizedBox(height: 28),
-
-            // Buttons
+            // SHARE & DOWNLOAD BUTTON
             SizedBox(
               width: double.infinity,
               height: 52,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0D6E66),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  elevation: 0,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
                 ),
-                onPressed: _regenerateQR,
-                child: const Text(
-                  'REGENERATE QR',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.8,
-                    color: Colors.white,
-                  ),
+                onPressed: _shareOrDownload,
+                icon: const Icon(Icons.share_rounded, size: 20),
+                label: Text(
+                  isAdmission ? 'Share / Print Admission QR' : 'Share or Download QR',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                 ),
               ),
             ),
             const SizedBox(height: 12),
+
+            // RE-GENERATE QR CODE BUTTON
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 50,
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textNavy,
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  foregroundColor: const Color(0xFF0D6E66),
+                  side: const BorderSide(color: Color(0xFFCCFBF1), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  backgroundColor: Colors.white,
                 ),
-                icon: const Icon(Icons.file_upload_outlined, size: 20),
+                onPressed: _regenerateQR,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text(
-                  'SHARE OR DOWNLOAD',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.8,
-                  ),
+                  'Re-generate QR Code',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
-                onPressed: _shareOrDownload,
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),
+
+            // How It Works Card
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF0D6E66)),
+                      const SizedBox(width: 8),
+                      Text(
+                        isAdmission ? 'How Self-Admission Works:' : 'How Live Portal Works:',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textNavy),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    isAdmission
+                        ? '1. Print this QR poster and place it on your reception desk.\n'
+                          '2. Visiting students scan with phone camera (no app install needed).\n'
+                          '3. Student fills name, phone, photo, and desired shift.\n'
+                          '4. Request appears instantly in your "QR REQUESTS" tab in Student Directory.\n'
+                          '5. You allot an empty seat and collect payment with 1 tap!'
+                        : '1. Print this QR code and paste it on library entrance.\n'
+                          '2. Aspirants can scan with phone camera to see occupied vs vacant seats.\n'
+                          '3. Prevents crowded front desks and saves time for library admin.',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
-
-  Widget _featureRow(String text) {
-    return Row(
-      children: [
-        Container(
-          width: 20,
-          height: 20,
-          decoration: const BoxDecoration(
-            color: Color(0xFFDCFCE7),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.check, size: 13, color: Color(0xFF16A34A)),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textNavy,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
-

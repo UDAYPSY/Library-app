@@ -1449,6 +1449,76 @@ void main() {
       expect(service.isAuthenticated, isFalse);
       expect(service.currentUserId, isNull);
     });
+
+    test('QR Self-Registration: Submit, reject, and accept workflows work accurately', () async {
+      final req1 = RegistrationRequest(
+        id: 'req_001',
+        studentName: 'Priya Patel',
+        phone: '9988776655',
+        preferredShift: 'Morning Shift',
+        goalOrExam: 'UPSC Civil Services',
+        address: 'Sector 14, Gurugram',
+        createdAt: DateTime.now(),
+        status: 'PENDING',
+      );
+
+      // Submit registration request
+      await service.submitRegistrationRequest(req1);
+
+      expect(service.currentRegistrationRequests.any((r) => r.id == 'req_001'), isTrue);
+      final fetched = service.currentRegistrationRequests.firstWhere((r) => r.id == 'req_001');
+      expect(fetched.studentName, equals('Priya Patel'));
+      expect(fetched.status, equals('PENDING'));
+
+      // Reject a request test
+      final req2 = RegistrationRequest(
+        id: 'req_002',
+        studentName: 'Rohan Sharma',
+        phone: '9988776644',
+        preferredShift: 'Evening Shift',
+        goalOrExam: 'SSC CGL',
+        address: 'Delhi',
+        createdAt: DateTime.now(),
+        status: 'PENDING',
+      );
+      await service.submitRegistrationRequest(req2);
+      await service.rejectRegistrationRequest('req_002', reason: 'Evening shift full');
+
+      final rejected = service.currentRegistrationRequests.firstWhere((r) => r.id == 'req_002');
+      expect(rejected.status, equals('REJECTED'));
+      expect(rejected.adminNotes, equals('Evening shift full'));
+
+      // Accept req1: Allot seat S-40, fee 1000, paid 1000
+      await service.acceptRegistrationRequest(
+        requestId: 'req_001',
+        seatNumber: 40,
+        monthlyFee: 1000,
+        feePaid: 1000,
+        paymentMode: 'UPI',
+      );
+
+      // Verify req1 status is ACCEPTED and seat is assigned
+      final acceptedReq = service.currentRegistrationRequests.firstWhere((r) => r.id == 'req_001');
+      expect(acceptedReq.status, equals('ACCEPTED'));
+      expect(acceptedReq.allottedSeatNumber, equals(40));
+
+      // Verify student was registered in library
+      final student = service.findStudentByPhone('9988776655');
+      expect(student, isNotNull);
+      expect(student!.name, equals('Priya Patel'));
+      expect(student.seatNumber, equals(40));
+      expect(student.status, equals('PAID'));
+
+      // Verify seat is now occupied
+      final seat40 = service.seats.firstWhere((s) => s.seatNumber == 40);
+      expect(seat40.isOccupied, isTrue);
+
+      // Verify initial fee payment was recorded
+      final payment = service.getLastPaymentForStudent(studentId: student.id, phone: '9988776655', name: 'Priya Patel');
+      expect(payment, isNotNull);
+      expect(payment!.amount, equals(1000));
+      expect(payment.paymentMode, equals('UPI'));
+    });
   });
 }
 

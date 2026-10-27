@@ -230,6 +230,7 @@ class LibraryService {
   static final List<StudentInfo> _mockStudents = [];
   static final List<ExpenseItem> _mockExpenses = [];
   static final List<PaymentTransaction> _mockPayments = [];
+  static final List<RegistrationRequest> _mockRegistrationRequests = [];
 
   static final StreamController<List<SeatInfo>> _mockSeatsController =
       StreamController<List<SeatInfo>>.broadcast();
@@ -239,6 +240,8 @@ class LibraryService {
       StreamController<List<ExpenseItem>>.broadcast();
   static final StreamController<List<PaymentTransaction>> _mockPaymentsController =
       StreamController<List<PaymentTransaction>>.broadcast();
+  static final StreamController<List<RegistrationRequest>> _mockRegistrationRequestsController =
+      StreamController<List<RegistrationRequest>>.broadcast();
 
   bool _initialized = false;
   bool _loadedFromLocalStorage = false;
@@ -375,6 +378,20 @@ class LibraryService {
       if (activeBranchStr != null && activeBranchStr.isNotEmpty) {
         activeBranchId = activeBranchStr;
       }
+
+      final reqsStr = await LocalStorageService.getString('app_library_registration_requests');
+      if (reqsStr != null && reqsStr.isNotEmpty) {
+        final decoded = json.decode(reqsStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          _mockRegistrationRequests.clear();
+          for (var item in decoded) {
+            _mockRegistrationRequests.add(RegistrationRequest.fromMap(Map<String, dynamic>.from(item)));
+          }
+          if (!_mockRegistrationRequestsController.isClosed) {
+            _mockRegistrationRequestsController.add(List.unmodifiable(_mockRegistrationRequests));
+          }
+        }
+      }
     } catch (_) {}
   }
 
@@ -389,6 +406,7 @@ class LibraryService {
       await LocalStorageService.saveString('app_library_staff', json.encode(staffList.map((s) => s.toMap()).toList()));
       await LocalStorageService.saveString('app_library_branches', json.encode(branches.map((b) => b.toMap()).toList()));
       await LocalStorageService.saveString('app_library_active_branch', activeBranchId);
+      await LocalStorageService.saveString('app_library_registration_requests', json.encode(_mockRegistrationRequests.map((r) => r.toMap()).toList()));
     } catch (_) {}
   }
 
@@ -831,6 +849,142 @@ class LibraryService {
   List<StudentInfo> get currentStudents => List.unmodifiable(_mockStudents);
   List<PaymentTransaction> get currentPayments => List.unmodifiable(_mockPayments);
   List<ExpenseItem> get currentExpenses => List.unmodifiable(_mockExpenses);
+  List<RegistrationRequest> get currentRegistrationRequests => List.unmodifiable(_mockRegistrationRequests);
+
+  Stream<List<RegistrationRequest>> streamRegistrationRequests() {
+    if (isFirebaseConnected) {
+      return _tenantCol('registration_requests')
+          .orderBy('created_at', descending: true)
+          .snapshots()
+          .map((snap) => snap.docs
+              .map((d) => RegistrationRequest.fromMap({'id': d.id, ...d.data()}))
+              .toList());
+    } else {
+      ensureInitialized();
+      Future.microtask(() {
+        if (!_mockRegistrationRequestsController.isClosed) {
+          _mockRegistrationRequestsController.add(List.unmodifiable(_mockRegistrationRequests));
+        }
+      });
+      return _mockRegistrationRequestsController.stream;
+    }
+  }
+
+  void notifyRegistrationRequestsChanged() {
+    if (!_mockRegistrationRequestsController.isClosed) {
+      _mockRegistrationRequestsController.add(List.unmodifiable(_mockRegistrationRequests));
+    }
+  }
+
+  // Submit self-registration request (called from public QR student registration web portal)
+  Future<void> submitRegistrationRequest(RegistrationRequest req) async {
+    ensureInitialized();
+    final effectiveLibId = req.libraryId.isNotEmpty ? req.libraryId : tenantId;
+    final updatedReq = req.copyWith(libraryId: effectiveLibId);
+
+    if (isFirebaseConnected) {
+      try {
+        await _db
+            .collection('libraries')
+            .doc(effectiveLibId)
+            .collection('registration_requests')
+            .doc(updatedReq.id)
+            .set(updatedReq.toMap());
+      } catch (_) {}
+    }
+
+    _mockRegistrationRequests.insert(0, updatedReq);
+    notifyRegistrationRequestsChanged();
+    await _saveLocalState();
+  }
+
+  // Admin accepts self-registration request, allocates seat, and registers student
+  Future<void> acceptRegistrationRequest({
+    required String requestId,
+    required int seatNumber,
+    required int monthlyFee,
+    required int feePaid,
+    required String paymentMode,
+    String? shiftOverride,
+    String? note,
+  }) async {
+    ensureInitialized();
+    final idx = _mockRegistrationRequests.indexWhere((r) => r.id == requestId);
+    RegistrationRequest? req;
+    if (idx != -1) {
+      req = _mockRegistrationRequests[idx];
+    } else if (isFirebaseConnected) {
+      try {
+        final doc = await _tenantCol('registration_requests').doc(requestId).get();
+        if (doc.exists) {
+          req = RegistrationRequest.fromMap({'id': doc.id, ...doc.data()!});
+        }
+      } catch (_) {}
+    }
+
+    if (req == null) return;
+
+    final effectiveShift = shiftOverride ?? req.shift;
+    final dues = (monthlyFee - feePaid).clamp(0, 999999);
+    final status = dues == 0 ? 'ACTIVE' : 'DUES';
+
+    await assignSeatAndRegisterStudent(
+      seatNumber: seatNumber,
+      studentName: req.studentName,
+      phone: req.phone,
+      shift: effectiveShift,
+      deviceUserId: currentUserName,
+      feeAmount: feePaid,
+      duesAmount: dues,
+      status: status,
+      fatherName: req.fatherName,
+      address: req.address,
+      aadhaarNumber: req.aadhaarNumber,
+      preparationFor: req.preparationFor,
+      gender: req.gender,
+      photoBase64: req.photoBase64,
+      paymentMode: paymentMode,
+      note: appendNote(req.address.isNotEmpty ? 'Address: ${req.address}' : '', note ?? 'Registered via QR Portal Self-Admission'),
+    );
+
+    if (isFirebaseConnected) {
+      try {
+        await _tenantCol('registration_requests').doc(requestId).update({
+          'status': 'ACCEPTED',
+          'seat_number': seatNumber,
+        });
+      } catch (_) {}
+    }
+
+    if (idx != -1) {
+      _mockRegistrationRequests[idx] = _mockRegistrationRequests[idx].copyWith(status: 'ACCEPTED');
+      notifyRegistrationRequestsChanged();
+      await _saveLocalState();
+    }
+  }
+
+  // Admin rejects registration request
+  Future<void> rejectRegistrationRequest(String requestId, {String reason = ''}) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      try {
+        await _tenantCol('registration_requests').doc(requestId).update({
+          'status': 'REJECTED',
+          'rejection_reason': reason,
+        });
+      } catch (_) {}
+    }
+
+    final idx = _mockRegistrationRequests.indexWhere((r) => r.id == requestId);
+    if (idx != -1) {
+      _mockRegistrationRequests[idx] = _mockRegistrationRequests[idx].copyWith(
+        status: 'REJECTED',
+        rejectionReason: reason,
+      );
+      notifyRegistrationRequestsChanged();
+      await _saveLocalState();
+    }
+  }
 
   // Disaster recovery and sync accessors
   List<StudentInfo> get mockStudentsList => _mockStudents;

@@ -8,6 +8,7 @@ import 'constants/app_colors.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding/welcome_carousel_screen.dart';
+import 'screens/public/student_self_registration_screen.dart';
 import 'screens/tools/student_live_portal_screen.dart';
 import 'services/disaster_recovery_service.dart';
 import 'services/library_service.dart';
@@ -144,6 +145,18 @@ class TrackMyLibraryApp extends StatelessWidget {
             '/': (context) => const LoginScreen(),
             '/onboarding': (context) => const WelcomeCarouselScreen(),
             '/portal': (context) => const StudentLivePortalScreen(),
+            '/join': (context) => const StudentSelfRegistrationScreen(),
+            '/register': (context) => const StudentSelfRegistrationScreen(),
+          },
+          onGenerateRoute: (settings) {
+            final uri = Uri.parse(settings.name ?? '/');
+            if (uri.path == '/join' || uri.path == '/register') {
+              final libId = uri.queryParameters['lib'];
+              return MaterialPageRoute(
+                builder: (_) => StudentSelfRegistrationScreen(libraryId: libId),
+              );
+            }
+            return null;
           },
         );
       },
