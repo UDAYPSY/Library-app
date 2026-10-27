@@ -21,17 +21,99 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
   int _qrSeed = 42;
   int _selectedQrMode = 0; // 0 = Desk Self-Admission QR, 1 = Live Seat Availability
 
+  String get _effectiveBaseUrl {
+    final base = _service.profile.portalBaseUrl.trim();
+    if (base.isNotEmpty) {
+      return base.replaceAll(RegExp(r'/+$'), '');
+    }
+    return 'https://udaypsy.github.io/Library-app';
+  }
+
   String get _registrationUrl {
     final tenant = _service.tenantId;
-    return 'https://udaypsy.github.io/Library-app/#/join?lib=$tenant';
+    return '$_effectiveBaseUrl/#/join?lib=$tenant';
   }
 
   String get _portalUrl {
-    final slug = _service.profile.libraryName.toLowerCase().replaceAll(RegExp(r'\s+'), '-');
-    return 'https://trackmylibrary.in/live/$slug';
+    final tenant = _service.tenantId;
+    return '$_effectiveBaseUrl/#/portal?lib=$tenant';
   }
 
   String get _publicUrl => _selectedQrMode == 0 ? _registrationUrl : _portalUrl;
+
+  void _editPortalBaseUrl() {
+    final ctrl = TextEditingController(text: _effectiveBaseUrl);
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.language_rounded, color: Color(0xFF0D6E66), size: 24),
+            SizedBox(width: 8),
+            Text('Web Portal Host URL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Set your production web domain or hosting URL for QR code generation:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              decoration: InputDecoration(
+                hintText: 'https://udaypsy.github.io/Library-app',
+                prefixIcon: const Icon(Icons.link_rounded),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ActionChip(
+                  label: const Text('GitHub Pages', style: TextStyle(fontSize: 11)),
+                  onPressed: () => ctrl.text = 'https://udaypsy.github.io/Library-app',
+                ),
+                ActionChip(
+                  label: const Text('app.manageyourlib.com', style: TextStyle(fontSize: 11)),
+                  onPressed: () => ctrl.text = 'https://app.manageyourlib.com',
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D6E66),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final newUrl = ctrl.text.trim();
+              if (newUrl.isNotEmpty) {
+                _service.profile.portalBaseUrl = newUrl;
+                await _service.saveProfile(_service.profile);
+                if (mounted) setState(() {});
+              }
+              Navigator.pop(dCtx);
+            },
+            child: const Text('Save & Update QR'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _regenerateQR() {
     setState(() {
@@ -415,25 +497,52 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // PREVIEW PAGE [↗]
-                  InkWell(
-                    onTap: _openPublicPreview,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          isAdmission ? 'TEST ADMISSION PORTAL' : 'PREVIEW LIVE SEATS',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
-                            color: Color(0xFF0D6E66),
-                          ),
+                  // PREVIEW PAGE [↗] & CONFIGURE DOMAIN [⚙]
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      InkWell(
+                        onTap: _openPublicPreview,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              isAdmission ? 'TEST PORTAL' : 'PREVIEW LIVE SEATS',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                                color: Color(0xFF0D6E66),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.open_in_new_rounded, size: 14, color: Color(0xFF0D6E66)),
+                          ],
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.open_in_new_rounded, size: 16, color: Color(0xFF0D6E66)),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 18),
+                      Container(width: 1, height: 14, color: const Color(0xFFCBD5E1)),
+                      const SizedBox(width: 18),
+                      InkWell(
+                        onTap: _editPortalBaseUrl,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'SET DOMAIN',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                                color: Color(0xFF0D6E66),
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(Icons.tune_rounded, size: 14, color: Color(0xFF0D6E66)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

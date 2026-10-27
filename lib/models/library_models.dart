@@ -28,6 +28,7 @@ class LibraryProfile {
   String? logoBase64;
   String? logoUrl;
   String tagline;
+  String portalBaseUrl;
 
   String get effectiveUpiId {
     if (upiId.trim().isNotEmpty) return upiId.trim();
@@ -94,6 +95,7 @@ class LibraryProfile {
     this.logoBase64,
     this.logoUrl,
     this.tagline = 'Silence • Focus • Success',
+    this.portalBaseUrl = 'https://udaypsy.github.io/Library-app',
     this.whatsappCredits = 150,
     this.messagesSentCount = 24,
     this.whatsappNotifications = true,
@@ -126,6 +128,7 @@ class LibraryProfile {
     String? logoBase64,
     String? logoUrl,
     String? tagline,
+    String? portalBaseUrl,
     int? whatsappCredits,
     int? messagesSentCount,
     bool? whatsappNotifications,
@@ -157,6 +160,7 @@ class LibraryProfile {
       logoBase64: logoBase64 ?? this.logoBase64,
       logoUrl: logoUrl ?? this.logoUrl,
       tagline: tagline ?? this.tagline,
+      portalBaseUrl: portalBaseUrl ?? this.portalBaseUrl,
       whatsappCredits: whatsappCredits ?? this.whatsappCredits,
       messagesSentCount: messagesSentCount ?? this.messagesSentCount,
       whatsappNotifications: whatsappNotifications ?? this.whatsappNotifications,
@@ -191,6 +195,7 @@ class LibraryProfile {
       'logo_base64': logoBase64,
       'logo_url': logoUrl,
       'tagline': tagline,
+      'portal_base_url': portalBaseUrl,
       'whatsapp_credits': whatsappCredits,
       'messages_sent_count': messagesSentCount,
       'whatsapp_notifications': whatsappNotifications,
@@ -225,6 +230,7 @@ class LibraryProfile {
       logoBase64: map['logo_base64'] as String?,
       logoUrl: map['logo_url'] as String?,
       tagline: map['tagline'] ?? 'Silence • Focus • Success',
+      portalBaseUrl: map['portal_base_url'] ?? 'https://udaypsy.github.io/Library-app',
       whatsappCredits: (map['whatsapp_credits'] as num?)?.toInt() ?? 150,
       messagesSentCount: (map['messages_sent_count'] as num?)?.toInt() ?? 24,
       whatsappNotifications: map['whatsapp_notifications'] ?? true,
