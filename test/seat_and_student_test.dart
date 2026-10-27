@@ -1361,7 +1361,7 @@ void main() {
         notes: 'June Month Fee',
       );
 
-      // Register second student with same name "Rahul Verma" on a different seat
+      // Register second student with same name "Rahul Verma" on a different seat with 0 initial fee paid
       await service.assignSeatAndRegisterStudent(
         seatNumber: 32,
         studentName: 'Rahul Verma',
@@ -1369,7 +1369,7 @@ void main() {
         shift: 'Evening Shift',
         deviceUserId: 'Admin',
         studentId: 'std_rahul_v2',
-        feeAmount: 900,
+        feeAmount: 0,
         duesAmount: 900,
         status: 'DUES',
       );
@@ -1422,7 +1422,7 @@ void main() {
       expect(service.currentPayments.any((p) => p.studentId == 'std_amit_old'), isFalse);
       expect(service.findStudentByPhone('9876533333'), isNull);
 
-      // Register new student who happens to also be named "Amit Sharma"
+      // Register new student who happens to also be named "Amit Sharma" with 0 initial fee paid
       await service.assignSeatAndRegisterStudent(
         seatNumber: 34,
         studentName: 'Amit Sharma',
@@ -1430,7 +1430,7 @@ void main() {
         shift: 'Full Day',
         deviceUserId: 'Admin',
         studentId: 'std_amit_new',
-        feeAmount: 1200,
+        feeAmount: 0,
         duesAmount: 1200,
         status: 'DUES',
       );
