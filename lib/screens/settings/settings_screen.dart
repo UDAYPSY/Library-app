@@ -1803,11 +1803,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final currentRole = _service.currentUserRole;
     final displayName = (_service.currentUserName.isNotEmpty && _service.currentUserName != 'Guest')
         ? _service.currentUserName
-        : (profile.adminName.isNotEmpty ? profile.adminName : 'Nivi');
+        : (profile.adminName.isNotEmpty && profile.adminName != 'Nivi' ? profile.adminName : 'Admin');
     final displayEmail = _service.currentUserEmail.isNotEmpty
         ? _service.currentUserEmail
-        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : 'manageyourlib@gmail.com');
-    final avatarLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'N';
+        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : 'admin@gmail.com');
+    final avatarLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'A';
 
     return Scaffold(
       backgroundColor: AppColors.scaffold(context),

@@ -1455,8 +1455,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
             Text('Share your library referral link with other admins or libraries. When they subscribe, you both receive ₹149 credited to your ledger!'),
             SizedBox(height: 14),
             SelectableText(
-              'Code: LIB-NIVI-149',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primaryTeal),
+              'Code: LIB-${_service.tenantId.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '').padRight(4, 'X').substring(0, 4)}-149',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primaryTeal),
             ),
           ],
         ),

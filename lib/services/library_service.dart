@@ -1050,8 +1050,8 @@ class LibraryService {
 
   // Active User Session & Role-Based Access Control (RBAC)
   String? currentUserId;
-  String currentUserName = 'Nivi';
-  String currentUserEmail = 'manageyourlib@gmail.com';
+  String currentUserName = 'Admin';
+  String currentUserEmail = '';
   String currentUserRole = 'Admin'; // 'Admin' or 'Receptionist'
   bool isAuthenticated = false;
 
@@ -1247,9 +1247,14 @@ class LibraryService {
           currentUserId = user.uid;
           profile.libraryId = user.uid;
           currentUserEmail = user.email ?? '';
-          currentUserName = (user.displayName != null && user.displayName!.isNotEmpty)
-              ? user.displayName!
-              : (profile.adminName.isNotEmpty ? profile.adminName : 'Admin');
+          final derivedName = (user.displayName != null && user.displayName!.trim().isNotEmpty)
+              ? user.displayName!.trim()
+              : (currentUserEmail.contains('@') ? currentUserEmail.split('@')[0] : 'Admin');
+          currentUserName = derivedName;
+          profile.adminName = derivedName;
+          if (currentUserEmail.isNotEmpty) {
+            profile.adminEmail = currentUserEmail;
+          }
           currentUserRole = 'Admin';
           isAuthenticated = true;
           await LocalStorageService.saveString(
@@ -1310,9 +1315,15 @@ class LibraryService {
       }
     }
 
-    final googleEmail = profile.adminEmail.isNotEmpty ? profile.adminEmail : 'admin@gmail.com';
+    final googleEmail = (profile.adminEmail.isNotEmpty && profile.adminEmail != 'manageyourlib@gmail.com')
+        ? profile.adminEmail
+        : 'admin@gmail.com';
     currentUserId = 'google_user_${DateTime.now().millisecondsSinceEpoch % 10000}';
-    currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Google Admin';
+    final derivedName = (profile.adminName.isNotEmpty && profile.adminName != 'Nivi' && profile.adminName != 'Admin')
+        ? profile.adminName
+        : 'Google Admin';
+    currentUserName = derivedName;
+    profile.adminName = derivedName;
     currentUserEmail = googleEmail;
     currentUserRole = 'Admin';
     isAuthenticated = true;

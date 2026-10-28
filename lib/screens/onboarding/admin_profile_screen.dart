@@ -28,7 +28,13 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: _service.profile.adminName != 'Nivi' ? _service.profile.adminName : '');
+    _nameCtrl = TextEditingController(
+      text: (_service.profile.adminName.isNotEmpty &&
+              _service.profile.adminName != 'Nivi' &&
+              _service.profile.adminName != 'Admin')
+          ? _service.profile.adminName
+          : '',
+    );
     _emailCtrl = TextEditingController(text: '');
     _phoneCtrl = TextEditingController(text: '');
     _upiCtrl = TextEditingController(text: _service.profile.upiId != '9457464850@upi' ? _service.profile.upiId : '');
