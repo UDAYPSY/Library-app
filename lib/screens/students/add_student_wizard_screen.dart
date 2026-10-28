@@ -332,9 +332,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         }
       }
 
-      if (req.seatNumber != null) {
-        _selectedSeat = req.seatNumber;
-      } else if (widget.initialSeatNumber != null) {
+      if (widget.initialSeatNumber != null) {
         _selectedSeat = widget.initialSeatNumber;
       }
 

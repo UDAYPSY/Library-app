@@ -1103,7 +1103,6 @@ class LibraryService {
     if (idx != -1) {
       _mockRegistrationRequests[idx] = _mockRegistrationRequests[idx].copyWith(
         status: 'ACCEPTED',
-        seatNumber: seatNumber,
       );
       notifyRegistrationRequestsChanged();
       await _saveLocalState();
