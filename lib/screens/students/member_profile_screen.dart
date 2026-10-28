@@ -941,14 +941,28 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     );
   }
 
+  String _buildGatePassUrl() {
+    final baseUrl = _service.profile.portalBaseUrl.trim().isNotEmpty
+        ? _service.profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
+        : 'https://udaypsy.github.io/Library-app';
+    final dueIso = _student.feeDueDate?.toIso8601String() ?? '';
+    final libName = _service.profile.libraryName;
+    return '$baseUrl/#/portal?lib=${_service.tenantId}'
+        '&verify=${_student.id}'
+        '&seat=${_student.seatNumber ?? 0}'
+        '&student=${Uri.encodeComponent(_student.name)}'
+        '&shift=${Uri.encodeComponent(_student.shift)}'
+        '&valid=${Uri.encodeComponent(dueIso)}'
+        '&status=${Uri.encodeComponent(_student.status)}'
+        '&phone=${Uri.encodeComponent(_student.phone)}'
+        '&libname=${Uri.encodeComponent(libName)}';
+  }
+
   String _buildIdCardPassText() {
     final libName = _service.profile.libraryName;
     final dueStr = _student.feeDueDate != null ? DateFormat('dd-MMM-yyyy').format(_student.feeDueDate!) : 'N/A';
     final seatStr = _student.seatNumber != null ? '#${_student.seatNumber}' : 'Unallocated';
-    final baseUrl = _service.profile.portalBaseUrl.trim().isNotEmpty
-        ? _service.profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
-        : 'https://udaypsy.github.io/Library-app';
-    final qrVerifyUrl = '$baseUrl/#/portal?lib=${_service.tenantId}&verify=${_student.id}&seat=${_student.seatNumber ?? 0}&student=${Uri.encodeComponent(_student.name)}';
+    final qrVerifyUrl = _buildGatePassUrl();
 
     return '''
 📇 *OFFICIAL DIGITAL ID CARD*
@@ -1009,10 +1023,7 @@ _Powered by TrackMyLibrary_
         ? DateFormat('dd-MMM-yyyy').format(_student.feeDueDate!)
         : 'Active Regular';
 
-    final baseUrl = _service.profile.portalBaseUrl.trim().isNotEmpty
-        ? _service.profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
-        : 'https://udaypsy.github.io/Library-app';
-    final qrVerifyUrl = '$baseUrl/#/portal?lib=${_service.tenantId}&verify=${_student.id}&seat=${_student.seatNumber ?? 0}&student=${Uri.encodeComponent(_student.name)}';
+    final qrVerifyUrl = _buildGatePassUrl();
 
     showModalBottomSheet(
       context: context,

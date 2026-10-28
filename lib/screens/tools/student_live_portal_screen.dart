@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
@@ -16,6 +17,7 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
   final LibraryService _service = LibraryService();
   String _selectedShift = 'All Shifts';
   int? _selectedSeatForInquiry;
+  DateTime? _gateEntryConfirmedAt;
 
   String get _effectiveLibraryId {
     final qLib = Uri.base.queryParameters['lib'];
@@ -111,8 +113,33 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
 
         final params = _urlParams;
         final verifiedId = params['verify'];
-        final verifiedStudent = params['student'];
-        final verifiedSeat = params['seat'];
+        final paramStudent = params['student'];
+        final paramSeat = params['seat'];
+        final paramShift = params['shift'];
+        final paramValid = params['valid'];
+        final paramStatus = params['status'];
+        final paramPhone = params['phone'];
+        final paramLibName = params['libname'];
+
+        StudentInfo? matchedStudent;
+        if (verifiedId != null && verifiedId.isNotEmpty) {
+          try {
+            matchedStudent = students.firstWhere((s) => s.id == verifiedId);
+          } catch (_) {}
+        }
+
+        final studentName = matchedStudent?.name ?? paramStudent ?? 'Registered Student';
+        final seatNum = matchedStudent?.seatNumber ?? int.tryParse(paramSeat ?? '') ?? 0;
+        final shiftName = matchedStudent?.shift ?? paramShift ?? 'Regular Shift';
+        final status = (matchedStudent?.status ?? paramStatus ?? 'ACTIVE').toUpperCase();
+        final studentPhone = matchedStudent?.phone ?? paramPhone ?? '';
+        final feeDueDate = matchedStudent?.feeDueDate ?? (paramValid != null && paramValid.isNotEmpty ? DateTime.tryParse(paramValid) : null);
+        final studentPhoto = matchedStudent?.hasPhoto == true ? matchedStudent!.photoBase64 : null;
+        final libraryName = profile.libraryName.isNotEmpty ? profile.libraryName : (paramLibName ?? 'Takshashila Library');
+
+        final bool isOverdue = feeDueDate != null && feeDueDate.isBefore(DateTime.now());
+        final bool isEntryAllowed = status != 'INACTIVE' && !isOverdue;
+        final validityText = feeDueDate != null ? DateFormat('dd MMM yyyy').format(feeDueDate) : 'Active Member';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -156,96 +183,332 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Verified Digital ID Pass Card if scanned via student QR pass
+            // Official Gate Pass & Student Entry Validation Card
             if (verifiedId != null && verifiedId.isNotEmpty)
               Container(
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                padding: const EdgeInsets.all(18),
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF042F2E), Color(0xFF0F766E)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    width: 2,
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF2DD4BF), width: 1.5),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x332DD4BF), blurRadius: 16, offset: Offset(0, 4)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.25),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
                   ],
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF2DD4BF),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.verified_rounded, color: Color(0xFF042F2E), size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    // Top Clearance Banner
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isEntryAllowed ? const Color(0xFF065F46) : const Color(0xFF78350F),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
                             children: [
-                              const Text(
-                                'OFFICIAL MEMBER DIGITAL PASS',
-                                style: TextStyle(
-                                  color: Color(0xFF99F6E4),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.8,
-                                ),
+                              Icon(
+                                isEntryAllowed ? Icons.verified_user_rounded : Icons.warning_amber_rounded,
+                                color: Colors.white,
+                                size: 20,
                               ),
+                              const SizedBox(width: 8),
                               Text(
-                                verifiedStudent ?? 'Registered Student',
+                                isEntryAllowed ? 'ENTRY PERMITTED • ACCESS GRANTED' : 'DUES PENDING • VERIFY AT DESK',
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 18,
                                   fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                  letterSpacing: 0.8,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF34D399)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              status,
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
                           ),
-                          child: const Text(
-                            'ACTIVE',
-                            style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 11),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    const Divider(color: Colors.white24, height: 1),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.chair_rounded, color: Color(0xFF2DD4BF), size: 16),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Seat: #${verifiedSeat ?? 'Unassigned'}',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          // Library Emblem & Title
+                          Row(
+                            children: [
+                              const Icon(Icons.account_balance_rounded, color: Color(0xFF2DD4BF), size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  libraryName.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'PASS #$verifiedId',
+                                style: const TextStyle(
+                                  color: Color(0xFF2DD4BF),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Student Photo & Name Row
+                          Row(
+                            children: [
+                              Container(
+                                width: 62,
+                                height: 62,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFF2DD4BF), width: 1.5),
+                                ),
+                                child: studentPhoto != null && studentPhoto.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: Image.memory(base64Decode(studentPhoto), fit: BoxFit.cover),
+                                      )
+                                    : Center(
+                                        child: Text(
+                                          studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
+                                          style: const TextStyle(
+                                            fontSize: 26,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF2DD4BF),
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      studentName,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 19,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.badge_rounded, color: Color(0xFF64748B), size: 14),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Gate Entry Pass ID: $verifiedId',
+                                          style: const TextStyle(
+                                            color: Color(0xFF94A3B8),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+                          const Divider(color: Colors.white12, height: 1),
+                          const SizedBox(height: 14),
+
+                          // Verification Grid: Seat, Shift, Validity
+                          Row(
+                            children: [
+                              // Seat
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.04),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      const Text(
+                                        'SEAT',
+                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        seatNum > 0 ? '#$seatNum' : 'Floating',
+                                        style: const TextStyle(
+                                          color: Color(0xFF2DD4BF),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Shift
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.04),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      const Text(
+                                        'SHIFT',
+                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        shiftName,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Validity
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.04),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      const Text(
+                                        'VALIDITY',
+                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        validityText,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: isOverdue ? const Color(0xFFF87171) : const Color(0xFF34D399),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          if (studentPhone.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.phone_rounded, color: Color(0xFF64748B), size: 14),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Phone: $studentPhone',
+                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                        Text(
-                          'Pass ID: $verifiedId',
-                          style: const TextStyle(color: Color(0xFF99F6E4), fontWeight: FontWeight.w700, fontSize: 12),
-                        ),
-                      ],
+
+                          const SizedBox(height: 16),
+
+                          // Gate Entry Attendance Action Button
+                          if (_gateEntryConfirmedAt != null)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFF10B981)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF34D399), size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Entry Verified & Logged at ${DateFormat('hh:mm a').format(_gateEntryConfirmedAt!)}',
+                                    style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    ),
+                                    icon: const Icon(Icons.door_sliding_rounded, size: 18),
+                                    label: const Text(
+                                      'Confirm Library Entry',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _gateEntryConfirmedAt = DateTime.now();
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Gate entry recorded for $studentName!'),
+                                          backgroundColor: const Color(0xFF10B981),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

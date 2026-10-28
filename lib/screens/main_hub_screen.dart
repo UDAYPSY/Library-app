@@ -1852,8 +1852,17 @@ class _MainHubScreenState extends State<MainHubScreen> {
     final baseUrl = profile.portalBaseUrl.trim().isNotEmpty
         ? profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
         : 'https://udaypsy.github.io/Library-app';
+    final dueIso = student?.feeDueDate?.toIso8601String() ?? '';
     final qrVerifyUrl = student != null
-        ? '$baseUrl/#/portal?lib=${_service.tenantId}&verify=${student.id}&seat=${student.seatNumber ?? 0}&student=${Uri.encodeComponent(student.name)}'
+        ? '$baseUrl/#/portal?lib=${_service.tenantId}'
+          '&verify=${student.id}'
+          '&seat=${student.seatNumber ?? 0}'
+          '&student=${Uri.encodeComponent(student.name)}'
+          '&shift=${Uri.encodeComponent(student.shift)}'
+          '&valid=${Uri.encodeComponent(dueIso)}'
+          '&status=${Uri.encodeComponent(student.status)}'
+          '&phone=${Uri.encodeComponent(student.phone)}'
+          '&libname=${Uri.encodeComponent(profile.libraryName)}'
         : '$baseUrl/#/portal?lib=${_service.tenantId}';
 
     showModalBottomSheet(

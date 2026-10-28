@@ -129,18 +129,44 @@ void main() async {
 class TrackMyLibraryApp extends StatelessWidget {
   const TrackMyLibraryApp({super.key});
 
+  static String determineInitialRoute() {
+    try {
+      final frag = Uri.base.fragment;
+      final path = Uri.base.path;
+      final query = Uri.base.queryParameters;
+      if (frag.contains('portal') || path.endsWith('/portal') || query.containsKey('verify')) {
+        return '/portal';
+      }
+      if (frag.contains('join') || frag.contains('register') || path.endsWith('/join') || path.endsWith('/register')) {
+        return '/join';
+      }
+    } catch (_) {}
+    return '/';
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: ThemeService(),
       builder: (context, _) {
+        final initial = determineInitialRoute();
         return MaterialApp(
           title: 'Track My Library',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeService().themeMode,
-          initialRoute: '/',
+          initialRoute: initial,
+          onGenerateInitialRoutes: (initialRoute) {
+            final target = determineInitialRoute();
+            if (target == '/portal') {
+              return [MaterialPageRoute(builder: (_) => const StudentLivePortalScreen())];
+            }
+            if (target == '/join') {
+              return [MaterialPageRoute(builder: (_) => const StudentSelfRegistrationScreen())];
+            }
+            return [MaterialPageRoute(builder: (_) => const LoginScreen())];
+          },
           routes: {
             '/': (context) => const LoginScreen(),
             '/onboarding': (context) => const WelcomeCarouselScreen(),
@@ -149,14 +175,25 @@ class TrackMyLibraryApp extends StatelessWidget {
             '/register': (context) => const StudentSelfRegistrationScreen(),
           },
           onGenerateRoute: (settings) {
-            final uri = Uri.parse(settings.name ?? '/');
-            if (uri.path == '/join' || uri.path == '/register') {
+            final name = settings.name ?? '/';
+            final uri = Uri.parse(name.startsWith('/') ? name : '/$name');
+            if (uri.path == '/portal' || uri.path.endsWith('/portal')) {
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => const StudentLivePortalScreen(),
+              );
+            }
+            if (uri.path == '/join' || uri.path == '/register' || uri.path.endsWith('/join') || uri.path.endsWith('/register')) {
               final libId = uri.queryParameters['lib'];
               return MaterialPageRoute(
+                settings: settings,
                 builder: (_) => StudentSelfRegistrationScreen(libraryId: libId),
               );
             }
-            return null;
+            if (uri.path == '/onboarding') {
+              return MaterialPageRoute(settings: settings, builder: (_) => const WelcomeCarouselScreen());
+            }
+            return MaterialPageRoute(settings: settings, builder: (_) => const LoginScreen());
           },
         );
       },

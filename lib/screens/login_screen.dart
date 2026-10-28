@@ -7,6 +7,8 @@ import '../services/biometric_auth_service.dart';
 import 'main_hub_screen.dart';
 import 'onboarding/workspace_setup_screen.dart';
 import 'onboarding/welcome_carousel_screen.dart';
+import 'tools/student_live_portal_screen.dart';
+import 'public/student_self_registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,8 +30,40 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _service.ensureInitialized();
+    if (_checkPublicWebRedirect()) return;
     _checkActiveSession();
     _loadSavedIdentifier();
+  }
+
+  bool _checkPublicWebRedirect() {
+    try {
+      final frag = Uri.base.fragment;
+      final path = Uri.base.path;
+      final query = Uri.base.queryParameters;
+      if (frag.contains('portal') || path.endsWith('/portal') || query.containsKey('verify')) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const StudentLivePortalScreen()),
+            );
+          }
+        });
+        return true;
+      }
+      if (frag.contains('join') || frag.contains('register') || path.endsWith('/join') || path.endsWith('/register')) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const StudentSelfRegistrationScreen()),
+            );
+          }
+        });
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   Future<void> _checkActiveSession() async {
