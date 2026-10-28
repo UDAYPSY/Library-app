@@ -36,6 +36,29 @@ def patch_gradle_files():
             content = re.sub(r'applicationId\s+["\'][^"\']+["\']', 'applicationId "com.trackmylibrary.app"', content)
             content = re.sub(r'applicationId\s*=\s*["\'][^"\']+["\']', 'applicationId = "com.trackmylibrary.app"', content)
 
+            # Inject persistent release signing configuration
+            if 'signingConfigs {' in content and 'release {' not in content:
+                content = content.replace('signingConfigs {', '''signingConfigs {
+        release {
+            if (file('release.jks').exists()) {
+                storeFile file('release.jks')
+                storePassword 'trackmylib2026'
+                keyAlias 'trackmylib'
+                keyPassword 'trackmylib2026'
+            } else if (file('trackmylibrary-release.jks').exists()) {
+                storeFile file('trackmylibrary-release.jks')
+                storePassword(System.getenv('STORE_PASSWORD') ?: 'trackmylib2026')
+                keyAlias(System.getenv('KEY_ALIAS') ?: 'trackmylib')
+                keyPassword(System.getenv('KEY_PASSWORD') ?: 'trackmylib2026')
+            }
+        }''')
+            # Switch release build type to use release signing config when available
+            content = re.sub(
+                r'signingConfig\s+signingConfigs\.debug',
+                'signingConfig (file("release.jks").exists() || file("trackmylibrary-release.jks").exists()) ? signingConfigs.release : signingConfigs.debug',
+                content
+            )
+
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
         print(f"Successfully patched {file_path}")

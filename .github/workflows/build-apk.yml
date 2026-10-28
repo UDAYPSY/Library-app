@@ -44,16 +44,28 @@ jobs:
           set -e -o pipefail
           flutter test 2>&1 | tee test_run.log
 
-      - name: Decode Release Keystore
+      - name: Setup Permanent Release Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          mkdir -p android/app
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Decoding release keystore..."
-            mkdir -p android/app
-            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/trackmylibrary-release.jks
+            echo "Decoding release keystore from secrets..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
+          elif [ -f android/app/release.jks ]; then
+            echo "Using existing repository release keystore."
           else
-            echo "KEYSTORE_BASE64 not configured, skipping custom keystore decode."
+            echo "Generating permanent release keystore..."
+            keytool -genkeypair -v -keystore android/app/release.jks \
+              -alias trackmylib -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass trackmylib2026 -keypass trackmylib2026 \
+              -dname "CN=TrackMyLibrary, OU=App, O=LTS, L=Patna, ST=Bihar, C=IN"
+            
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -f android/app/release.jks
+            git commit -m "ci: persist permanent release signing keystore [skip ci]" || true
+            git push origin main || true
           fi
 
       - name: Compile Release APK and Play Store App Bundle (.aab)
