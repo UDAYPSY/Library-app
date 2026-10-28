@@ -12,4 +12,8 @@ class LocalStoreImpl {
   static Future<void> remove(String key) async {
     _memoryStore.remove(key);
   }
+
+  static Future<void> clearAll() async {
+    _memoryStore.clear();
+  }
 }

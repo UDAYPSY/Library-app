@@ -185,6 +185,30 @@ void main() {
       await LocalStorageService.saveString('app_setup_completed', 'true');
       expect(await service.hasConfiguredLibrary(), isTrue);
     });
+
+    test('deleteAccountPermanently completely wipes state, storage, and library configuration', () async {
+      service.profile.libraryName = 'Test Deletion Library';
+      await LocalStorageService.saveString('app_setup_completed', 'true');
+      await LocalStorageService.saveString('app_last_login_identifier', 'admin@test.com');
+      await LocalStorageService.saveString('app_active_session', '{"user_id":"123"}');
+
+      await service.deleteAccountPermanently();
+
+      expect(service.profile.libraryName, isEmpty);
+      expect(service.currentUserId, isNull);
+      expect(service.isAuthenticated, isFalse);
+      expect(service.staffList, isEmpty);
+      expect(service.branches, isEmpty);
+      expect(await LocalStorageService.getString('app_setup_completed'), isNull);
+      expect(await LocalStorageService.getString('app_last_login_identifier'), isNull);
+      expect(await LocalStorageService.getString('app_active_session'), isNull);
+      expect(await service.hasConfiguredLibrary(), isFalse);
+
+      // Biometrics must fail when no credentials exist
+      final bioRes = await service.loginWithBiometrics();
+      expect(bioRes.success, isFalse);
+      expect(bioRes.message, contains('No registered credentials found'));
+    });
   });
 }
 

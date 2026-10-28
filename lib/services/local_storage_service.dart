@@ -11,4 +11,7 @@ class LocalStorageService {
 
   static Future<void> remove(String key) =>
       LocalStoreImpl.remove(key);
+
+  static Future<void> clearAll() =>
+      LocalStoreImpl.clearAll();
 }

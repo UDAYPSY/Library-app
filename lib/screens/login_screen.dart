@@ -57,8 +57,11 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         if (saved != null && saved.isNotEmpty) {
           _emailCtrl.text = saved;
+        } else {
+          _emailCtrl.text = '';
         }
-        _canUseBiometrics = (savedSession != null || (saved != null && saved.isNotEmpty));
+        _canUseBiometrics = (savedSession != null && savedSession.isNotEmpty) ||
+            (saved != null && saved.isNotEmpty);
       });
     }
   }
@@ -205,6 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _service.mockPaymentsList.clear();
           _service.mockExpensesList.clear();
           _service.staffList.clear();
+          _service.branches.clear();
           _service.profile.libraryName = '';
           _service.profile.city = '';
 
@@ -259,30 +263,69 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.fingerprint_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Biometric verified! Welcome back, ${result.userName}.',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: const Color(0xFF0D766E),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        final hasLibrary = await _service.hasConfiguredLibrary();
+        if (!mounted) return;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainHubScreen()),
-        );
+        if (hasLibrary) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.fingerprint_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Biometric verified! Welcome back, ${result.userName}.',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF0D766E),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainHubScreen()),
+          );
+        } else {
+          // Library not created yet: route to workspace setup
+          _service.mockStudentsList.clear();
+          _service.mockPaymentsList.clear();
+          _service.mockExpensesList.clear();
+          _service.staffList.clear();
+          _service.branches.clear();
+          _service.profile.libraryName = '';
+          _service.profile.city = '';
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.celebration_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Biometric verified! Let\'s create and set up your library.',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF0D766E),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const WorkspaceSetupScreen()),
+          );
+        }
       } else {
         setState(() {
           _isLoading = false;

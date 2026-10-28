@@ -20,4 +20,10 @@ class LocalStoreImpl {
       html.window.localStorage.remove(key);
     } catch (_) {}
   }
+
+  static Future<void> clearAll() async {
+    try {
+      html.window.localStorage.clear();
+    } catch (_) {}
+  }
 }

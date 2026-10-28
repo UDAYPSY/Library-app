@@ -620,7 +620,17 @@ class LibraryService {
 
     if (isFirebaseConnected) {
       try {
-        final collections = ['students', 'seats', 'payments', 'expenses', 'staff', 'settings', 'backups'];
+        final collections = [
+          'students',
+          'seats',
+          'payments',
+          'expenses',
+          'staff',
+          'settings',
+          'backups',
+          'branches',
+          'registration_requests',
+        ];
         for (final col in collections) {
           final snaps = await _tenantCol(col).get();
           final batch = _db.batch();
@@ -649,16 +659,29 @@ class LibraryService {
       } catch (_) {}
     }
 
-    // Reset all in-memory state
+    // Reset all in-memory state cleanly
     _mockStudents.clear();
     _mockPayments.clear();
     _mockExpenses.clear();
+    _mockRegistrationRequests.clear();
     staffList.clear();
+    branches.clear();
+    sections = [
+      SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
+    ];
     _mockSeats = List.generate(
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
     );
-    profile = LibraryProfile();
+    profile = LibraryProfile(
+      libraryId: '',
+      libraryName: '',
+      city: '',
+      adminName: '',
+      adminEmail: '',
+      adminPhone: '',
+      upiId: '',
+    );
     isAuthenticated = false;
     currentUserId = null;
     currentUserRole = 'Admin';
@@ -666,30 +689,24 @@ class LibraryService {
     currentUserEmail = '';
 
     // Notify all UI streams of complete reset
-    _mockStudentsController.add(List.unmodifiable(_mockStudents));
-    _mockPaymentsController.add(List.unmodifiable(_mockPayments));
-    _mockExpensesController.add(List.unmodifiable(_mockExpenses));
-    _mockSeatsController.add(List.unmodifiable(_mockSeats));
-
-    // Completely wipe persistent storage keys
-    final keysToRemove = [
-      'app_active_session',
-      'app_library_profile',
-      'app_library_students',
-      'app_library_payments',
-      'app_library_expenses',
-      'app_library_staff',
-      'app_library_sections',
-      'app_library_shifts',
-      'app_admin_password',
-      'gdrive_auto_backup_enabled',
-      'gdrive_backup_frequency',
-      'gdrive_last_backup_time',
-      'gdrive_account_email',
-    ];
-    for (final k in keysToRemove) {
-      await LocalStorageService.remove(k);
+    if (!_mockStudentsController.isClosed) {
+      _mockStudentsController.add(const []);
     }
+    if (!_mockPaymentsController.isClosed) {
+      _mockPaymentsController.add(const []);
+    }
+    if (!_mockExpensesController.isClosed) {
+      _mockExpensesController.add(const []);
+    }
+    if (!_mockRegistrationRequestsController.isClosed) {
+      _mockRegistrationRequestsController.add(const []);
+    }
+    if (!_mockSeatsController.isClosed) {
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    }
+
+    // Completely wipe persistent local storage (memory cache, JSON file, web localStorage)
+    await LocalStorageService.clearAll();
   }
 
   bool deleteSection(String sectionName) {
@@ -1255,11 +1272,61 @@ class LibraryService {
   Future<bool> hasConfiguredLibrary() async {
     ensureInitialized();
 
-    // 1. Explicit setup completion flag in local storage
-    final setupDone = await LocalStorageService.getString('app_setup_completed');
-    if (setupDone == 'true') return true;
+    // 1. If connected to Firebase and authenticated with a cloud user (e.g. Google Sign-In),
+    // check cloud Firestore first. If cloud has no library for this user, they MUST do library creation first!
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        final libDoc = await _db.collection('libraries').doc(tenantId).get();
+        if (libDoc.exists && libDoc.data() != null) {
+          final data = libDoc.data()!;
+          final name = data['library_name']?.toString().trim() ?? '';
+          if (name.isNotEmpty && name != 'Patna Central Library') {
+            profile = LibraryProfile.fromMap(data);
+            await LocalStorageService.saveString('app_setup_completed', 'true');
+            await _saveLocalState();
+            return true;
+          }
+        }
 
-    // 2. Custom library name in local storage (not empty and not default sample library)
+        final brandingDoc = await _tenantCol('settings').doc('branding').get();
+        if (brandingDoc.exists && brandingDoc.data() != null) {
+          final data = brandingDoc.data()!;
+          final name = data['library_name']?.toString().trim() ?? '';
+          if (name.isNotEmpty && name != 'Patna Central Library') {
+            profile = LibraryProfile.fromMap(data);
+            await LocalStorageService.saveString('app_setup_completed', 'true');
+            await _saveLocalState();
+            return true;
+          }
+        }
+
+        // Firebase user exists in auth but has no library configured in Firestore yet
+        return false;
+      } catch (_) {}
+    }
+
+    // 2. Explicit setup completion flag in local storage
+    final setupDone = await LocalStorageService.getString('app_setup_completed');
+    if (setupDone == 'true') {
+      final profileStr = await LocalStorageService.getString('app_library_profile');
+      if (profileStr != null && profileStr.isNotEmpty) {
+        try {
+          final decoded = json.decode(profileStr);
+          if (decoded is Map && decoded['library_name'] != null) {
+            final name = decoded['library_name'].toString().trim();
+            if (name.isNotEmpty && name != 'Patna Central Library') {
+              return true;
+            }
+          }
+        } catch (_) {}
+      }
+      if (profile.libraryName.isNotEmpty && profile.libraryName != 'Patna Central Library') {
+        return true;
+      }
+      return false;
+    }
+
+    // 3. Custom library name in local storage (not empty and not default sample library)
     final profileStr = await LocalStorageService.getString('app_library_profile');
     if (profileStr != null && profileStr.isNotEmpty) {
       try {
@@ -1273,36 +1340,9 @@ class LibraryService {
       } catch (_) {}
     }
 
-    // 3. In-memory profile has a custom library name
+    // 4. In-memory profile has a custom library name
     if (profile.libraryName.isNotEmpty && profile.libraryName != 'Patna Central Library') {
       return true;
-    }
-
-    // 4. If connected to Firebase, check if cloud tenant document has a configured library
-    if (isFirebaseConnected && currentUserId != null) {
-      try {
-        final libDoc = await _db.collection('libraries').doc(tenantId).get();
-        if (libDoc.exists && libDoc.data() != null) {
-          final data = libDoc.data()!;
-          if (data['library_name'] != null && data['library_name'].toString().trim().isNotEmpty) {
-            profile = LibraryProfile.fromMap(data);
-            await LocalStorageService.saveString('app_setup_completed', 'true');
-            await _saveLocalState();
-            return true;
-          }
-        }
-
-        final brandingDoc = await _tenantCol('settings').doc('branding').get();
-        if (brandingDoc.exists && brandingDoc.data() != null) {
-          final data = brandingDoc.data()!;
-          if (data['library_name'] != null && data['library_name'].toString().trim().isNotEmpty) {
-            profile = LibraryProfile.fromMap(data);
-            await LocalStorageService.saveString('app_setup_completed', 'true');
-            await _saveLocalState();
-            return true;
-          }
-        }
-      } catch (_) {}
     }
 
     return false;
@@ -1331,27 +1371,48 @@ class LibraryService {
           isAuthenticated = true;
 
           // Attempt to restore existing cloud library profile if user has previously configured one
+          bool restoredCloudProfile = false;
           try {
             final libDoc = await _db.collection('libraries').doc(user.uid).get();
             if (libDoc.exists && libDoc.data() != null) {
               final data = libDoc.data()!;
-              if (data['library_name'] != null && data['library_name'].toString().trim().isNotEmpty) {
+              final name = data['library_name']?.toString().trim() ?? '';
+              if (name.isNotEmpty && name != 'Patna Central Library') {
                 profile = LibraryProfile.fromMap(data);
                 await LocalStorageService.saveString('app_setup_completed', 'true');
                 await _saveLocalState();
+                restoredCloudProfile = true;
               }
-            } else {
+            }
+            if (!restoredCloudProfile) {
               final brandingDoc = await _db.collection('libraries').doc(user.uid).collection('settings').doc('branding').get();
               if (brandingDoc.exists && brandingDoc.data() != null) {
                 final data = brandingDoc.data()!;
-                if (data['library_name'] != null && data['library_name'].toString().trim().isNotEmpty) {
+                final name = data['library_name']?.toString().trim() ?? '';
+                if (name.isNotEmpty && name != 'Patna Central Library') {
                   profile = LibraryProfile.fromMap(data);
                   await LocalStorageService.saveString('app_setup_completed', 'true');
                   await _saveLocalState();
+                  restoredCloudProfile = true;
                 }
               }
             }
           } catch (_) {}
+
+          if (!restoredCloudProfile) {
+            // First time Google user or account was permanently deleted:
+            // Ensure local state is clean so they are routed to library creation wizard
+            profile.libraryName = '';
+            profile.city = '';
+            _mockStudents.clear();
+            _mockPayments.clear();
+            _mockExpenses.clear();
+            _mockRegistrationRequests.clear();
+            staffList.clear();
+            branches.clear();
+            await LocalStorageService.remove('app_setup_completed');
+            await LocalStorageService.remove('app_library_profile');
+          }
 
           await LocalStorageService.saveString(
             'app_active_session',
@@ -1460,7 +1521,14 @@ class LibraryService {
     final lastIdentifier = await LocalStorageService.getString('app_last_login_identifier');
     final effectiveId = (lastIdentifier != null && lastIdentifier.isNotEmpty)
         ? lastIdentifier
-        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : 'manageyourlib@gmail.com');
+        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : '');
+
+    if (effectiveId.isEmpty) {
+      return const AuthResult(
+        success: false,
+        message: 'No registered credentials found on this device. Please log in with Google or your credentials first.',
+      );
+    }
 
     // Re-authenticate using local admin session
     currentUserId = 'admin_bio_001';

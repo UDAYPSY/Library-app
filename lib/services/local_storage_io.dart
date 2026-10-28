@@ -66,4 +66,14 @@ class LocalStoreImpl {
       }
     } catch (_) {}
   }
+
+  static Future<void> clearAll() async {
+    await _ensureInit();
+    _memory.clear();
+    try {
+      if (_storageFile != null && await _storageFile!.exists()) {
+        await _storageFile!.delete();
+      }
+    } catch (_) {}
+  }
 }
