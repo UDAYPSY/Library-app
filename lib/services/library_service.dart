@@ -1205,6 +1205,16 @@ class LibraryService {
     }
   }
 
+  void notifyStreamControllers() {
+    notifyStudentsChanged();
+    notifyPaymentsChanged();
+    notifyExpensesChanged();
+    notifyRegistrationRequestsChanged();
+    if (!_mockSeatsController.isClosed) {
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    }
+  }
+
   PaymentTransaction? getLastPaymentForStudent({String? studentId, String? phone, String? name}) {
     final normPhone = phone != null ? normalizePhone(phone) : null;
     for (var p in _mockPayments) {
