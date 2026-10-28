@@ -7,7 +7,9 @@ service cloud.firestore {
     }
 
     match /libraries/{libraryId} {
-      allow read, write: if isLibraryOwner(libraryId);
+      // Allow public read on library profile for public QR admission portal & seat verification
+      allow read: if true;
+      allow write: if isLibraryOwner(libraryId);
 
       match /students/{studentId} {
         allow read: if isLibraryOwner(libraryId);
@@ -35,7 +37,8 @@ service cloud.firestore {
       }
 
       match /settings/{docId} {
-        allow read, write: if isLibraryOwner(libraryId);
+        allow read: if true;
+        allow write: if isLibraryOwner(libraryId);
       }
 
       match /staff/{staffId} {
@@ -52,9 +55,11 @@ service cloud.firestore {
 
       match /registration_requests/{requestId} {
         // Prospective students can submit self-registration via public QR / link
-        allow create: if request.resource.data.name is string 
-                      && request.resource.data.name.size() > 0
-                      && request.resource.data.phone is string;
+        allow create: if request.resource.data.phone is string 
+                      && (
+                        (request.resource.data.student_name is string && request.resource.data.student_name.size() > 0) ||
+                        (request.resource.data.name is string && request.resource.data.name.size() > 0)
+                      );
         // Only library owner can view, approve, update, or reject requests
         allow read, update, delete: if isLibraryOwner(libraryId);
       }

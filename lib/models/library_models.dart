@@ -919,6 +919,7 @@ class RegistrationRequest {
     return {
       'id': id,
       'student_name': studentName,
+      'name': studentName,
       'phone': phone,
       'father_name': fatherName,
       'address': address,

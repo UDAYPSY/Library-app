@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart';
 import '../models/library_models.dart';
 import 'local_storage_service.dart';
 import 'biometric_auth_service.dart';
@@ -886,9 +887,54 @@ class LibraryService {
       return _tenantCol('registration_requests')
           .orderBy('created_at', descending: true)
           .snapshots()
-          .map((snap) => snap.docs
-              .map((d) => RegistrationRequest.fromMap({'id': d.id, ...d.data()}))
-              .toList());
+          .map((snap) {
+        final list = snap.docs
+            .map((d) => RegistrationRequest.fromMap({'id': d.id, ...d.data()}))
+            .toList();
+        _mockRegistrationRequests.clear();
+        _mockRegistrationRequests.addAll(list);
+
+        // Seamlessly sync pending QR admissions into the in-memory student directory
+        bool studentsUpdated = false;
+        for (final req in list) {
+          if (req.status == 'PENDING') {
+            final studentId = 'st_qr_${req.id}';
+            final alreadyPresent = _mockStudents.any(
+              (s) => s.id == studentId || (s.phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(req.phone)),
+            );
+            if (!alreadyPresent) {
+              final dateStr = DateFormat('dd-MMM-yyyy').format(req.createdAt);
+              _mockStudents.insert(0, StudentInfo(
+                id: studentId,
+                name: req.studentName,
+                phone: req.phone,
+                shift: req.shift,
+                seatNumber: null,
+                joinedAt: req.createdAt,
+                duesAmount: 0,
+                monthlyFee: req.preferredMonthlyFee ?? 0,
+                status: 'UNALLOCATED',
+                fatherName: req.fatherName,
+                address: req.address,
+                aadhaarNumber: req.aadhaarNumber,
+                preparationFor: req.preparationFor,
+                gender: req.gender,
+                photoBase64: req.photoBase64,
+                note: 'Registered via QR Admission Portal on $dateStr. Pending seat allotment.',
+              ));
+              studentsUpdated = true;
+            }
+          }
+        }
+        if (studentsUpdated) {
+          _syncSeatsWithStudents();
+          if (!_mockStudentsController.isClosed) {
+            _mockStudentsController.add(List.unmodifiable(_mockStudents));
+          }
+        }
+
+        return list;
+      });
     } else {
       ensureInitialized();
       Future.microtask(() {
@@ -914,17 +960,59 @@ class LibraryService {
 
     if (isFirebaseConnected) {
       try {
+        final payload = {
+          ...updatedReq.toMap(),
+          'name': updatedReq.studentName,
+          'student_name': updatedReq.studentName,
+        };
         await _db
             .collection('libraries')
             .doc(effectiveLibId)
             .collection('registration_requests')
             .doc(updatedReq.id)
-            .set(updatedReq.toMap());
-      } catch (_) {}
+            .set(payload);
+      } catch (cloudErr) {
+        debugPrint('Cloud sync note in submitRegistrationRequest: $cloudErr');
+      }
     }
 
+    _mockRegistrationRequests.removeWhere((r) => r.id == updatedReq.id);
     _mockRegistrationRequests.insert(0, updatedReq);
     notifyRegistrationRequestsChanged();
+
+    // Immediately insert unallocated student entry so they are instantly visible in the Students Tab!
+    final studentId = 'st_qr_${updatedReq.id}';
+    final existingIdx = _mockStudents.indexWhere(
+      (s) => s.id == studentId || (s.phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(updatedReq.phone)),
+    );
+    if (existingIdx == -1) {
+      final now = DateTime.now();
+      final dateStr = DateFormat('dd-MMM-yyyy').format(now);
+      final newStudent = StudentInfo(
+        id: studentId,
+        name: updatedReq.studentName,
+        phone: updatedReq.phone,
+        shift: updatedReq.shift,
+        seatNumber: null,
+        joinedAt: now,
+        duesAmount: 0,
+        monthlyFee: updatedReq.preferredMonthlyFee ?? 0,
+        status: 'UNALLOCATED',
+        fatherName: updatedReq.fatherName,
+        address: updatedReq.address,
+        aadhaarNumber: updatedReq.aadhaarNumber,
+        preparationFor: updatedReq.preparationFor,
+        gender: updatedReq.gender,
+        photoBase64: updatedReq.photoBase64,
+        note: 'Registered via QR Admission Portal on $dateStr. Pending seat allotment.',
+      );
+      _mockStudents.insert(0, newStudent);
+      _syncSeatsWithStudents();
+      if (!_mockStudentsController.isClosed) {
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+    }
+
     await _saveLocalState();
   }
 
@@ -957,6 +1045,10 @@ class LibraryService {
     final effectiveShift = shiftOverride ?? req.shift;
     final dues = (monthlyFee - feePaid).clamp(0, 999999);
     final status = dues == 0 ? 'ACTIVE' : 'DUES';
+
+    // Remove temporary unallocated placeholder so confirmed student takes its place cleanly
+    final tempStudentId = 'st_qr_$requestId';
+    _mockStudents.removeWhere((s) => s.id == tempStudentId || (s.seatNumber == null && normalizePhone(s.phone) == normalizePhone(req!.phone)));
 
     await assignSeatAndRegisterStudent(
       seatNumber: seatNumber,
@@ -1003,6 +1095,12 @@ class LibraryService {
           'rejection_reason': reason,
         });
       } catch (_) {}
+    }
+
+    final tempStudentId = 'st_qr_$requestId';
+    _mockStudents.removeWhere((s) => s.id == tempStudentId);
+    if (!_mockStudentsController.isClosed) {
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
     }
 
     final idx = _mockRegistrationRequests.indexWhere((r) => r.id == requestId);

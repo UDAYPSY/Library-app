@@ -51,13 +51,31 @@ class _StudentSelfRegistrationScreenState
     'Other Competitive Exams',
   ];
 
+  String get _effectiveLibraryId {
+    if (widget.libraryId != null && widget.libraryId!.trim().isNotEmpty) {
+      return widget.libraryId!.trim();
+    }
+    final qLib = Uri.base.queryParameters['lib'];
+    if (qLib != null && qLib.trim().isNotEmpty) return qLib.trim();
+
+    final frag = Uri.base.fragment;
+    if (frag.isNotEmpty) {
+      final fUri = Uri.parse(frag.startsWith('/') ? frag : '/$frag');
+      final fLib = fUri.queryParameters['lib'];
+      if (fLib != null && fLib.trim().isNotEmpty) return fLib.trim();
+    }
+    return _service.tenantId;
+  }
+
   @override
   void initState() {
     super.initState();
     _service.ensureInitialized();
-    final shifts = _service.shifts;
+    final shifts = _service.shifts.where((s) => s.isActive).toList();
     if (shifts.isNotEmpty) {
       _selectedShift = shifts.first.name;
+    } else if (_service.shifts.isNotEmpty) {
+      _selectedShift = _service.shifts.first.name;
     }
   }
 
@@ -154,18 +172,47 @@ class _StudentSelfRegistrationScreenState
       return;
     }
 
+    final phone = LibraryService.normalizePhone(_phoneCtrl.text);
+    if (phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid 10-digit mobile number'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final cleanAadhaar = _aadhaarCtrl.text.replaceAll(' ', '').trim();
+    if (cleanAadhaar.isNotEmpty && (cleanAadhaar.length != 12 || int.tryParse(cleanAadhaar) == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aadhaar must be exactly 12 digits'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     final reqId = 'req_${DateTime.now().millisecondsSinceEpoch}';
-    final effectiveLibId = widget.libraryId ?? _service.tenantId;
+    final effectiveLibId = _effectiveLibraryId;
+
+    final matchedShift = _service.shifts.firstWhere(
+      (s) => s.name.toLowerCase() == _selectedShift.toLowerCase(),
+      orElse: () => ShiftConfig(id: 'def', name: _selectedShift, startsAt: '', endsAt: '', monthlyFee: 500),
+    );
 
     final request = RegistrationRequest(
       id: reqId,
       studentName: _nameCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim(),
+      phone: phone,
       fatherName: _fatherNameCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
-      aadhaarNumber: _aadhaarCtrl.text.trim(),
+      aadhaarNumber: cleanAadhaar,
       preparationFor: _selectedPrep,
       gender: _selectedGender,
       shift: _selectedShift,
@@ -173,6 +220,7 @@ class _StudentSelfRegistrationScreenState
       createdAt: DateTime.now(),
       status: 'PENDING',
       libraryId: effectiveLibId,
+      preferredMonthlyFee: matchedShift.monthlyFee,
     );
 
     try {
@@ -552,16 +600,36 @@ class _StudentSelfRegistrationScreenState
                     children: [
                       _buildLabel('Preferred Shift *'),
                       DropdownButtonFormField<String>(
-                        value: _selectedShift,
+                        value: (shifts.any((s) => s.name == _selectedShift))
+                            ? _selectedShift
+                            : (shifts.isNotEmpty ? shifts.first.name : 'Full Day'),
                         decoration: _inputDeco('', null),
+                        isExpanded: true,
                         items: (shifts.isNotEmpty
-                                ? shifts.map((s) => s.name).toList()
-                                : ['Full Day', 'Morning Shift', 'Evening Shift', 'Night Shift'])
-                            .map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis)))
+                                ? shifts
+                                : [
+                                    const ShiftConfig(id: 's1', name: 'Full Day', startsAt: '06:00 AM', endsAt: '10:00 PM', monthlyFee: 500),
+                                    const ShiftConfig(id: 's2', name: 'Morning Shift', startsAt: '06:00 AM', endsAt: '02:00 PM', monthlyFee: 600),
+                                    const ShiftConfig(id: 's3', name: 'Evening Shift', startsAt: '02:00 PM', endsAt: '10:00 PM', monthlyFee: 600),
+                                    const ShiftConfig(id: 's4', name: 'Night Shift', startsAt: '10:00 PM', endsAt: '06:00 AM', monthlyFee: 500),
+                                  ])
+                            .map((s) => DropdownMenuItem(
+                                  value: s.name,
+                                  child: Text(
+                                    '${s.name} (₹${s.monthlyFee}/month)',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                ))
                             .toList(),
                         onChanged: (v) {
                           if (v != null) setState(() => _selectedShift = v);
                         },
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '* Select shift according to your timing. Fee is payable at desk upon seat allotment.',
+                        style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF0F766E), fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -593,8 +661,8 @@ class _StudentSelfRegistrationScreenState
             ),
             const SizedBox(height: 16),
 
-            // Aadhaar / ID (Optional)
-            _buildLabel('Aadhaar / ID Card Number (Optional)'),
+            // Aadhaar / ID (12 Digits)
+            _buildLabel('Aadhaar / ID Card Number (12 Digits)'),
             TextFormField(
               controller: _aadhaarCtrl,
               keyboardType: TextInputType.number,
@@ -603,6 +671,14 @@ class _StudentSelfRegistrationScreenState
                 LengthLimitingTextInputFormatter(12),
               ],
               decoration: _inputDeco('12-digit Aadhaar number', Icons.badge_rounded),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return null;
+                final clean = v.replaceAll(' ', '').trim();
+                if (clean.length != 12 || int.tryParse(clean) == null) {
+                  return 'Aadhaar must be exactly 12 digits';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 20),
 

@@ -17,10 +17,41 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
   String _selectedShift = 'All Shifts';
   int? _selectedSeatForInquiry;
 
+  String get _effectiveLibraryId {
+    final qLib = Uri.base.queryParameters['lib'];
+    if (qLib != null && qLib.trim().isNotEmpty) return qLib.trim();
+
+    final frag = Uri.base.fragment;
+    if (frag.isNotEmpty) {
+      try {
+        final fUri = Uri.parse(frag.startsWith('/') ? frag : '/$frag');
+        final fLib = fUri.queryParameters['lib'];
+        if (fLib != null && fLib.trim().isNotEmpty) return fLib.trim();
+      } catch (_) {}
+    }
+    return _service.tenantId;
+  }
+
+  Map<String, String> get _urlParams {
+    final params = Map<String, String>.from(Uri.base.queryParameters);
+    final frag = Uri.base.fragment;
+    if (frag.isNotEmpty) {
+      try {
+        final fUri = Uri.parse(frag.startsWith('/') ? frag : '/$frag');
+        params.addAll(fUri.queryParameters);
+      } catch (_) {}
+    }
+    return params;
+  }
+
   @override
   void initState() {
     super.initState();
     _service.ensureInitialized();
+    final targetLib = _effectiveLibraryId;
+    if (targetLib.isNotEmpty && targetLib != _service.tenantId) {
+      _service.switchTenant(targetLib);
+    }
   }
 
   Future<void> _sendWhatsAppInquiry({int? seatNum, String? shiftName}) async {
@@ -78,6 +109,11 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
         final vacantCount = (totalSeats - occupiedCount).clamp(0, totalSeats);
         final occupancyPercent = totalSeats > 0 ? ((occupiedCount / totalSeats) * 100).round() : 0;
 
+        final params = _urlParams;
+        final verifiedId = params['verify'];
+        final verifiedStudent = params['student'];
+        final verifiedSeat = params['seat'];
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
@@ -85,7 +121,13 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/');
+            }
+          },
         ),
         title: const Text(
           'Live Student Seat Board',
@@ -114,6 +156,101 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // Verified Digital ID Pass Card if scanned via student QR pass
+            if (verifiedId != null && verifiedId.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF042F2E), Color(0xFF0F766E)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF2DD4BF), width: 1.5),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x332DD4BF), blurRadius: 16, offset: Offset(0, 4)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF2DD4BF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.verified_rounded, color: Color(0xFF042F2E), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'OFFICIAL MEMBER DIGITAL PASS',
+                                style: TextStyle(
+                                  color: Color(0xFF99F6E4),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              Text(
+                                verifiedStudent ?? 'Registered Student',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF34D399)),
+                          ),
+                          child: const Text(
+                            'ACTIVE',
+                            style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(color: Colors.white24, height: 1),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.chair_rounded, color: Color(0xFF2DD4BF), size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Seat: #${verifiedSeat ?? 'Unassigned'}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'Pass ID: $verifiedId',
+                          style: const TextStyle(color: Color(0xFF99F6E4), fontWeight: FontWeight.w700, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
             // Hero Library Header Card
             Container(
               margin: const EdgeInsets.fromLTRB(16, 10, 16, 20),

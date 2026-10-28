@@ -945,7 +945,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     final libName = _service.profile.libraryName;
     final dueStr = _student.feeDueDate != null ? DateFormat('dd-MMM-yyyy').format(_student.feeDueDate!) : 'N/A';
     final seatStr = _student.seatNumber != null ? '#${_student.seatNumber}' : 'Unallocated';
-    final qrVerifyUrl = 'https://trackmylibrary.in/portal?verify=${_student.id}&seat=${_student.seatNumber ?? 0}&student=${Uri.encodeComponent(_student.name)}';
+    final baseUrl = _service.profile.portalBaseUrl.trim().isNotEmpty
+        ? _service.profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
+        : 'https://udaypsy.github.io/Library-app';
+    final qrVerifyUrl = '$baseUrl/#/portal?lib=${_service.tenantId}&verify=${_student.id}&seat=${_student.seatNumber ?? 0}&student=${Uri.encodeComponent(_student.name)}';
 
     return '''
 📇 *OFFICIAL DIGITAL ID CARD*
@@ -1006,7 +1009,10 @@ _Powered by TrackMyLibrary_
         ? DateFormat('dd-MMM-yyyy').format(_student.feeDueDate!)
         : 'Active Regular';
 
-    final qrVerifyUrl = 'https://trackmylibrary.in/portal?verify=${_student.id}&seat=${_student.seatNumber ?? 0}&student=${Uri.encodeComponent(_student.name)}';
+    final baseUrl = _service.profile.portalBaseUrl.trim().isNotEmpty
+        ? _service.profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
+        : 'https://udaypsy.github.io/Library-app';
+    final qrVerifyUrl = '$baseUrl/#/portal?lib=${_service.tenantId}&verify=${_student.id}&seat=${_student.seatNumber ?? 0}&student=${Uri.encodeComponent(_student.name)}';
 
     showModalBottomSheet(
       context: context,

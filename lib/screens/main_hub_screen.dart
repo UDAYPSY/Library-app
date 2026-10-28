@@ -1849,6 +1849,13 @@ class _MainHubScreenState extends State<MainHubScreen> {
         ? students.firstWhere((s) => s.status != 'INACTIVE', orElse: () => students.first)
         : null;
 
+    final baseUrl = profile.portalBaseUrl.trim().isNotEmpty
+        ? profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
+        : 'https://udaypsy.github.io/Library-app';
+    final qrVerifyUrl = student != null
+        ? '$baseUrl/#/portal?lib=${_service.tenantId}&verify=${student.id}&seat=${student.seatNumber ?? 0}&student=${Uri.encodeComponent(student.name)}'
+        : '$baseUrl/#/portal?lib=${_service.tenantId}';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2038,7 +2045,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: QrImageView(
-                                data: 'https://trackmylibrary.in/portal?verify=${student.id}&seat=${student.seatNumber ?? 0}',
+                                data: qrVerifyUrl,
                                 size: 52,
                                 version: QrVersions.auto,
                               ),
@@ -2075,7 +2082,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
 ✅ *Status:* ${student.status}
 ----------------------------------------
 📲 *Scan Digital Verification Pass:*
-https://trackmylibrary.in/portal?verify=${student.id}&seat=${student.seatNumber ?? 0}
+$qrVerifyUrl
 '''.trim();
                           final uri = Uri.parse('https://wa.me/$target?text=${Uri.encodeComponent(passMsg)}');
                           try {
@@ -2122,8 +2129,10 @@ https://trackmylibrary.in/portal?verify=${student.id}&seat=${student.seatNumber 
 
   void _showQRCodeModal() {
     final profile = _service.profile;
-    final slug = profile.libraryName.toLowerCase().replaceAll(RegExp(r'\s+'), '-');
-    final portalUrl = 'https://trackmylibrary.in/live/$slug';
+    final baseUrl = profile.portalBaseUrl.trim().isNotEmpty
+        ? profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
+        : 'https://udaypsy.github.io/Library-app';
+    final portalUrl = '$baseUrl/#/portal?lib=${_service.tenantId}';
 
     showModalBottomSheet(
       context: context,

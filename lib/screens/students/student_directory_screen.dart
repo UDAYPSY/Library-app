@@ -1287,7 +1287,122 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    // Top banner for pending QR admission requests (visible across all student directory tabs)
+                    if (_selectedStatusFilter != 'QR REQUESTS')
+                      StreamBuilder<List<RegistrationRequest>>(
+                        stream: _service.streamRegistrationRequests(),
+                        initialData: _service.currentRegistrationRequests,
+                        builder: (ctx, reqSnap) {
+                          final pending = (reqSnap.data ?? _service.currentRegistrationRequests)
+                              .where((r) => r.status == 'PENDING')
+                              .toList();
+                          if (pending.isEmpty) return const SizedBox.shrink();
+
+                          final first = pending.first;
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () {
+                                if (pending.length == 1) {
+                                  _showSeatAllotmentSheet(first);
+                                } else {
+                                  setState(() => _selectedStatusFilter = 'QR REQUESTS');
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF0F766E), Color(0xFF0D9488)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x260F766E),
+                                      blurRadius: 10,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                '${pending.length} New QR Admission Request${pending.length > 1 ? "s" : ""}',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFEF08A),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'PENDING',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF854D0E),
+                                                    fontSize: 8,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${first.studentName} (${first.shift}) • Tap to allot seat',
+                                            style: const TextStyle(
+                                              color: Color(0xFFCCFBF1),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: const Color(0xFF0F766E),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        elevation: 0,
+                                      ),
+                                      onPressed: () => _showSeatAllotmentSheet(first),
+                                      child: const Text('Allot Seat', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
 
                     // Content Area (Image 2: Empty state OR Student Cards OR QR Requests)
                     Expanded(
@@ -1900,7 +2015,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                              Expanded(
                                                child: ElevatedButton.icon(
                                                  style: ElevatedButton.styleFrom(
-                                                   backgroundColor: AppColors.primaryTeal,
+                                                   backgroundColor: st.seatNumber == null ? const Color(0xFF0F766E) : AppColors.primaryTeal,
                                                    foregroundColor: Colors.white,
                                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                                    elevation: 0,
@@ -1908,12 +2023,37 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                      borderRadius: BorderRadius.circular(14),
                                                    ),
                                                  ),
-                                                 icon: const Icon(Icons.visibility_outlined, size: 18, color: Colors.white),
-                                                 label: const Text(
-                                                   'View Profile',
-                                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                                                 icon: Icon(st.seatNumber == null ? Icons.chair_alt_rounded : Icons.visibility_outlined, size: 18, color: Colors.white),
+                                                 label: Text(
+                                                   st.seatNumber == null ? "Allot Seat" : "View Profile",
+                                                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
                                                  ),
-                                                 onPressed: () => _openViewStudentSheet(st, memberId),
+                                                 onPressed: () {
+                                                   if (st.seatNumber == null) {
+                                                     final req = _service.currentRegistrationRequests.firstWhere(
+                                                       (r) => (r.id.isNotEmpty && st.id.contains(r.id)) || (r.phone.isNotEmpty && LibraryService.normalizePhone(r.phone) == LibraryService.normalizePhone(st.phone)),
+                                                       orElse: () => RegistrationRequest(
+                                                         id: "req_${st.id}",
+                                                         studentName: st.name,
+                                                         phone: st.phone,
+                                                         shift: st.shift,
+                                                         status: "PENDING",
+                                                         createdAt: st.joinedAt ?? DateTime.now(),
+                                                         libraryId: _service.tenantId,
+                                                         fatherName: st.fatherName,
+                                                         address: st.address,
+                                                         aadhaarNumber: st.aadhaarNumber,
+                                                         preparationFor: st.preparationFor,
+                                                         gender: st.gender,
+                                                         photoBase64: st.photoBase64,
+                                                         preferredMonthlyFee: st.monthlyFee,
+                                                       ),
+                                                     );
+                                                     _showSeatAllotmentSheet(req);
+                                                   } else {
+                                                     _openViewStudentSheet(st, memberId);
+                                                   }
+                                                 },
                                                ),
                                              ),
                                              const SizedBox(width: 8),
