@@ -1274,6 +1274,14 @@ class LibraryService {
           }
         } on FirebaseAuthException catch (e) {
         final errText = '${e.code} ${e.message ?? ''}'.toLowerCase();
+        if (errText.contains('certificate hash') ||
+            errText.contains('invalid-cert-hash') ||
+            errText.contains('17093')) {
+          return const AuthResult(
+            success: false,
+            message: 'Firebase certificate error: SHA-1 and SHA-256 fingerprints are missing in Firebase Console for com.trackmylibrary.app. Please add them under Project Settings > Your Apps.',
+          );
+        }
         if (errText.contains('invalid_app_id') ||
             errText.contains('invalid-app-credential') ||
             errText.contains('app-not-authorized') ||
@@ -1286,6 +1294,12 @@ class LibraryService {
         return AuthResult(success: false, message: 'Google Sign-In failed: ${e.message ?? e.code}');
       } catch (e) {
         final errStr = e.toString().toLowerCase();
+        if (errStr.contains('certificate hash') || errStr.contains('invalid-cert-hash') || errStr.contains('17093')) {
+          return const AuthResult(
+            success: false,
+            message: 'Firebase certificate error: SHA-1 and SHA-256 fingerprints are missing in Firebase Console for com.trackmylibrary.app.',
+          );
+        }
         if (errStr.contains('invalid_app_id') || errStr.contains('12500')) {
           return const AuthResult(
             success: false,
