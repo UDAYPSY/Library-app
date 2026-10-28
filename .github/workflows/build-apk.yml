@@ -67,6 +67,7 @@ jobs:
             git commit -m "ci: persist permanent release signing keystore [skip ci]" || true
             git push origin main || true
           fi
+          python3 .github/scripts/patch_android_gradle.py
 
       - name: Compile Release APK and Play Store App Bundle (.aab)
         env:
@@ -84,7 +85,11 @@ jobs:
       - name: Extract and Print Signing Fingerprints (SHA-1 & SHA-256)
         run: |
           echo "=================================================================="
-          echo "=== APK CERTIFICATE FINGERPRINTS (COPY TO FIREBASE CONSOLE) ==="
+          echo "=== RELEASE KEYSTORE FINGERPRINTS (DIRECT FROM release.jks) ==="
+          echo "=================================================================="
+          keytool -list -v -keystore android/app/release.jks -storepass trackmylib2026
+          echo "=================================================================="
+          echo "=== APK CERTIFICATE FINGERPRINTS (VERIFY SIGNED APK) ==="
           echo "=================================================================="
           keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk || true
           echo "=================================================================="

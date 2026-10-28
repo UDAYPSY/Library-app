@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "984519580974-android-oauth.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.trackmylibrary.app",
+            "certificate_hash": "d483c9e258a2480c2df17aa150d7b77882070728"
+          }
+        },
+        {
           "client_id": "984519580974-ionoon1d9uns3v20fhkt9pgosmu837pa.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -26,6 +26,24 @@ def patch_gradle_files():
             content = re.sub(r'^\s*.*minSdk.*$', '        minSdk = 23', content, flags=re.MULTILINE)
             content = re.sub(r'namespace\s*=\s*["\'][^"\']+["\']', 'namespace = "com.trackmylibrary.app"', content)
             content = re.sub(r'applicationId\s*=\s*["\'][^"\']+["\']', 'applicationId = "com.trackmylibrary.app"', content)
+
+            kts_signing = '''    signingConfigs {
+        getByName("debug") {
+            storeFile = file("${project.projectDir}/release.jks")
+            storePassword = "trackmylib2026"
+            keyAlias = "trackmylib"
+            keyPassword = "trackmylib2026"
+        }
+        create("release") {
+            storeFile = file("${project.projectDir}/release.jks")
+            storePassword = "trackmylib2026"
+            keyAlias = "trackmylib"
+            keyPassword = "trackmylib2026"
+        }
+    }'''
+            if 'signingConfigs {' in content:
+                content = re.sub(r'signingConfigs\s*\{.*?\n    \}', kts_signing, content, flags=re.DOTALL)
+            content = re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\(["\']debug["\']\)', 'signingConfig = signingConfigs.getByName("release")', content)
         else:
             if re.search(r'minSdk\s*=', content):
                 content = re.sub(r'^\s*.*minSdk.*$', '        minSdk = 23', content, flags=re.MULTILINE)
@@ -36,26 +54,30 @@ def patch_gradle_files():
             content = re.sub(r'applicationId\s+["\'][^"\']+["\']', 'applicationId "com.trackmylibrary.app"', content)
             content = re.sub(r'applicationId\s*=\s*["\'][^"\']+["\']', 'applicationId = "com.trackmylibrary.app"', content)
 
-            # Inject persistent release signing configuration
-            if 'signingConfigs {' in content and 'release {' not in content:
-                content = content.replace('signingConfigs {', '''signingConfigs {
+            # Override BOTH debug and release signing configs to permanently use release.jks
+            groovy_signing = '''    signingConfigs {
+        debug {
+            storeFile file("${project.projectDir}/release.jks")
+            storePassword 'trackmylib2026'
+            keyAlias 'trackmylib'
+            keyPassword 'trackmylib2026'
+        }
         release {
-            if (file('release.jks').exists()) {
-                storeFile file('release.jks')
-                storePassword 'trackmylib2026'
-                keyAlias 'trackmylib'
-                keyPassword 'trackmylib2026'
-            } else if (file('trackmylibrary-release.jks').exists()) {
-                storeFile file('trackmylibrary-release.jks')
-                storePassword(System.getenv('STORE_PASSWORD') ?: 'trackmylib2026')
-                keyAlias(System.getenv('KEY_ALIAS') ?: 'trackmylib')
-                keyPassword(System.getenv('KEY_PASSWORD') ?: 'trackmylib2026')
-            }
-        }''')
-            # Switch release build type to use release signing config when available
+            storeFile file("${project.projectDir}/release.jks")
+            storePassword 'trackmylib2026'
+            keyAlias 'trackmylib'
+            keyPassword 'trackmylib2026'
+        }
+    }'''
+            if 'signingConfigs {' in content:
+                content = re.sub(r'signingConfigs\s*\{.*?\n    \}', groovy_signing, content, flags=re.DOTALL)
+            else:
+                content = content.replace('android {', f'android {{\n{groovy_signing}')
+            
+            # Switch any release signingConfig to release (with or without '=')
             content = re.sub(
-                r'signingConfig\s+signingConfigs\.debug',
-                'signingConfig (file("release.jks").exists() || file("trackmylibrary-release.jks").exists()) ? signingConfigs.release : signingConfigs.debug',
+                r'signingConfig\s*=?\s*signingConfigs\.\w+',
+                'signingConfig signingConfigs.release',
                 content
             )
 
