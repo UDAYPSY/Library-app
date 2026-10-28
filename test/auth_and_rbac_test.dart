@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/models/library_models.dart';
 import 'package:library_manager/services/library_service.dart';
+import 'package:library_manager/services/local_storage_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
