@@ -94,5 +94,46 @@ void main() {
       expect(foundByPhone, isNotNull);
       expect(foundByPhone!.studentName, equals('Pooja Verma'));
     });
+
+    test('Filtering payments by student name returns exact matching transactions', () async {
+      await service.recordPayment(
+        studentId: 'std_01',
+        studentName: 'Amit Patel',
+        phone: '9111111111',
+        seatNumber: 10,
+        shift: 'Morning',
+        amount: 500,
+        date: DateTime.now(),
+        paymentMode: 'UPI',
+      );
+      await service.recordPayment(
+        studentId: 'std_02',
+        studentName: 'Sneha Rao',
+        phone: '9222222222',
+        seatNumber: 12,
+        shift: 'Evening',
+        amount: 700,
+        date: DateTime.now(),
+        paymentMode: 'Cash',
+      );
+      await service.recordPayment(
+        studentId: 'std_01',
+        studentName: 'Amit Patel',
+        phone: '9111111111',
+        seatNumber: 10,
+        shift: 'Morning',
+        amount: 500,
+        date: DateTime.now().subtract(const Duration(days: 30)),
+        paymentMode: 'UPI',
+      );
+
+      final amitPayments = service.currentPayments.where((p) => p.studentName == 'Amit Patel').toList();
+      expect(amitPayments.length, equals(2));
+      expect(amitPayments.every((p) => p.studentName == 'Amit Patel'), isTrue);
+
+      final snehaPayments = service.currentPayments.where((p) => p.studentName == 'Sneha Rao').toList();
+      expect(snehaPayments.length, equals(1));
+      expect(snehaPayments.first.amount, equals(700));
+    });
   });
 }

@@ -16,8 +16,8 @@ class RevenueScreen extends StatefulWidget {
 class _RevenueScreenState extends State<RevenueScreen> {
   final LibraryService _service = LibraryService();
   final TextEditingController _searchCtrl = TextEditingController();
-  final ScrollController _monthScrollCtrl = ScrollController();
 
+  String _selectedStudent = 'All Students';
   late String _selectedYear;
   late String _selectedMonth;
   late final List<String> _years;
@@ -91,36 +91,205 @@ class _RevenueScreenState extends State<RevenueScreen> {
       _selectedMonth = monthShort;
       _selectedYear = '${now.year}';
     }
-
-    // Auto-scroll months to make current month visible
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_monthScrollCtrl.hasClients) return;
-      final mIdx = _months.indexOf(_selectedMonth);
-      if (mIdx > 4) {
-        _monthScrollCtrl.animateTo(
-          (mIdx - 3) * 60.0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
-    _monthScrollCtrl.dispose();
     super.dispose();
   }
 
   void _resetFilters() {
     setState(() {
       _searchCtrl.clear();
+      _selectedStudent = 'All Students';
       _selectedYear = 'All Years';
       _selectedMonth = 'All Months';
       _selectedPaymentMethod = 'All Methods';
       _selectedDate = null;
     });
+  }
+
+  int get _activeFilterCount {
+    int count = 0;
+    if (_selectedStudent != 'All Students') count++;
+    if (_selectedMonth != 'All Months') count++;
+    if (_selectedYear != 'All Years') count++;
+    if (_selectedDate != null) count++;
+    if (_selectedPaymentMethod != 'All Methods') count++;
+    if (_searchCtrl.text.trim().isNotEmpty) count++;
+    return count;
+  }
+
+  List<String> _getStudentNames(List<PaymentTransaction> allPayments) {
+    final names = <String>{};
+    for (final s in _service.currentStudents) {
+      if (s.name.trim().isNotEmpty) {
+        names.add(s.name.trim());
+      }
+    }
+    for (final p in allPayments) {
+      if (p.studentName.trim().isNotEmpty) {
+        names.add(p.studentName.trim());
+      }
+    }
+    final sorted = names.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return ['All Students', ...sorted];
+  }
+
+  Future<void> _handleDateSelection(String val) async {
+    final now = DateTime.now();
+    if (val == 'All Dates') {
+      setState(() => _selectedDate = null);
+    } else if (val == 'Today') {
+      setState(() {
+        _selectedDate = DateTime(now.year, now.month, now.day);
+        _selectedYear = '${now.year}';
+        _selectedMonth = DateFormat('MMM').format(now);
+      });
+    } else if (val == 'Yesterday') {
+      final yest = now.subtract(const Duration(days: 1));
+      setState(() {
+        _selectedDate = DateTime(yest.year, yest.month, yest.day);
+        _selectedYear = '${yest.year}';
+        _selectedMonth = DateFormat('MMM').format(yest);
+      });
+    } else if (val == '__PICK__') {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: _selectedDate ?? now,
+        firstDate: DateTime(2020),
+        lastDate: DateTime(2035),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: AppColors.primaryTeal,
+                onPrimary: Colors.white,
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+      if (picked != null) {
+        setState(() {
+          _selectedDate = DateTime(picked.year, picked.month, picked.day);
+          _selectedYear = '${picked.year}';
+          _selectedMonth = DateFormat('MMM').format(picked);
+        });
+      }
+    }
+  }
+
+  String _currentDateOptionValue() {
+    if (_selectedDate == null) return 'All Dates';
+    final now = DateTime.now();
+    if (_isSameDay(_selectedDate, now)) return 'Today';
+    final yest = now.subtract(const Duration(days: 1));
+    if (_isSameDay(_selectedDate, yest)) return 'Yesterday';
+    return 'custom_${DateFormat('dd-MMM-yyyy').format(_selectedDate!)}';
+  }
+
+  List<DropdownMenuItem<String>> _buildDateDropdownItems() {
+    final items = <DropdownMenuItem<String>>[
+      DropdownMenuItem(
+        value: 'All Dates',
+        child: Row(
+          children: [
+            Icon(Icons.date_range_rounded, size: 14, color: _selectedDate == null ? AppColors.primaryTeal : AppColors.textMutedColor(context)),
+            const SizedBox(width: 6),
+            const Text('All Dates', style: TextStyle(fontSize: 12)),
+          ],
+        ),
+      ),
+      DropdownMenuItem(
+        value: 'Today',
+        child: Row(
+          children: [
+            Icon(Icons.today_rounded, size: 14, color: _isSameDay(_selectedDate, DateTime.now()) ? AppColors.primaryTeal : AppColors.textMutedColor(context)),
+            const SizedBox(width: 6),
+            const Text('Today', style: TextStyle(fontSize: 12)),
+          ],
+        ),
+      ),
+      DropdownMenuItem(
+        value: 'Yesterday',
+        child: Row(
+          children: [
+            Icon(Icons.history_rounded, size: 14, color: _isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1))) ? AppColors.primaryTeal : AppColors.textMutedColor(context)),
+            const SizedBox(width: 6),
+            const Text('Yesterday', style: TextStyle(fontSize: 12)),
+          ],
+        ),
+      ),
+    ];
+    if (_selectedDate != null &&
+        !_isSameDay(_selectedDate, DateTime.now()) &&
+        !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))) {
+      final dateStr = DateFormat('dd-MMM-yyyy').format(_selectedDate!);
+      items.add(DropdownMenuItem(
+        value: 'custom_$dateStr',
+        child: Row(
+          children: [
+            const Icon(Icons.event_available_rounded, size: 14, color: AppColors.primaryTeal),
+            const SizedBox(width: 6),
+            Text(dateStr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryTeal)),
+          ],
+        ),
+      ));
+    }
+    items.add(
+      const DropdownMenuItem(
+        value: '__PICK__',
+        child: Row(
+          children: [
+            Icon(Icons.edit_calendar_rounded, size: 14, color: AppColors.primaryTeal),
+            const SizedBox(width: 6),
+            Text('Pick Specific Date...', style: TextStyle(fontSize: 12, color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+    return items;
+  }
+
+  Widget _buildDropdownContainer({
+    required String label,
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 13, color: AppColors.primaryTeal),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+                color: AppColors.textMutedColor(context),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.subSurface(context),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.cardBorderColor(context)),
+          ),
+          child: DropdownButtonHideUnderline(child: child),
+        ),
+      ],
+    );
   }
 
 
@@ -135,6 +304,13 @@ class _RevenueScreenState extends State<RevenueScreen> {
         // Apply Search & Filters
         final query = _searchCtrl.text.trim().toLowerCase();
         final filteredPayments = allPayments.where((p) {
+          // Student name filter
+          if (_selectedStudent != 'All Students') {
+            if (p.studentName.trim().toLowerCase() != _selectedStudent.trim().toLowerCase()) {
+              return false;
+            }
+          }
+
           // Specific date filter
           if (_selectedDate != null) {
             if (!_isSameDay(p.date, _selectedDate)) return false;
@@ -178,6 +354,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
         }).toList();
 
         final totalRevenue = filteredPayments.fold<int>(0, (sum, p) => sum + p.amount);
+        final studentNames = _getStudentNames(allPayments);
 
         return Scaffold(
           backgroundColor: AppColors.scaffold(context),
@@ -225,7 +402,9 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    '${filteredPayments.length} Transactions',
+                                    _selectedStudent != 'All Students'
+                                        ? '$_selectedStudent • ${filteredPayments.length} Payment${filteredPayments.length == 1 ? "" : "s"}'
+                                        : '${filteredPayments.length} Transactions',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
@@ -265,7 +444,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                   ),
                 ),
 
-                // Filter Card (Image 2)
+                // Filter Card with all Dropdown Filters
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   child: Container(
@@ -287,7 +466,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                       children: [
                         // Search bar
                         Container(
-                          height: 44,
+                          height: 42,
                           decoration: BoxDecoration(
                             color: AppColors.subSurface(context),
                             borderRadius: BorderRadius.circular(14),
@@ -298,379 +477,316 @@ class _RevenueScreenState extends State<RevenueScreen> {
                             onChanged: (_) => setState(() {}),
                             style: TextStyle(color: AppColors.text(context), fontSize: 13),
                             decoration: InputDecoration(
-                              hintText: 'Search name or notes...',
+                              hintText: 'Search notes, phone, or seat...',
                               hintStyle: TextStyle(color: AppColors.textSubtleColor(context), fontSize: 13),
                               prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMutedColor(context), size: 20),
+                              suffixIcon: _searchCtrl.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear_rounded, size: 16),
+                                      color: AppColors.textMutedColor(context),
+                                      onPressed: () {
+                                        _searchCtrl.clear();
+                                        setState(() {});
+                                      },
+                                    )
+                                  : null,
                               border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 11),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-
-                        // Date Filter Chips Row: [All Dates] [Today] [Yesterday] [Select Date]
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              // All Dates
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () => setState(() => _selectedDate = null),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                    decoration: BoxDecoration(
-                                      color: _selectedDate == null ? AppColors.primaryTeal : AppColors.subSurface(context),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: _selectedDate == null ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'All Dates',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: _selectedDate == null ? Colors.white : AppColors.text(context),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Today
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () {
-                                    final now = DateTime.now();
-                                    setState(() {
-                                      _selectedDate = DateTime(now.year, now.month, now.day);
-                                      _selectedYear = '${now.year}';
-                                      _selectedMonth = DateFormat('MMM').format(now);
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                    decoration: BoxDecoration(
-                                      color: _isSameDay(_selectedDate, DateTime.now()) ? AppColors.primaryTeal : AppColors.subSurface(context),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: _isSameDay(_selectedDate, DateTime.now()) ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Today',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: _isSameDay(_selectedDate, DateTime.now()) ? Colors.white : AppColors.text(context),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Yesterday
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () {
-                                    final yest = DateTime.now().subtract(const Duration(days: 1));
-                                    setState(() {
-                                      _selectedDate = DateTime(yest.year, yest.month, yest.day);
-                                      _selectedYear = '${yest.year}';
-                                      _selectedMonth = DateFormat('MMM').format(yest);
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                    decoration: BoxDecoration(
-                                      color: _isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1))) ? AppColors.primaryTeal : AppColors.subSurface(context),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: _isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1))) ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Yesterday',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: _isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1))) ? Colors.white : AppColors.text(context),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Calendar Date Picker Button
-                              InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () async {
-                                  final now = DateTime.now();
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: _selectedDate ?? now,
-                                    firstDate: DateTime(2020),
-                                    lastDate: DateTime(2035),
-                                    builder: (context, child) {
-                                      return Theme(
-                                        data: Theme.of(context).copyWith(
-                                          colorScheme: const ColorScheme.light(
-                                            primary: AppColors.primaryTeal,
-                                            onPrimary: Colors.white,
-                                          ),
-                                        ),
-                                        child: child!,
-                                      );
-                                    },
-                                  );
-                                  if (picked != null) {
-                                    setState(() {
-                                      _selectedDate = DateTime(picked.year, picked.month, picked.day);
-                                      _selectedYear = '${picked.year}';
-                                      _selectedMonth = DateFormat('MMM').format(picked);
-                                    });
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                                  decoration: BoxDecoration(
-                                    color: _selectedDate != null &&
-                                            !_isSameDay(_selectedDate, DateTime.now()) &&
-                                            !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
-                                        ? AppColors.primaryTeal
-                                        : AppColors.subSurface(context),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _selectedDate != null &&
-                                              !_isSameDay(_selectedDate, DateTime.now()) &&
-                                              !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
-                                          ? AppColors.primaryTeal
-                                          : AppColors.cardBorderColor(context),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.calendar_month_rounded,
-                                        size: 14,
-                                        color: _selectedDate != null &&
-                                                !_isSameDay(_selectedDate, DateTime.now()) &&
-                                                !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
-                                            ? Colors.white
-                                            : AppColors.primaryTeal,
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        _selectedDate != null
-                                            ? DateFormat('dd-MMM-yyyy').format(_selectedDate!)
-                                            : 'Select Date',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w800,
-                                          color: _selectedDate != null &&
-                                                  !_isSameDay(_selectedDate, DateTime.now()) &&
-                                                  !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
-                                              ? Colors.white
-                                              : AppColors.text(context),
-                                        ),
-                                      ),
-                                      if (_selectedDate != null) ...[
-                                        const SizedBox(width: 6),
-                                        GestureDetector(
-                                          onTap: () => setState(() => _selectedDate = null),
-                                          child: Icon(
-                                            Icons.close_rounded,
-                                            size: 14,
-                                            color: _selectedDate != null &&
-                                                    !_isSameDay(_selectedDate, DateTime.now()) &&
-                                                    !_isSameDay(_selectedDate, DateTime.now().subtract(const Duration(days: 1)))
-                                                ? Colors.white
-                                                : AppColors.textMutedColor(context),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                         const SizedBox(height: 10),
 
-                        // Year Filter Chips Row: [All Years] [2025] [2026] (Image 2)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: _years.map((yr) {
-                              final isSelected = _selectedYear == yr;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () => setState(() => _selectedYear = yr),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? AppColors.primaryTeal : AppColors.subSurface(context),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: isSelected ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
+                        // Dropdown 1: Student Name Filter (Full Width Dropdown)
+                        _buildDropdownContainer(
+                          label: 'STUDENT NAME',
+                          icon: Icons.person_rounded,
+                          child: DropdownButton<String>(
+                            value: studentNames.contains(_selectedStudent) ? _selectedStudent : 'All Students',
+                            isExpanded: true,
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primaryTeal, size: 20),
+                            dropdownColor: AppColors.card(context),
+                            borderRadius: BorderRadius.circular(14),
+                            items: studentNames.map((name) {
+                              final isSelected = _selectedStudent == name;
+                              return DropdownMenuItem<String>(
+                                value: name,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      name == 'All Students' ? Icons.people_alt_rounded : Icons.person_outline_rounded,
+                                      size: 15,
+                                      color: isSelected ? AppColors.primaryTeal : AppColors.textMutedColor(context),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        name == 'All Students'
+                                            ? 'All Students (${studentNames.length - 1} registered)'
+                                            : name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                          color: isSelected ? AppColors.primaryTeal : AppColors.text(context),
+                                        ),
                                       ),
                                     ),
-                                    child: Text(
-                                      yr,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: isSelected ? Colors.white : AppColors.text(context),
-                                      ),
-                                    ),
-                                  ),
+                                    if (name != 'All Students' && isSelected)
+                                      const Icon(Icons.check_rounded, size: 16, color: AppColors.primaryTeal),
+                                  ],
                                 ),
                               );
                             }).toList(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Month Filter Chips Row: [Aug] [Sep] [Oct] [Nov] [Dec] (Image 2)
-                        SizedBox(
-                          height: 36,
-                          child: ListView.builder(
-                            controller: _monthScrollCtrl,
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _months.length,
-                            itemBuilder: (ctx, i) {
-                              final m = _months[i];
-                              final isSelected = _selectedMonth == m;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () => setState(() => _selectedMonth = m),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? AppColors.primaryTeal : AppColors.subSurface(context),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: isSelected ? AppColors.primaryTeal : AppColors.cardBorderColor(context),
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        m,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w800,
-                                          color: isSelected ? Colors.white : AppColors.text(context),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _selectedStudent = val);
+                              }
                             },
                           ),
                         ),
                         const SizedBox(height: 10),
 
-                        // Payment Method Dropdown
+                        // Dropdowns Row: Month & Year (Two columns)
                         Row(
                           children: [
-                            SizedBox(
-                              width: 60,
-                              child: Text(
-                                'METHOD',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.6,
-                                  color: AppColors.textMutedColor(context),
+                            Expanded(
+                              child: _buildDropdownContainer(
+                                label: 'MONTH',
+                                icon: Icons.calendar_month_rounded,
+                                child: DropdownButton<String>(
+                                  value: _months.contains(_selectedMonth) ? _selectedMonth : 'All Months',
+                                  isExpanded: true,
+                                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primaryTeal, size: 18),
+                                  dropdownColor: AppColors.card(context),
+                                  borderRadius: BorderRadius.circular(14),
+                                  items: _months.map((m) {
+                                    final isSelected = _selectedMonth == m;
+                                    return DropdownMenuItem<String>(
+                                      value: m,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_month_outlined,
+                                            size: 13,
+                                            color: isSelected ? AppColors.primaryTeal : AppColors.textMutedColor(context),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            m,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                              color: isSelected ? AppColors.primaryTeal : AppColors.text(context),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _selectedMonth = val);
+                                  },
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 10),
                             Expanded(
-                              child: Container(
-                                height: 38,
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                decoration: BoxDecoration(
-                                  color: AppColors.subSurface(context),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _selectedPaymentMethod != 'All Methods'
-                                        ? AppColors.primaryTeal
-                                        : AppColors.cardBorderColor(context),
-                                    width: _selectedPaymentMethod != 'All Methods' ? 1.5 : 1.0,
-                                  ),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _paymentMethods.contains(_selectedPaymentMethod)
-                                        ? _selectedPaymentMethod
-                                        : 'All Methods',
-                                    isExpanded: true,
-                                    icon: const Icon(
-                                      Icons.keyboard_arrow_down_rounded,
-                                      color: AppColors.primaryTeal,
-                                      size: 20,
-                                    ),
-                                    dropdownColor: AppColors.card(context),
-                                    borderRadius: BorderRadius.circular(12),
-                                    items: _paymentMethods.map((method) {
-                                      final isSelected = _selectedPaymentMethod == method;
-                                      IconData icon;
-                                      if (method == 'UPI') {
-                                        icon = Icons.qr_code_2_rounded;
-                                      } else if (method == 'Cash') {
-                                        icon = Icons.payments_rounded;
-                                      } else if (method == 'Card') {
-                                        icon = Icons.credit_card_rounded;
-                                      } else if (method == 'Net Banking / Cheque') {
-                                        icon = Icons.account_balance_rounded;
-                                      } else {
-                                        icon = Icons.tune_rounded;
-                                      }
-
-                                      return DropdownMenuItem<String>(
-                                        value: method,
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              icon,
-                                              size: 15,
-                                              color: isSelected ? AppColors.primaryTeal : AppColors.textMutedColor(context),
+                              child: _buildDropdownContainer(
+                                label: 'YEAR',
+                                icon: Icons.event_note_rounded,
+                                child: DropdownButton<String>(
+                                  value: _years.contains(_selectedYear) ? _selectedYear : 'All Years',
+                                  isExpanded: true,
+                                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primaryTeal, size: 18),
+                                  dropdownColor: AppColors.card(context),
+                                  borderRadius: BorderRadius.circular(14),
+                                  items: _years.map((y) {
+                                    final isSelected = _selectedYear == y;
+                                    return DropdownMenuItem<String>(
+                                      value: y,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.event_note_outlined,
+                                            size: 13,
+                                            color: isSelected ? AppColors.primaryTeal : AppColors.textMutedColor(context),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            y,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                              color: isSelected ? AppColors.primaryTeal : AppColors.text(context),
                                             ),
-                                            const SizedBox(width: 8),
-                                            Text(
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _selectedYear = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Dropdowns Row: Date / Day & Payment Method (Two columns)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDropdownContainer(
+                                label: 'DATE / DAY',
+                                icon: Icons.today_rounded,
+                                child: DropdownButton<String>(
+                                  value: _currentDateOptionValue(),
+                                  isExpanded: true,
+                                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primaryTeal, size: 18),
+                                  dropdownColor: AppColors.card(context),
+                                  borderRadius: BorderRadius.circular(14),
+                                  items: _buildDateDropdownItems(),
+                                  onChanged: (val) {
+                                    if (val != null) _handleDateSelection(val);
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _buildDropdownContainer(
+                                label: 'PAYMENT METHOD',
+                                icon: Icons.account_balance_wallet_rounded,
+                                child: DropdownButton<String>(
+                                  value: _paymentMethods.contains(_selectedPaymentMethod) ? _selectedPaymentMethod : 'All Methods',
+                                  isExpanded: true,
+                                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primaryTeal, size: 18),
+                                  dropdownColor: AppColors.card(context),
+                                  borderRadius: BorderRadius.circular(14),
+                                  items: _paymentMethods.map((method) {
+                                    final isSelected = _selectedPaymentMethod == method;
+                                    IconData icon;
+                                    if (method == 'UPI') {
+                                      icon = Icons.qr_code_2_rounded;
+                                    } else if (method == 'Cash') {
+                                      icon = Icons.payments_rounded;
+                                    } else if (method == 'Card') {
+                                      icon = Icons.credit_card_rounded;
+                                    } else if (method == 'Net Banking / Cheque') {
+                                      icon = Icons.account_balance_rounded;
+                                    } else {
+                                      icon = Icons.tune_rounded;
+                                    }
+
+                                    return DropdownMenuItem<String>(
+                                      value: method,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            icon,
+                                            size: 13,
+                                            color: isSelected ? AppColors.primaryTeal : AppColors.textMutedColor(context),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
                                               method,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                                                 color: isSelected ? AppColors.primaryTeal : AppColors.text(context),
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (val) {
-                                      if (val != null) {
-                                        setState(() => _selectedPaymentMethod = val);
-                                      }
-                                    },
-                                  ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _selectedPaymentMethod = val);
+                                  },
                                 ),
                               ),
                             ),
                           ],
                         ),
+
+                        // Active Filter Chips & Reset All Button
+                        if (_activeFilterCount > 0) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryTeal.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Active Filters: $_activeFilterCount',
+                                      style: const TextStyle(
+                                        color: AppColors.primaryTeal,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (_selectedStudent != 'All Students') ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      constraints: const BoxConstraints(maxWidth: 130),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0F766E).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _selectedStudent,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF0F766E),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: _resetFilters,
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.restart_alt_rounded, size: 14, color: Color(0xFFEF4444)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Reset All',
+                                        style: TextStyle(
+                                          color: Color(0xFFEF4444),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
