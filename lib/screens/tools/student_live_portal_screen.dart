@@ -139,7 +139,139 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
 
         final bool isOverdue = feeDueDate != null && feeDueDate.isBefore(DateTime.now());
         final bool isEntryAllowed = status != 'INACTIVE' && !isOverdue;
+        final bool isOverdue = feeDueDate != null && feeDueDate.isBefore(DateTime.now());
+        final bool isEntryAllowed = status != 'INACTIVE' && !isOverdue;
         final validityText = feeDueDate != null ? DateFormat('dd MMM yyyy').format(feeDueDate) : 'Active Member';
+
+        // When a student ID QR is scanned, show ONLY their particular student details / gate pass (no live seat map)
+        if (verifiedId != null && verifiedId.isNotEmpty) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF0F172A),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF0F172A),
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                onPressed: () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    Navigator.pushReplacementNamed(context, '/');
+                  }
+                },
+              ),
+              title: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Student Digital Pass',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                  Text(
+                    'Member Identity Verification',
+                    style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 11),
+                  ),
+                ],
+              ),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: (isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.4),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircleAvatar(
+                        radius: 4,
+                        backgroundColor: isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isEntryAllowed ? 'VERIFIED' : 'ATTENTION',
+                        style: TextStyle(
+                          color: isEntryAllowed ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 40),
+              child: Column(
+                children: [
+                  _buildGatePassCard(
+                    context: context,
+                    isEntryAllowed: isEntryAllowed,
+                    status: status,
+                    libraryName: libraryName,
+                    verifiedId: verifiedId,
+                    studentPhoto: studentPhoto,
+                    studentName: studentName,
+                    seatNum: seatNum,
+                    shiftName: shiftName,
+                    validityText: validityText,
+                    isOverdue: isOverdue,
+                    studentPhone: studentPhone,
+                  ),
+                  const SizedBox(height: 12),
+                  // Library Info Box
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.shield_outlined, color: Color(0xFF2DD4BF), size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Verified Gate Access',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'This digital pass confirms active registration at $libraryName. Present this QR screen at the reception desk to enter.',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, height: 1.4),
+                        ),
+                        if (profile.adminPhone.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(Icons.phone_rounded, color: Color(0xFF64748B), size: 14),
+                              SizedBox(width: 6),
+                              Text(
+                                'Helpdesk: ${profile.adminPhone}',
+                                style: const TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -183,337 +315,6 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Official Gate Pass & Student Entry Validation Card
-            if (verifiedId != null && verifiedId.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.25),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Top Clearance Banner
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isEntryAllowed ? const Color(0xFF065F46) : const Color(0xFF78350F),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                isEntryAllowed ? Icons.verified_user_rounded : Icons.warning_amber_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isEntryAllowed ? 'ENTRY PERMITTED • ACCESS GRANTED' : 'DUES PENDING • VERIFY AT DESK',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 11,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.white24,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              status,
-                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          // Library Emblem & Title
-                          Row(
-                            children: [
-                              const Icon(Icons.account_balance_rounded, color: Color(0xFF2DD4BF), size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  libraryName.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Color(0xFF94A3B8),
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
-                                    letterSpacing: 0.6,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                'PASS #$verifiedId',
-                                style: const TextStyle(
-                                  color: Color(0xFF2DD4BF),
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Student Photo & Name Row
-                          Row(
-                            children: [
-                              Container(
-                                width: 62,
-                                height: 62,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: const Color(0xFF2DD4BF), width: 1.5),
-                                ),
-                                child: studentPhoto != null && studentPhoto.isNotEmpty
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(14),
-                                        child: Image.memory(base64Decode(studentPhoto), fit: BoxFit.cover),
-                                      )
-                                    : Center(
-                                        child: Text(
-                                          studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
-                                          style: const TextStyle(
-                                            fontSize: 26,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF2DD4BF),
-                                          ),
-                                        ),
-                                      ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      studentName,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 19,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.badge_rounded, color: Color(0xFF64748B), size: 14),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Gate Entry Pass ID: $verifiedId',
-                                          style: const TextStyle(
-                                            color: Color(0xFF94A3B8),
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 16),
-                          const Divider(color: Colors.white12, height: 1),
-                          const SizedBox(height: 14),
-
-                          // Verification Grid: Seat, Shift, Validity
-                          Row(
-                            children: [
-                              // Seat
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.04),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      const Text(
-                                        'SEAT',
-                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        seatNum > 0 ? '#$seatNum' : 'Floating',
-                                        style: const TextStyle(
-                                          color: Color(0xFF2DD4BF),
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Shift
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.04),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      const Text(
-                                        'SHIFT',
-                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        shiftName,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Validity
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.04),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      const Text(
-                                        'VALIDITY',
-                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        validityText,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: isOverdue ? const Color(0xFFF87171) : const Color(0xFF34D399),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          if (studentPhone.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.phone_rounded, color: Color(0xFF64748B), size: 14),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Phone: $studentPhone',
-                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
-                                ),
-                              ],
-                            ),
-                          ],
-
-                          const SizedBox(height: 16),
-
-                          // Gate Entry Attendance Action Button
-                          if (_gateEntryConfirmedAt != null)
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFF10B981)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF34D399), size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Entry Verified & Logged at ${DateFormat('hh:mm a').format(_gateEntryConfirmedAt!)}',
-                                    style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                    ),
-                                    icon: const Icon(Icons.door_sliding_rounded, size: 18),
-                                    label: const Text(
-                                      'Confirm Library Entry',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _gateEntryConfirmedAt = DateTime.now();
-                                      });
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Gate entry recorded for $studentName!'),
-                                          backgroundColor: const Color(0xFF10B981),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
             // Hero Library Header Card
             Container(
               margin: const EdgeInsets.fromLTRB(16, 10, 16, 20),
@@ -1027,4 +828,349 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
       ],
     );
   }
+
+  Widget _buildGatePassCard({
+    required BuildContext context,
+    required bool isEntryAllowed,
+    required String status,
+    required String libraryName,
+    required String verifiedId,
+    required String? studentPhoto,
+    required String studentName,
+    required int seatNum,
+    required String shiftName,
+    required String validityText,
+    required bool isOverdue,
+    required String studentPhone,
+  }) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Top Clearance Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              color: isEntryAllowed ? const Color(0xFF065F46) : const Color(0xFF78350F),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      isEntryAllowed ? Icons.verified_user_rounded : Icons.warning_amber_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isEntryAllowed ? 'ENTRY PERMITTED • ACCESS GRANTED' : 'DUES PENDING • VERIFY AT DESK',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    status,
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // Library Emblem & Title
+                Row(
+                  children: [
+                    const Icon(Icons.account_balance_rounded, color: Color(0xFF2DD4BF), size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        libraryName.toUpperCase(),
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'PASS #$verifiedId',
+                      style: const TextStyle(
+                        color: Color(0xFF2DD4BF),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Student Photo & Name Row
+                Row(
+                  children: [
+                    Container(
+                      width: 62,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF2DD4BF), width: 1.5),
+                      ),
+                      child: studentPhoto != null && studentPhoto.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: Image.memory(base64Decode(studentPhoto), fit: BoxFit.cover),
+                            )
+                          : Center(
+                              child: Text(
+                                studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2DD4BF),
+                                ),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            studentName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.badge_rounded, color: Color(0xFF64748B), size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Gate Entry Pass ID: $verifiedId',
+                                style: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+                const Divider(color: Colors.white12, height: 1),
+                const SizedBox(height: 14),
+
+                // Verification Grid: Seat, Shift, Validity
+                Row(
+                  children: [
+                    // Seat
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'SEAT',
+                              style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              seatNum > 0 ? '#$seatNum' : 'Floating',
+                              style: const TextStyle(
+                                color: Color(0xFF2DD4BF),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Shift
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'SHIFT',
+                              style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              shiftName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Validity
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'VALIDITY',
+                              style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              validityText,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isOverdue ? const Color(0xFFF87171) : const Color(0xFF34D399),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                if (studentPhone.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.phone_rounded, color: Color(0xFF64748B), size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Phone: $studentPhone',
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+
+                // Gate Entry Attendance Action Button
+                if (_gateEntryConfirmedAt != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF10B981)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: Color(0xFF34D399), size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Entry Verified & Logged at ${DateFormat('hh:mm a').format(_gateEntryConfirmedAt!)}',
+                          style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isEntryAllowed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          icon: const Icon(Icons.door_sliding_rounded, size: 18),
+                          label: const Text(
+                            'Confirm Library Entry',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _gateEntryConfirmedAt = DateTime.now();
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Gate entry recorded for $studentName!'),
+                                backgroundColor: const Color(0xFF10B981),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
