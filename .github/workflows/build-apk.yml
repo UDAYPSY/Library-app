@@ -81,6 +81,7 @@ jobs:
         if: failure()
         run: |
           echo "==================== BUILD FAILED ===================="
+          [ -f test_run.log ] && echo "=== TEST RUN LOG ===" && tail -n 250 test_run.log || true
           tail -n 250 apk_build.log || true
           tail -n 250 aab_build.log || true
           git config user.name "github-actions[bot]"
@@ -88,6 +89,7 @@ jobs:
           git checkout -B ci-error-log
           [ -f apk_build.log ] && cp apk_build.log CI_FAILURE.txt || echo "No apk_build.log" > CI_FAILURE.txt
           [ -f aab_build.log ] && cp aab_build.log CI_AAB_FAILURE.txt || true
+          [ -f test_run.log ] && cp test_run.log CI_TEST_FAILURE.txt || echo "No test_run.log" > CI_TEST_FAILURE.txt
           [ -f CI_FAILURE.txt ] && git add -f CI_FAILURE.txt || true
           [ -f CI_AAB_FAILURE.txt ] && git add -f CI_AAB_FAILURE.txt || true
           [ -f CI_TEST_FAILURE.txt ] && git add -f CI_TEST_FAILURE.txt || true
@@ -100,6 +102,7 @@ jobs:
         with:
           name: apk-build-log
           path: |
+            test_run.log
             apk_build.log
             aab_build.log
           if-no-files-found: ignore

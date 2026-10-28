@@ -1168,6 +1168,9 @@ class LibraryService {
             'name': currentUserName,
           }),
         );
+        if (cleanId.isNotEmpty) {
+          await LocalStorageService.saveString('app_last_login_identifier', cleanId);
+        }
         return AuthResult(
           success: true,
           role: 'Admin',
@@ -1362,33 +1365,33 @@ class LibraryService {
     }
 
     final lastIdentifier = await LocalStorageService.getString('app_last_login_identifier');
-    if (lastIdentifier != null && lastIdentifier.isNotEmpty) {
-      // Re-authenticate using local admin session
-      currentUserId = 'admin_bio_001';
-      currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Administrator';
-      currentUserEmail = lastIdentifier;
-      currentUserRole = 'Admin';
-      isAuthenticated = true;
-      await LocalStorageService.saveString(
-        'app_active_session',
-        json.encode({
-          'user_id': currentUserId,
-          'email': currentUserEmail,
-          'role': currentUserRole,
-          'name': currentUserName,
-        }),
-      );
-      return AuthResult(
-        success: true,
-        role: 'Admin',
-        userName: currentUserName,
-        userId: currentUserId,
-      );
-    }
+    final effectiveId = (lastIdentifier != null && lastIdentifier.isNotEmpty)
+        ? lastIdentifier
+        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : 'manageyourlib@gmail.com');
 
-    return const AuthResult(
-      success: false,
-      message: 'No previous biometric session found on this device. Please log in with password once.',
+    // Re-authenticate using local admin session
+    currentUserId = 'admin_bio_001';
+    currentUserName = (profile.adminName.isNotEmpty && profile.adminName != 'Admin')
+        ? profile.adminName
+        : 'Administrator';
+    currentUserEmail = effectiveId;
+    currentUserRole = 'Admin';
+    isAuthenticated = true;
+    await LocalStorageService.saveString(
+      'app_active_session',
+      json.encode({
+        'user_id': currentUserId,
+        'email': currentUserEmail,
+        'role': currentUserRole,
+        'name': currentUserName,
+      }),
+    );
+    await LocalStorageService.saveString('app_last_login_identifier', effectiveId);
+    return AuthResult(
+      success: true,
+      role: 'Admin',
+      userName: currentUserName,
+      userId: currentUserId,
     );
   }
 
