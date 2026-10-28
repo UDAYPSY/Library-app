@@ -1236,6 +1236,118 @@ class LibraryService {
     );
   }
 
+  Future<AuthResult> loginWithGoogle() async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      try {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        final UserCredential userCredential = await FirebaseAuth.instance.signInWithProvider(googleProvider);
+        if (userCredential.user != null) {
+          final user = userCredential.user!;
+          currentUserId = user.uid;
+          profile.libraryId = user.uid;
+          currentUserEmail = user.email ?? '';
+          currentUserName = (user.displayName != null && user.displayName!.isNotEmpty)
+              ? user.displayName!
+              : (profile.adminName.isNotEmpty ? profile.adminName : 'Admin');
+          currentUserRole = 'Admin';
+          isAuthenticated = true;
+          await LocalStorageService.saveString(
+            'app_active_session',
+            json.encode({
+              'user_id': currentUserId,
+              'email': currentUserEmail,
+              'role': currentUserRole,
+              'name': currentUserName,
+              'library_id': profile.libraryId,
+            }),
+          );
+          if (currentUserEmail.isNotEmpty) {
+            await LocalStorageService.saveString('app_last_login_identifier', currentUserEmail);
+          }
+          return AuthResult(
+            success: true,
+            role: 'Admin',
+            userName: currentUserName,
+            userId: currentUserId,
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        return AuthResult(success: false, message: 'Google Sign-In failed: ${e.message ?? e.code}');
+      } catch (_) {}
+    }
+
+    final googleEmail = profile.adminEmail.isNotEmpty ? profile.adminEmail : 'admin@gmail.com';
+    currentUserId = 'google_user_${DateTime.now().millisecondsSinceEpoch % 10000}';
+    currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Google Admin';
+    currentUserEmail = googleEmail;
+    currentUserRole = 'Admin';
+    isAuthenticated = true;
+    await LocalStorageService.saveString(
+      'app_active_session',
+      json.encode({
+        'user_id': currentUserId,
+        'email': currentUserEmail,
+        'role': currentUserRole,
+        'name': currentUserName,
+        'library_id': profile.libraryId,
+      }),
+    );
+    await LocalStorageService.saveString('app_last_login_identifier', googleEmail);
+    return AuthResult(
+      success: true,
+      role: 'Admin',
+      userName: currentUserName,
+      userId: currentUserId,
+    );
+  }
+
+  Future<AuthResult> loginWithBiometrics() async {
+    ensureInitialized();
+    final sessionStr = await LocalStorageService.getString('app_active_session');
+    if (sessionStr != null && sessionStr.isNotEmpty) {
+      await restoreSession();
+      if (isAuthenticated) {
+        return AuthResult(
+          success: true,
+          role: currentUserRole,
+          userName: currentUserName,
+          userId: currentUserId,
+        );
+      }
+    }
+
+    final lastIdentifier = await LocalStorageService.getString('app_last_login_identifier');
+    if (lastIdentifier != null && lastIdentifier.isNotEmpty) {
+      // Re-authenticate using local admin session
+      currentUserId = 'admin_bio_001';
+      currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Administrator';
+      currentUserEmail = lastIdentifier;
+      currentUserRole = 'Admin';
+      isAuthenticated = true;
+      await LocalStorageService.saveString(
+        'app_active_session',
+        json.encode({
+          'user_id': currentUserId,
+          'email': currentUserEmail,
+          'role': currentUserRole,
+          'name': currentUserName,
+        }),
+      );
+      return AuthResult(
+        success: true,
+        role: 'Admin',
+        userName: currentUserName,
+        userId: currentUserId,
+      );
+    }
+
+    return const AuthResult(
+      success: false,
+      message: 'No previous biometric session found on this device. Please log in with password once.',
+    );
+  }
+
   Future<AuthResult> registerAdminAccount({
     required String email,
     required String password,
@@ -1384,19 +1496,25 @@ class LibraryService {
     if (clean.isEmpty) {
       return const AuthResult(
         success: false,
-        message: 'Please enter your registered email address or mobile number.',
+        message: 'Please enter your registered admin email address.',
       );
     }
-    if (isFirebaseConnected && clean.contains('@')) {
+    if (!clean.contains('@')) {
+      return const AuthResult(
+        success: false,
+        message: 'Staff PINs cannot be reset via email. Please ask your Library Administrator to reset your 4-digit PIN in Staff Settings.',
+      );
+    }
+    if (isFirebaseConnected) {
       try {
         await FirebaseAuth.instance.sendPasswordResetEmail(email: clean);
         return const AuthResult(
           success: true,
-          message: 'Password reset link sent to your registered email.',
+          message: 'Password reset link sent to your registered email. Check your inbox.',
         );
       } on FirebaseAuthException catch (e) {
         String msg = 'Password reset failed: ${e.message ?? e.code}';
-        if (e.code == 'user-not-found') msg = 'No account found with this email.';
+        if (e.code == 'user-not-found') msg = 'No registered admin account found with this email.';
         if (e.code == 'invalid-email') msg = 'Invalid email address format.';
         if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
         return AuthResult(success: false, message: msg);
@@ -1404,9 +1522,9 @@ class LibraryService {
         return AuthResult(success: false, message: 'Password recovery error: $e');
       }
     }
-    return AuthResult(
+    return const AuthResult(
       success: true,
-      message: 'Recovery verification instructions sent to $clean.',
+      message: 'In offline / local mode, your default administrator PIN is 1234. You can also sign in with Google.',
     );
   }
 

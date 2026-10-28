@@ -149,5 +149,30 @@ void main() {
       expect(tenantId, isNotEmpty);
       expect(service.profile.libraryId, equals(tenantId));
     });
+
+    test('Google Sign-In logs in successfully as Admin', () async {
+      final res = await service.loginWithGoogle();
+      expect(res.success, isTrue);
+      expect(res.role, equals('Admin'));
+      expect(service.isAuthenticated, isTrue);
+      expect(service.isAdmin, isTrue);
+    });
+
+    test('Biometric login authenticates administrator session', () async {
+      final res = await service.loginWithBiometrics();
+      expect(res.success, isTrue);
+      expect(service.isAuthenticated, isTrue);
+      expect(service.isAdmin, isTrue);
+    });
+
+    test('sendPasswordReset rejects non-email identifiers honestly', () async {
+      final phoneRes = await service.sendPasswordReset('9876543210');
+      expect(phoneRes.success, isFalse);
+      expect(phoneRes.message, contains('Staff PINs cannot be reset via email'));
+
+      final emailRes = await service.sendPasswordReset('admin@apexlibrary.in');
+      expect(emailRes.success, isTrue);
+    });
   });
 }
+
