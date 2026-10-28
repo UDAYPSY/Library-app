@@ -1172,6 +1172,13 @@ class LibraryService {
     return profile.libraryId.isNotEmpty ? profile.libraryId : 'default_library';
   }
 
+  void switchTenant(String newTenantId) {
+    final clean = newTenantId.trim();
+    if (clean.isNotEmpty) {
+      profile = profile.copyWith(libraryId: clean);
+    }
+  }
+
   CollectionReference<Map<String, dynamic>> _tenantCol(String collectionName) {
     return _db.collection('libraries').doc(tenantId).collection(collectionName);
   }

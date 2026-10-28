@@ -608,12 +608,12 @@ class _StudentSelfRegistrationScreenState
                         items: (shifts.isNotEmpty
                                 ? shifts
                                 : [
-                                    const ShiftConfig(id: 's1', name: 'Full Day', startsAt: '06:00 AM', endsAt: '10:00 PM', monthlyFee: 500),
-                                    const ShiftConfig(id: 's2', name: 'Morning Shift', startsAt: '06:00 AM', endsAt: '02:00 PM', monthlyFee: 600),
-                                    const ShiftConfig(id: 's3', name: 'Evening Shift', startsAt: '02:00 PM', endsAt: '10:00 PM', monthlyFee: 600),
-                                    const ShiftConfig(id: 's4', name: 'Night Shift', startsAt: '10:00 PM', endsAt: '06:00 AM', monthlyFee: 500),
+                                    ShiftConfig(id: 's1', name: 'Full Day', startsAt: '06:00 AM', endsAt: '10:00 PM', monthlyFee: 500),
+                                    ShiftConfig(id: 's2', name: 'Morning Shift', startsAt: '06:00 AM', endsAt: '02:00 PM', monthlyFee: 600),
+                                    ShiftConfig(id: 's3', name: 'Evening Shift', startsAt: '02:00 PM', endsAt: '10:00 PM', monthlyFee: 600),
+                                    ShiftConfig(id: 's4', name: 'Night Shift', startsAt: '10:00 PM', endsAt: '06:00 AM', monthlyFee: 500),
                                   ])
-                            .map((s) => DropdownMenuItem(
+                            .map<DropdownMenuItem<String>>((s) => DropdownMenuItem<String>(
                                   value: s.name,
                                   child: Text(
                                     '${s.name} (₹${s.monthlyFee}/month)',
