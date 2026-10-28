@@ -416,6 +416,7 @@ class StudentInfo {
   final String aadhaarNumber;
   final String preparationFor;
   final String gender;
+  final String? email;
   final String? photoBase64;
   final DateTime? updatedAt;
 
@@ -439,6 +440,7 @@ class StudentInfo {
     this.aadhaarNumber = '',
     this.preparationFor = '',
     this.gender = 'Male',
+    this.email,
     this.photoBase64,
     this.updatedAt,
   });
@@ -481,6 +483,7 @@ class StudentInfo {
     String? aadhaarNumber,
     String? preparationFor,
     String? gender,
+    String? email,
     String? photoBase64,
     DateTime? updatedAt,
   }) {
@@ -508,6 +511,7 @@ class StudentInfo {
       aadhaarNumber: aadhaarNumber ?? this.aadhaarNumber,
       preparationFor: preparationFor ?? this.preparationFor,
       gender: gender ?? this.gender,
+      email: email ?? this.email,
       photoBase64: photoBase64 ?? this.photoBase64,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -534,6 +538,7 @@ class StudentInfo {
       'aadhaar_number': aadhaarNumber,
       'preparation_for': preparationFor,
       'gender': gender,
+      'email': email,
       'photo_base64': photoBase64,
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -569,6 +574,7 @@ class StudentInfo {
       aadhaarNumber: (data['aadhaar_number'] as String?) ?? '',
       preparationFor: (data['preparation_for'] as String?) ?? '',
       gender: (data['gender'] as String?) ?? 'Male',
+      email: data['email'] as String?,
       photoBase64: data['photo_base64'] as String?,
       updatedAt: parseDate(data['updated_at']),
     );
