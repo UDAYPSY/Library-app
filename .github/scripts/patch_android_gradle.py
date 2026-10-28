@@ -24,11 +24,17 @@ def patch_gradle_files():
         # Replace the entire line matching minSdk or minSdkVersion with clean minSdk = 23
         if is_kts:
             content = re.sub(r'^\s*.*minSdk.*$', '        minSdk = 23', content, flags=re.MULTILINE)
+            content = re.sub(r'namespace\s*=\s*["\'][^"\']+["\']', 'namespace = "com.trackmylibrary.app"', content)
+            content = re.sub(r'applicationId\s*=\s*["\'][^"\']+["\']', 'applicationId = "com.trackmylibrary.app"', content)
         else:
             if re.search(r'minSdk\s*=', content):
                 content = re.sub(r'^\s*.*minSdk.*$', '        minSdk = 23', content, flags=re.MULTILINE)
             else:
                 content = re.sub(r'^\s*.*minSdk(Version)?.*$', '        minSdkVersion 23', content, flags=re.MULTILINE)
+            content = re.sub(r'namespace\s+["\'][^"\']+["\']', 'namespace "com.trackmylibrary.app"', content)
+            content = re.sub(r'namespace\s*=\s*["\'][^"\']+["\']', 'namespace = "com.trackmylibrary.app"', content)
+            content = re.sub(r'applicationId\s+["\'][^"\']+["\']', 'applicationId "com.trackmylibrary.app"', content)
+            content = re.sub(r'applicationId\s*=\s*["\'][^"\']+["\']', 'applicationId = "com.trackmylibrary.app"', content)
 
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -61,11 +67,13 @@ def patch_manifest():
         if os.path.exists(path):
             with open(path, 'r', encoding='utf-8') as f:
                 content = f.read()
+            # Ensure package attribute points to com.trackmylibrary.app if present
+            content = re.sub(r'package\s*=\s*["\'][^"\']+["\']', 'package="com.trackmylibrary.app"', content)
             if '<queries>' not in content and '</manifest>' in content:
                 content = content.replace('</manifest>', queries_block)
-                with open(path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                print(f"Injected <queries> into {path}")
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f"Patched AndroidManifest at {path}")
 
 if __name__ == '__main__':
     patch_gradle_files()

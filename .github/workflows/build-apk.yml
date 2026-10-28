@@ -33,7 +33,7 @@ jobs:
       - name: Scaffolding and Dependencies
         run: |
           cp pubspec.yaml pubspec.yaml.bak
-          flutter create --org com.trackmylibrary --project-name trackmylibrary --platforms android .
+          flutter create --org com.trackmylibrary --project-name app --platforms android .
           cp pubspec.yaml.bak pubspec.yaml
           rm -f test/widget_test.dart
           python3 .github/scripts/patch_android_gradle.py

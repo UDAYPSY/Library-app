@@ -1265,16 +1265,35 @@ class LibraryService {
           if (currentUserEmail.isNotEmpty) {
             await LocalStorageService.saveString('app_last_login_identifier', currentUserEmail);
           }
-          return AuthResult(
-            success: true,
-            role: 'Admin',
-            userName: currentUserName,
-            userId: currentUserId,
+            return AuthResult(
+              success: true,
+              role: 'Admin',
+              userName: currentUserName,
+              userId: currentUserId,
+            );
+          }
+        } on FirebaseAuthException catch (e) {
+        final errText = '${e.code} ${e.message ?? ''}'.toLowerCase();
+        if (errText.contains('invalid_app_id') ||
+            errText.contains('invalid-app-credential') ||
+            errText.contains('app-not-authorized') ||
+            errText.contains('12500')) {
+          return const AuthResult(
+            success: false,
+            message: 'Google Sign-In failed (invalid_APP_ID): Android package (com.trackmylibrary.app) and SHA-1 fingerprint must be added to your Firebase Console under Project Settings > Your Apps.',
           );
         }
-      } on FirebaseAuthException catch (e) {
         return AuthResult(success: false, message: 'Google Sign-In failed: ${e.message ?? e.code}');
-      } catch (_) {}
+      } catch (e) {
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('invalid_app_id') || errStr.contains('12500')) {
+          return const AuthResult(
+            success: false,
+            message: 'Google Sign-In failed (invalid_APP_ID): Please register SHA-1 fingerprint for com.trackmylibrary.app in Firebase Console.',
+          );
+        }
+        return AuthResult(success: false, message: 'Google Sign-In failed: $e');
+      }
     }
 
     final googleEmail = profile.adminEmail.isNotEmpty ? profile.adminEmail : 'admin@gmail.com';
