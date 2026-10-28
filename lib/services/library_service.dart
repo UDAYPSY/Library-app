@@ -1087,6 +1087,19 @@ class LibraryService {
     }
   }
 
+  // Remove temporary unallocated QR self-registration placeholder cleanly
+  void removeUnallocatedStudentForRequest(String requestId, {String? phone}) {
+    ensureInitialized();
+    final tempStudentId = 'st_qr_$requestId';
+    _mockStudents.removeWhere((s) =>
+        s.id == tempStudentId ||
+        (phone != null && s.seatNumber == null && normalizePhone(s.phone) == normalizePhone(phone)));
+    _syncSeatsWithStudents();
+    if (!_mockStudentsController.isClosed) {
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    }
+  }
+
   // Mark registration request accepted after seat allotment & registration via wizard
   Future<void> markRegistrationRequestAccepted({
     required String requestId,
@@ -1094,10 +1107,7 @@ class LibraryService {
     String? phone,
   }) async {
     ensureInitialized();
-    final tempStudentId = 'st_qr_$requestId';
-    _mockStudents.removeWhere((s) =>
-        s.id == tempStudentId ||
-        (phone != null && s.seatNumber == null && normalizePhone(s.phone) == normalizePhone(phone)));
+    removeUnallocatedStudentForRequest(requestId, phone: phone);
 
     final idx = _mockRegistrationRequests.indexWhere((r) => r.id == requestId);
     if (idx != -1) {

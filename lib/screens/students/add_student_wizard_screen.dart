@@ -902,11 +902,10 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       }
 
       if (widget.registrationRequest != null) {
-        final req = widget.registrationRequest!;
-        final tempStudentId = 'st_qr_${req.id}';
-        _service.currentStudents.removeWhere((s) =>
-            s.id == tempStudentId ||
-            (s.seatNumber == null && LibraryService.normalizePhone(s.phone) == LibraryService.normalizePhone(req.phone)));
+        _service.removeUnallocatedStudentForRequest(
+          widget.registrationRequest!.id,
+          phone: widget.registrationRequest!.phone,
+        );
       }
 
       await _service.assignSeatAndRegisterStudent(

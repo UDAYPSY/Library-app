@@ -1517,6 +1517,54 @@ void main() {
       expect(payment!.amount, equals(1000));
       expect(payment.paymentMode, equals('UPI'));
     });
+
+    test('Wizard QR admission workflow removes placeholder and marks accepted safely', () async {
+      final req = RegistrationRequest(
+        id: 'req_wizard_001',
+        studentName: 'Aman Verma',
+        phone: '9811223344',
+        shift: 'Morning Shift',
+        preparationFor: 'GATE Exam',
+        address: 'Noida Sector 62',
+        createdAt: DateTime.now(),
+        status: 'PENDING',
+      );
+
+      await service.submitRegistrationRequest(req);
+
+      // Verify unallocated placeholder student exists
+      expect(service.findStudentByPhone('9811223344'), isNotNull);
+      expect(service.findStudentByPhone('9811223344')!.status, equals('UNALLOCATED'));
+
+      // Remove placeholder as done by wizard
+      service.removeUnallocatedStudentForRequest(req.id, phone: req.phone);
+      expect(service.findStudentByPhone('9811223344'), isNull);
+
+      // Assign seat and register student
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 15,
+        studentName: req.studentName,
+        phone: req.phone,
+        shift: req.shift,
+        feeAmount: 800,
+        status: 'ACTIVE',
+      );
+
+      // Mark request accepted
+      await service.markRegistrationRequestAccepted(
+        requestId: req.id,
+        seatNumber: 15,
+        phone: req.phone,
+      );
+
+      final accepted = service.currentRegistrationRequests.firstWhere((r) => r.id == 'req_wizard_001');
+      expect(accepted.status, equals('ACCEPTED'));
+
+      final registeredStudent = service.findStudentByPhone('9811223344');
+      expect(registeredStudent, isNotNull);
+      expect(registeredStudent!.seatNumber, equals(15));
+      expect(registeredStudent.status, equals('ACTIVE'));
+    });
   });
 }
 
