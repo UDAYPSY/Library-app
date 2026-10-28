@@ -1883,56 +1883,11 @@ class LibraryService {
     await _saveLocalState();
   }
 
-  // Delete / Void Payment Transaction with optional student dues reinstatement
+  // Financial ledger immutability: payments cannot be manually deleted
   Future<void> deletePayment(String paymentId, {bool reinstateStudentDues = false}) async {
-    ensureInitialized();
-    PaymentTransaction? targetPay;
-    try {
-      targetPay = _mockPayments.firstWhere((p) => p.id == paymentId);
-    } catch (_) {}
-
-    if (isFirebaseConnected) {
-      try {
-        await _tenantCol('payments').doc(paymentId).delete();
-        if (reinstateStudentDues && targetPay != null && targetPay.studentId.isNotEmpty) {
-          final studentDoc = await _tenantCol('students').doc(targetPay.studentId).get();
-          if (studentDoc.exists) {
-            final data = studentDoc.data() ?? {};
-            final curDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
-            final restoredDues = curDues + targetPay.amount;
-            final now = DateTime.now();
-            final dateStr = DateFormat('dd-MMM-yyyy').format(now);
-            final curNote = (data['note'] as String?) ?? '';
-            final voidLog = 'Payment of ₹${targetPay.amount} voided/deleted on $dateStr (₹${targetPay.amount} added back to pending dues).';
-            await _tenantCol('students').doc(targetPay.studentId).update({
-              'dues_amount': restoredDues,
-              'status': 'DUES',
-              'note': appendNote(curNote, voidLog),
-            });
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (reinstateStudentDues && targetPay != null && targetPay.studentId.isNotEmpty) {
-      final sIdx = _mockStudents.indexWhere((s) => s.id == targetPay!.studentId);
-      if (sIdx != -1) {
-        final st = _mockStudents[sIdx];
-        final now = DateTime.now();
-        final dateStr = DateFormat('dd-MMM-yyyy').format(now);
-        final voidLog = 'Payment of ₹${targetPay.amount} voided/deleted on $dateStr (₹${targetPay.amount} added back to pending dues).';
-        _mockStudents[sIdx] = st.copyWith(
-          duesAmount: st.duesAmount + targetPay.amount,
-          status: 'DUES',
-          note: appendNote(st.note, voidLog),
-        );
-        _mockStudentsController.add(List.unmodifiable(_mockStudents));
-      }
-    }
-
-    _mockPayments.removeWhere((p) => p.id == paymentId);
-    _mockPaymentsController.add(List.unmodifiable(_mockPayments));
-    await _saveLocalState();
+    throw UnsupportedError(
+      'Payment transactions are an immutable financial ledger and cannot be manually deleted.',
+    );
   }
 
   // Stream Payment Transactions with optional limit

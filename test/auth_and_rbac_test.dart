@@ -209,6 +209,13 @@ void main() {
       expect(bioRes.success, isFalse);
       expect(bioRes.message, contains('No registered credentials found'));
     });
+
+    test('Financial ledger immutability blocks manual payment deletion', () async {
+      expect(
+        () => service.deletePayment('pay_123'),
+        throwsA(isA<UnsupportedError>()),
+      );
+    });
   });
 }
 

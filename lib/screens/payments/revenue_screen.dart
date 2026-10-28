@@ -123,86 +123,6 @@ class _RevenueScreenState extends State<RevenueScreen> {
     });
   }
 
-  void _confirmDeletePayment(PaymentTransaction p) {
-    bool reinstateDues = true;
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (modalCtx, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 24),
-              SizedBox(width: 8),
-              Text('Void / Delete Payment', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Are you sure you want to delete the payment of ₹${p.amount} recorded for ${p.studentName.isNotEmpty ? p.studentName : "Student"}?',
-                style: const TextStyle(fontSize: 14, color: AppColors.textNavy),
-              ),
-              const SizedBox(height: 14),
-              if (p.studentId.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7).withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: Row(
-                    children: [
-                      Checkbox(
-                        value: reinstateDues,
-                        activeColor: const Color(0xFFD97706),
-                        onChanged: (val) => setModalState(() => reinstateDues = val ?? true),
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'Add ₹ amount back to student pending dues',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await _service.deletePayment(p.id, reinstateStudentDues: reinstateDues);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Payment of ₹${p.amount} deleted/voided.'),
-                      backgroundColor: Colors.black87,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              child: const Text('Delete Transaction', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -920,14 +840,28 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                               color: AppColors.primaryTeal,
                                             ),
                                           ),
-                                          const SizedBox(width: 4),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Color(0xFFEF4444)),
-                                            tooltip: 'Delete / Void Payment',
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            visualDensity: VisualDensity.compact,
-                                            onPressed: () => _confirmDeletePayment(p),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF10B981).withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF059669)),
+                                                SizedBox(width: 3),
+                                                Text(
+                                                  'Recorded',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF059669),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ],
                                       ),

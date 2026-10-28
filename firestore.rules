@@ -37,6 +37,27 @@ service cloud.firestore {
       match /settings/{docId} {
         allow read, write: if isLibraryOwner(libraryId);
       }
+
+      match /staff/{staffId} {
+        allow read, write: if isLibraryOwner(libraryId);
+      }
+
+      match /branches/{branchId} {
+        allow read, write: if isLibraryOwner(libraryId);
+      }
+
+      match /backups/{backupId} {
+        allow read, write: if isLibraryOwner(libraryId);
+      }
+
+      match /registration_requests/{requestId} {
+        // Prospective students can submit self-registration via public QR / link
+        allow create: if request.resource.data.name is string 
+                      && request.resource.data.name.size() > 0
+                      && request.resource.data.phone is string;
+        // Only library owner can view, approve, update, or reject requests
+        allow read, update, delete: if isLibraryOwner(libraryId);
+      }
     }
 
     match /{document=**} {
