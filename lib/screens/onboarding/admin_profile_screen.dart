@@ -28,17 +28,33 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(
-      text: (_service.profile.adminName.isNotEmpty &&
-              _service.profile.adminName != 'Nivi' &&
-              _service.profile.adminName != 'Admin')
-          ? _service.profile.adminName
-          : '',
-    );
-    _emailCtrl = TextEditingController(text: '');
-    _phoneCtrl = TextEditingController(text: '');
+    final initialName = (_service.currentUserName.isNotEmpty &&
+            _service.currentUserName != 'Nivi' &&
+            _service.currentUserName != 'Admin')
+        ? _service.currentUserName
+        : (_service.profile.adminName.isNotEmpty &&
+                _service.profile.adminName != 'Nivi' &&
+                _service.profile.adminName != 'Admin')
+            ? _service.profile.adminName
+            : '';
+    _nameCtrl = TextEditingController(text: initialName);
+
+    final initialEmail = (_service.currentUserEmail.isNotEmpty &&
+            _service.currentUserEmail != 'manageyourlib@gmail.com')
+        ? _service.currentUserEmail
+        : (_service.profile.adminEmail.isNotEmpty &&
+                _service.profile.adminEmail != 'manageyourlib@gmail.com')
+            ? _service.profile.adminEmail
+            : '';
+    _emailCtrl = TextEditingController(text: initialEmail);
+
+    final initialPhone = (_service.profile.adminPhone.isNotEmpty &&
+            _service.profile.adminPhone != '9457464850')
+        ? _service.profile.adminPhone
+        : '';
+    _phoneCtrl = TextEditingController(text: initialPhone);
     _upiCtrl = TextEditingController(text: _service.profile.upiId != '9457464850@upi' ? _service.profile.upiId : '');
-    _driveEmailCtrl = TextEditingController(text: '');
+    _driveEmailCtrl = TextEditingController(text: initialEmail);
 
     _emailCtrl.addListener(() {
       if (_driveEmailCtrl.text.isEmpty || _driveEmailCtrl.text == _emailCtrl.text) {
@@ -73,7 +89,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       _emailCtrl.text.trim().contains('.');
   bool get _isPhoneValid =>
       _phoneCtrl.text.replaceAll(RegExp(r'\D'), '').length >= 10;
-  bool get _isPassValid => _passCtrl.text.length >= 6;
+  bool get _isPassValid => _service.isAuthenticated || _passCtrl.text.length >= 6;
 
   void _onCreateAccount() async {
     setState(() => _showErrors = true);
@@ -99,7 +115,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       }
     }
 
-    await LocalStorageService.saveString('app_admin_password', _passCtrl.text.trim());
+    final passToSave = _passCtrl.text.trim().isNotEmpty
+        ? _passCtrl.text.trim()
+        : 'google_auth_${_service.currentUserId ?? DateTime.now().millisecondsSinceEpoch}';
+    await LocalStorageService.saveString('app_admin_password', passToSave);
 
     final driveEmail = _driveEmailCtrl.text.trim().isNotEmpty ? _driveEmailCtrl.text.trim() : _emailCtrl.text.trim();
     await LocalStorageService.saveString('gdrive_auto_backup_enabled', _enableDriveAutoBackup ? 'true' : 'false');
@@ -317,9 +336,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
                       // Input 4: Password
                       _buildField(
-                        label: 'PASSWORD',
+                        label: _service.isAuthenticated ? 'ADMIN PASSWORD (OPTIONAL - LINKED WITH GOOGLE)' : 'PASSWORD',
                         controller: _passCtrl,
-                        hintText: 'Min. 6 characters',
+                        hintText: _service.isAuthenticated ? 'Optional offline PIN / password' : 'Min. 6 characters',
                         prefixIcon: Icons.lock_outline_rounded,
                         obscureText: _obscurePass,
                         isError: _showErrors && !_isPassValid,

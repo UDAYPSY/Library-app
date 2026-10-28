@@ -173,6 +173,17 @@ void main() {
       final emailRes = await service.sendPasswordReset('admin@apexlibrary.in');
       expect(emailRes.success, isTrue);
     });
+
+    test('hasConfiguredLibrary detects configured vs unconfigured state', () async {
+      service.profile.libraryName = '';
+      await LocalStorageService.remove('app_setup_completed');
+      await LocalStorageService.remove('app_library_profile');
+      expect(await service.hasConfiguredLibrary(), isFalse);
+
+      service.profile.libraryName = 'Sunrise Study Library';
+      await LocalStorageService.saveString('app_setup_completed', 'true');
+      expect(await service.hasConfiguredLibrary(), isTrue);
+    });
   });
 }
 

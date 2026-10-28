@@ -34,10 +34,19 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _checkActiveSession() async {
     await _service.restoreSession();
     if (_service.isAuthenticated && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainHubScreen()),
-      );
+      final hasLibrary = await _service.hasConfiguredLibrary();
+      if (!mounted) return;
+      if (hasLibrary) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainHubScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const WorkspaceSetupScreen()),
+        );
+      }
     }
   }
 
@@ -161,30 +170,69 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Google Sign-In successful! Welcome, ${result.userName}.',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: const Color(0xFF0D766E),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        final hasLibrary = await _service.hasConfiguredLibrary();
+        if (!mounted) return;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainHubScreen()),
-        );
+        if (hasLibrary) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Google Sign-In successful! Welcome back, ${result.userName}.',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF0D766E),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainHubScreen()),
+          );
+        } else {
+          // First-time Google user: no library created yet.
+          // Reset sample mock data so they start with a clean slate
+          _service.mockStudentsList.clear();
+          _service.mockPaymentsList.clear();
+          _service.mockExpensesList.clear();
+          _service.staffList.clear();
+          _service.profile.libraryName = '';
+          _service.profile.city = '';
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.celebration_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Welcome, ${result.userName}! Let\'s create and set up your library.',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF0D766E),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const WorkspaceSetupScreen()),
+          );
+        }
       } else {
         setState(() {
           _isLoading = false;

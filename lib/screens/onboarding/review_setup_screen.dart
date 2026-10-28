@@ -424,15 +424,24 @@ class ReviewSetupScreen extends StatelessWidget {
                   onPressed: () async {
                     final savedPass = (await LocalStorageService.getString('app_admin_password')) ??
                         'admin_${DateTime.now().millisecondsSinceEpoch}';
-                    await service.registerAdminAccount(
+                    final regRes = await service.registerAdminAccount(
                       email: service.profile.adminEmail.isNotEmpty ? service.profile.adminEmail : 'manageyourlib@gmail.com',
                       password: savedPass,
                       adminName: service.profile.adminName.isNotEmpty ? service.profile.adminName : 'Administrator',
                       libraryName: service.profile.libraryName.isNotEmpty ? service.profile.libraryName : 'My Library',
                       phone: service.profile.adminPhone.isNotEmpty ? service.profile.adminPhone : '9457464850',
                     );
+                    if (!regRes.success) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(regRes.message ?? 'Registration error')),
+                        );
+                      }
+                      return;
+                    }
                     service.updateSectionsAndRebuildSeats(service.sections);
                     await service.persistAll();
+                    await LocalStorageService.saveString('app_setup_completed', 'true');
 
                     // Initialize baseline disaster recovery snapshot
                     final recovery = DisasterRecoveryService(service: service);

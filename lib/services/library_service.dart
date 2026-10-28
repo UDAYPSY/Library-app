@@ -413,12 +413,24 @@ class LibraryService {
   /// Public persistence helper ensuring all changes to profile, seats, shifts & staff are stored locally
   Future<void> persistAll() async {
     await _saveLocalState();
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        await _db.collection('libraries').doc(tenantId).set(profile.toMap(), SetOptions(merge: true));
+        await _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true));
+      } catch (_) {}
+    }
   }
 
   /// Update and persist library profile metadata
   Future<void> saveProfile(LibraryProfile newProfile) async {
     profile = newProfile;
     await _saveLocalState();
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        await _db.collection('libraries').doc(tenantId).set(profile.toMap(), SetOptions(merge: true));
+        await _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true));
+      } catch (_) {}
+    }
   }
 
   void _migrateSchema(Map<String, dynamic> data, {required int fromVersion}) {
@@ -1239,6 +1251,63 @@ class LibraryService {
     );
   }
 
+  /// Check whether the current user or device has completed library setup and configured a real library
+  Future<bool> hasConfiguredLibrary() async {
+    ensureInitialized();
+
+    // 1. Explicit setup completion flag in local storage
+    final setupDone = await LocalStorageService.getString('app_setup_completed');
+    if (setupDone == 'true') return true;
+
+    // 2. Custom library name in local storage (not empty and not default sample library)
+    final profileStr = await LocalStorageService.getString('app_library_profile');
+    if (profileStr != null && profileStr.isNotEmpty) {
+      try {
+        final decoded = json.decode(profileStr);
+        if (decoded is Map && decoded['library_name'] != null) {
+          final name = decoded['library_name'].toString().trim();
+          if (name.isNotEmpty && name != 'Patna Central Library') {
+            return true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. In-memory profile has a custom library name
+    if (profile.libraryName.isNotEmpty && profile.libraryName != 'Patna Central Library') {
+      return true;
+    }
+
+    // 4. If connected to Firebase, check if cloud tenant document has a configured library
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        final libDoc = await _db.collection('libraries').doc(tenantId).get();
+        if (libDoc.exists && libDoc.data() != null) {
+          final data = libDoc.data()!;
+          if (data['library_name'] != null && data['library_name'].toString().trim().isNotEmpty) {
+            profile = LibraryProfile.fromMap(data);
+            await LocalStorageService.saveString('app_setup_completed', 'true');
+            await _saveLocalState();
+            return true;
+          }
+        }
+
+        final brandingDoc = await _tenantCol('settings').doc('branding').get();
+        if (brandingDoc.exists && brandingDoc.data() != null) {
+          final data = brandingDoc.data()!;
+          if (data['library_name'] != null && data['library_name'].toString().trim().isNotEmpty) {
+            profile = LibraryProfile.fromMap(data);
+            await LocalStorageService.saveString('app_setup_completed', 'true');
+            await _saveLocalState();
+            return true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return false;
+  }
+
   Future<AuthResult> loginWithGoogle() async {
     ensureInitialized();
     if (isFirebaseConnected) {
@@ -1260,6 +1329,30 @@ class LibraryService {
           }
           currentUserRole = 'Admin';
           isAuthenticated = true;
+
+          // Attempt to restore existing cloud library profile if user has previously configured one
+          try {
+            final libDoc = await _db.collection('libraries').doc(user.uid).get();
+            if (libDoc.exists && libDoc.data() != null) {
+              final data = libDoc.data()!;
+              if (data['library_name'] != null && data['library_name'].toString().trim().isNotEmpty) {
+                profile = LibraryProfile.fromMap(data);
+                await LocalStorageService.saveString('app_setup_completed', 'true');
+                await _saveLocalState();
+              }
+            } else {
+              final brandingDoc = await _db.collection('libraries').doc(user.uid).collection('settings').doc('branding').get();
+              if (brandingDoc.exists && brandingDoc.data() != null) {
+                final data = brandingDoc.data()!;
+                if (data['library_name'] != null && data['library_name'].toString().trim().isNotEmpty) {
+                  profile = LibraryProfile.fromMap(data);
+                  await LocalStorageService.saveString('app_setup_completed', 'true');
+                  await _saveLocalState();
+                }
+              }
+            }
+          } catch (_) {}
+
           await LocalStorageService.saveString(
             'app_active_session',
             json.encode({
@@ -1414,22 +1507,31 @@ class LibraryService {
     }
 
     if (isFirebaseConnected) {
-      try {
-        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: cleanEmail,
-          password: cleanPass,
-        );
-        if (credential.user != null) {
-          currentUserId = credential.user!.uid;
-          profile.libraryId = credential.user!.uid;
-        }
-      } on FirebaseAuthException catch (e) {
-        String msg = 'Registration failed: ${e.message ?? e.code}';
-        if (e.code == 'email-already-in-use') msg = 'This email is already registered. Please sign in directly from the login screen.';
-        if (e.code == 'weak-password') msg = 'The password is too weak (min 6 characters required).';
-        if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
-        return AuthResult(success: false, message: msg);
-      } catch (_) {}
+      final currentFbUser = FirebaseAuth.instance.currentUser;
+      if (currentFbUser != null &&
+          currentFbUser.email != null &&
+          currentFbUser.email!.toLowerCase() == cleanEmail.toLowerCase()) {
+        // User is already authenticated (e.g. via Google Sign-In)
+        currentUserId = currentFbUser.uid;
+        profile.libraryId = currentFbUser.uid;
+      } else {
+        try {
+          final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: cleanEmail,
+            password: cleanPass,
+          );
+          if (credential.user != null) {
+            currentUserId = credential.user!.uid;
+            profile.libraryId = credential.user!.uid;
+          }
+        } on FirebaseAuthException catch (e) {
+          String msg = 'Registration failed: ${e.message ?? e.code}';
+          if (e.code == 'email-already-in-use') msg = 'This email is already registered. Please sign in directly from the login screen.';
+          if (e.code == 'weak-password') msg = 'The password is too weak (min 6 characters required).';
+          if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
+          return AuthResult(success: false, message: msg);
+        } catch (_) {}
+      }
     }
 
     profile.adminEmail = cleanEmail;
@@ -1458,6 +1560,12 @@ class LibraryService {
       }),
     );
     await _saveLocalState();
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        await _db.collection('libraries').doc(tenantId).set(profile.toMap(), SetOptions(merge: true));
+        await _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true));
+      } catch (_) {}
+    }
     return AuthResult(
       success: true,
       role: 'Admin',

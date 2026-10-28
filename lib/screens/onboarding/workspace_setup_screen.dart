@@ -19,8 +19,18 @@ class _WorkspaceSetupScreenState extends State<WorkspaceSetupScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: _service.profile.libraryName);
-    _cityCtrl = TextEditingController(text: _service.profile.city);
+    _nameCtrl = TextEditingController(
+      text: (_service.profile.libraryName.isNotEmpty &&
+              _service.profile.libraryName != 'Patna Central Library')
+          ? _service.profile.libraryName
+          : '',
+    );
+    _cityCtrl = TextEditingController(
+      text: (_service.profile.city.isNotEmpty &&
+              _service.profile.city != 'City Center, Main St')
+          ? _service.profile.city
+          : '',
+    );
   }
 
   void _onContinue() {
