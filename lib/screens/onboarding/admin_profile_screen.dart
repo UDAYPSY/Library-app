@@ -6,7 +6,8 @@ import 'seat_setup_screen.dart';
 import '../login_screen.dart';
 
 class AdminProfileScreen extends StatefulWidget {
-  const AdminProfileScreen({super.key});
+  final bool isEditMode;
+  const AdminProfileScreen({super.key, this.isEditMode = false});
 
   @override
   State<AdminProfileScreen> createState() => _AdminProfileScreenState();
@@ -89,7 +90,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       _emailCtrl.text.trim().contains('.');
   bool get _isPhoneValid =>
       _phoneCtrl.text.replaceAll(RegExp(r'\D'), '').length >= 10;
-  bool get _isPassValid => _service.isAuthenticated || _passCtrl.text.length >= 6;
+  bool get _isPassValid => widget.isEditMode
+      ? (_passCtrl.text.isEmpty || _passCtrl.text.length >= 6)
+      : (_service.isAuthenticated || _passCtrl.text.length >= 6);
 
   void _onCreateAccount() async {
     setState(() => _showErrors = true);
@@ -115,16 +118,33 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       }
     }
 
-    final passToSave = _passCtrl.text.trim().isNotEmpty
-        ? _passCtrl.text.trim()
-        : 'google_auth_${_service.currentUserId ?? DateTime.now().millisecondsSinceEpoch}';
-    await LocalStorageService.saveString('app_admin_password', passToSave);
+    if (_passCtrl.text.trim().isNotEmpty) {
+      await LocalStorageService.saveString('app_admin_password', _passCtrl.text.trim());
+    } else if (!widget.isEditMode) {
+      final passToSave = 'google_auth_${_service.currentUserId ?? DateTime.now().millisecondsSinceEpoch}';
+      await LocalStorageService.saveString('app_admin_password', passToSave);
+    }
 
     final driveEmail = _driveEmailCtrl.text.trim().isNotEmpty ? _driveEmailCtrl.text.trim() : _emailCtrl.text.trim();
     await LocalStorageService.saveString('gdrive_auto_backup_enabled', _enableDriveAutoBackup ? 'true' : 'false');
     await LocalStorageService.saveString('gdrive_backup_email', driveEmail);
 
+    await _service.saveProfile(_service.profile);
+
     if (!mounted) return;
+
+    if (widget.isEditMode) {
+      Navigator.pop(context, true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Administrator profile updated successfully!'),
+          backgroundColor: Color(0xFF0D766E),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const SeatSetupScreen()),
@@ -157,7 +177,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'JOIN THE EXPERTS',
+                    widget.isEditMode ? 'LIBRARY SETTINGS' : 'JOIN THE EXPERTS',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.8),
                       fontSize: 11,
@@ -166,9 +186,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    'Administrator Profile',
-                    style: TextStyle(
+                  Text(
+                    widget.isEditMode ? 'Edit Admin Profile' : 'Administrator Profile',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
@@ -176,32 +196,55 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Almost there! Who will be managing this space?',
+                    widget.isEditMode
+                        ? 'Update your administrator profile, UPI ID & cloud backup.'
+                        : 'Almost there! Who will be managing this space?',
                     style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
                   ),
                   const SizedBox(height: 16),
 
-                  // Progress Bar: Step 2 of 2 (Full)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: const LinearProgressIndicator(
-                            value: 1.0,
-                            minHeight: 5,
-                            backgroundColor: Colors.white24,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  // Progress Bar or Edit Mode Badge
+                  if (!widget.isEditMode)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: const LinearProgressIndicator(
+                              value: 1.0,
+                              minHeight: 5,
+                              backgroundColor: Colors.white24,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 14),
+                        const Text(
+                          'Step 2 of 2',
+                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white30),
                       ),
-                      const SizedBox(width: 14),
-                      const Text(
-                        'Step 2 of 2',
-                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.shield_rounded, color: Colors.white, size: 14),
+                          SizedBox(width: 6),
+                          Text(
+                            'Administrator Credentials',
+                            style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
                   const SizedBox(height: 6),
                 ],
               ),
@@ -450,31 +493,36 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                             ),
                           ),
                           onPressed: _onCreateAccount,
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Create Account',
-                                style: TextStyle(
+                                widget.isEditMode ? 'Save Changes' : 'Create Account',
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              SizedBox(width: 8),
-                              Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 18),
+                              const SizedBox(width: 8),
+                              Icon(
+                                widget.isEditMode ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 18),
 
-                      // Sign in link
-                      Center(
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.pushAndRemoveUntil(
-                              context,
+                      // Sign in link (only in onboarding)
+                      if (!widget.isEditMode)
+                        Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.pushAndRemoveUntil(
+                                context,
                               MaterialPageRoute(builder: (_) => const LoginScreen()),
                               (route) => false,
                             );

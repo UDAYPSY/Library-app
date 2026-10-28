@@ -29,6 +29,11 @@ class LibraryProfile {
   String? logoUrl;
   String tagline;
   String portalBaseUrl;
+  String accentColorHex;
+  String cardThemeStyle;
+  String noticeAnnouncement;
+  String receiptFooterNote;
+  bool showBrandingWatermark;
 
   String get effectiveUpiId {
     if (upiId.trim().isNotEmpty) return upiId.trim();
@@ -96,6 +101,11 @@ class LibraryProfile {
     this.logoUrl,
     this.tagline = 'Silence • Focus • Success',
     this.portalBaseUrl = 'https://udaypsy.github.io/Library-app',
+    this.accentColorHex = '#0D9488',
+    this.cardThemeStyle = 'Modern Glassmorphism',
+    this.noticeAnnouncement = 'Silence is Golden • High-Speed 5G Wi-Fi • Fully AC',
+    this.receiptFooterNote = 'Fees once paid are non-refundable. Please carry your student ID card.',
+    this.showBrandingWatermark = true,
     this.whatsappCredits = 150,
     this.messagesSentCount = 24,
     this.whatsappNotifications = true,
@@ -129,6 +139,11 @@ class LibraryProfile {
     String? logoUrl,
     String? tagline,
     String? portalBaseUrl,
+    String? accentColorHex,
+    String? cardThemeStyle,
+    String? noticeAnnouncement,
+    String? receiptFooterNote,
+    bool? showBrandingWatermark,
     int? whatsappCredits,
     int? messagesSentCount,
     bool? whatsappNotifications,
@@ -161,6 +176,11 @@ class LibraryProfile {
       logoUrl: logoUrl ?? this.logoUrl,
       tagline: tagline ?? this.tagline,
       portalBaseUrl: portalBaseUrl ?? this.portalBaseUrl,
+      accentColorHex: accentColorHex ?? this.accentColorHex,
+      cardThemeStyle: cardThemeStyle ?? this.cardThemeStyle,
+      noticeAnnouncement: noticeAnnouncement ?? this.noticeAnnouncement,
+      receiptFooterNote: receiptFooterNote ?? this.receiptFooterNote,
+      showBrandingWatermark: showBrandingWatermark ?? this.showBrandingWatermark,
       whatsappCredits: whatsappCredits ?? this.whatsappCredits,
       messagesSentCount: messagesSentCount ?? this.messagesSentCount,
       whatsappNotifications: whatsappNotifications ?? this.whatsappNotifications,
@@ -196,6 +216,11 @@ class LibraryProfile {
       'logo_url': logoUrl,
       'tagline': tagline,
       'portal_base_url': portalBaseUrl,
+      'accent_color_hex': accentColorHex,
+      'card_theme_style': cardThemeStyle,
+      'notice_announcement': noticeAnnouncement,
+      'receipt_footer_note': receiptFooterNote,
+      'show_branding_watermark': showBrandingWatermark,
       'whatsapp_credits': whatsappCredits,
       'messages_sent_count': messagesSentCount,
       'whatsapp_notifications': whatsappNotifications,
@@ -231,6 +256,11 @@ class LibraryProfile {
       logoUrl: map['logo_url'] as String?,
       tagline: map['tagline'] ?? 'Silence • Focus • Success',
       portalBaseUrl: map['portal_base_url'] ?? 'https://udaypsy.github.io/Library-app',
+      accentColorHex: map['accent_color_hex'] ?? '#0D9488',
+      cardThemeStyle: map['card_theme_style'] ?? 'Modern Glassmorphism',
+      noticeAnnouncement: map['notice_announcement'] ?? 'Silence is Golden • High-Speed 5G Wi-Fi • Fully AC',
+      receiptFooterNote: map['receipt_footer_note'] ?? 'Fees once paid are non-refundable. Please carry your student ID card.',
+      showBrandingWatermark: map['show_branding_watermark'] ?? true,
       whatsappCredits: (map['whatsapp_credits'] as num?)?.toInt() ?? 150,
       messagesSentCount: (map['messages_sent_count'] as num?)?.toInt() ?? 24,
       whatsappNotifications: map['whatsapp_notifications'] ?? true,

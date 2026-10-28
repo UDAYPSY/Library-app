@@ -163,7 +163,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('📁 File: TrackMyLibrary_Backup_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv',
+                      Text('📁 File: TrackMyLibrary_Master_Backup_${DateFormat('yyyyMMdd').format(DateTime.now())}.xls (Excel Multi-Sheet)',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 4),
                       Text('👥 Registered Members: ${_service.currentStudents.length}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),

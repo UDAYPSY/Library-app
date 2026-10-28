@@ -150,12 +150,28 @@ class LibraryService {
       profile.libraryName = b.name;
       profile.city = b.address;
       _saveLocalState();
+      notifyStreamControllers();
     }
   }
 
   void addBranch(LibraryBranch branch) {
     branches.add(branch);
     _saveLocalState();
+    notifyStreamControllers();
+  }
+
+  void removeBranch(String branchId) {
+    if (branches.length > 1) {
+      branches.removeWhere((b) => b.id == branchId);
+      if (activeBranchId == branchId) {
+        activeBranchId = branches.first.id;
+        final b = currentBranch;
+        profile.libraryName = b.name;
+        profile.city = b.address;
+      }
+      _saveLocalState();
+      notifyStreamControllers();
+    }
   }
 
   void addStaffMember(StaffMember staff) {
@@ -3707,9 +3723,19 @@ class LibraryService {
     String? logoBase64,
     String? logoUrl,
     bool clearCustomLogo = false,
+    String? accentColorHex,
+    String? cardThemeStyle,
+    String? noticeAnnouncement,
+    String? receiptFooterNote,
+    bool? showBrandingWatermark,
   }) {
     if (logoEmblem != null) profile.logoEmblem = logoEmblem;
     if (tagline != null) profile.tagline = tagline;
+    if (accentColorHex != null) profile.accentColorHex = accentColorHex;
+    if (cardThemeStyle != null) profile.cardThemeStyle = cardThemeStyle;
+    if (noticeAnnouncement != null) profile.noticeAnnouncement = noticeAnnouncement;
+    if (receiptFooterNote != null) profile.receiptFooterNote = receiptFooterNote;
+    if (showBrandingWatermark != null) profile.showBrandingWatermark = showBrandingWatermark;
     if (clearCustomLogo) {
       profile.logoBase64 = null;
       profile.logoUrl = null;
@@ -3724,6 +3750,7 @@ class LibraryService {
       profile.city = city.trim();
     }
     _saveLocalState();
+    notifyStreamControllers();
     if (isFirebaseConnected) {
       _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
     }

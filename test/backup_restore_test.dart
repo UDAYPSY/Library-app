@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/models/library_models.dart';
+import 'package:library_manager/services/disaster_recovery_service.dart';
 import 'package:library_manager/services/library_service.dart';
 
 void main() {
@@ -146,6 +147,23 @@ void main() {
       final student = service.findStudentByPhone('9811223344');
       expect(student, isNotNull);
       expect(student!.gender, equals('Male')); // Default migrated
+    });
+
+    test('Disaster recovery generates properly formatted multi-sheet Excel (.xls) and restores', () async {
+      final recoveryService = DisasterRecoveryService();
+      final xmlWorkbook = recoveryService.generateMasterExcelWorkbookXml();
+
+      expect(xmlWorkbook, contains('xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"'));
+      expect(xmlWorkbook, contains('ss:Name="Students &amp; Members"'));
+      expect(xmlWorkbook, contains('ss:Name="Fee Collections"'));
+      expect(xmlWorkbook, contains('ss:Name="Pending Dues &amp; Defaulters"'));
+      expect(xmlWorkbook, contains('ss:Name="Operating Expenses"'));
+      expect(xmlWorkbook, contains('ss:Name="Disaster Recovery Payload"'));
+      expect(xmlWorkbook, contains('SYSTEM_RESTORE_PAYLOAD'));
+
+      // Test restoring directly from the Excel SpreadsheetML file
+      final restoreResult = await recoveryService.restoreFromBackupContent(xmlWorkbook);
+      expect(restoreResult['success'], isTrue);
     });
   });
 }

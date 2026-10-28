@@ -10,6 +10,7 @@ import '../../services/file_export_service.dart';
 import '../../services/library_service.dart';
 import '../../services/theme_service.dart';
 import '../login_screen.dart';
+import '../onboarding/admin_profile_screen.dart';
 import '../shifts/shift_system_screen.dart';
 import '../tools/disaster_recovery_screen.dart';
 import '../tools/library_branding_screen.dart';
@@ -392,111 +393,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showEditProfileModal() {
-    final p = _service.profile;
-    final nameCtrl = TextEditingController(text: p.adminName);
-    final emailCtrl = TextEditingController(text: p.adminEmail);
-    final phoneCtrl = TextEditingController(text: p.adminPhone);
-    final upiCtrl = TextEditingController(text: p.upiId);
-    final libCtrl = TextEditingController(text: p.libraryName);
-    final cityCtrl = TextEditingController(text: p.city);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Edit Profile & Workspace', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Admin Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person_outline_rounded)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder(), prefixIcon: Icon(Icons.email_outlined)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneCtrl,
-                decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone_outlined)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: upiCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Payment UPI ID / VPA',
-                  helperText: 'UPI ID credited when students scan in-app fee QR codes',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.qr_code_2_rounded),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: libCtrl,
-                decoration: const InputDecoration(labelText: 'Library Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.local_library_outlined)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: cityCtrl,
-                decoration: const InputDecoration(labelText: 'City / Address', border: OutlineInputBorder(), prefixIcon: Icon(Icons.location_on_outlined)),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D766E),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () async {
-                    p.adminName = nameCtrl.text.trim();
-                    p.adminEmail = emailCtrl.text.trim();
-                    p.adminPhone = phoneCtrl.text.trim();
-                    if (upiCtrl.text.trim().isNotEmpty) {
-                      p.upiId = upiCtrl.text.trim();
-                    }
-                    p.libraryName = libCtrl.text.trim();
-                    p.city = cityCtrl.text.trim();
-                    await _service.persistAll();
-                    setState(() {});
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Color(0xFF0D766E)),
-                      );
-                    }
-                  },
-                  child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AdminProfileScreen(isEditMode: true)),
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _showBranchSwitcherModal() {
@@ -526,69 +428,113 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 16),
               ..._service.branches.map((b) {
                 final isCurrent = b.id == _service.activeBranchId;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isCurrent ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isCurrent ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isCurrent ? const Color(0xFFDCFCE7) : const Color(0xFFEDF2F7),
-                          borderRadius: BorderRadius.circular(10),
+                return InkWell(
+                  onTap: isCurrent
+                      ? null
+                      : () {
+                          _service.switchBranch(b.id);
+                          setState(() {});
+                          setModalState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Switched active branch to ${b.name}'),
+                              backgroundColor: const Color(0xFF0D766E),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isCurrent ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: isCurrent ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? const Color(0xFFDCFCE7) : const Color(0xFFEDF2F7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.apartment_rounded, color: isCurrent ? const Color(0xFF16A34A) : const Color(0xFF64748B), size: 20),
                         ),
-                        child: Icon(Icons.apartment_rounded, color: isCurrent ? const Color(0xFF16A34A) : const Color(0xFF64748B), size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(b.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.textNavy)),
-                            const SizedBox(height: 2),
-                            Text('${b.address} • ${b.totalSeats} Seats', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                          ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(b.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.textNavy)),
+                              const SizedBox(height: 2),
+                              Text('${b.address} • ${b.totalSeats} Seats', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            ],
+                          ),
                         ),
-                      ),
-                      if (isCurrent)
-                        const Row(
-                          children: [
-                            Text('ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF16A34A))),
-                            SizedBox(width: 4),
-                            Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18),
-                          ],
-                        )
-                      else
-                        TextButton(
-                          onPressed: () {
-                            _service.switchBranch(b.id);
-                            setState(() {});
-                            setModalState(() {});
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Switched to ${b.name}')),
-                            );
-                          },
-                          child: const Text('Switch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        ),
-                    ],
+                        if (isCurrent)
+                          const Row(
+                            children: [
+                              Text('ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF16A34A))),
+                              SizedBox(width: 4),
+                              Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18),
+                            ],
+                          )
+                        else
+                          Row(
+                            children: [
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0D766E),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  minimumSize: Size.zero,
+                                ),
+                                onPressed: () {
+                                  _service.switchBranch(b.id);
+                                  setState(() {});
+                                  setModalState(() {});
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Switched active branch to ${b.name}'),
+                                      backgroundColor: const Color(0xFF0D766E),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                },
+                                child: const Text('Switch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
+                              ),
+                              if (_service.branches.length > 1) ...[
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                  onPressed: () {
+                                    _service.removeBranch(b.id);
+                                    setState(() {});
+                                    setModalState(() {});
+                                  },
+                                ),
+                              ],
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
                 );
               }),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.add_business_rounded, color: Color(0xFF0F766E)),
+                  decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.add_business_rounded, color: Color(0xFF16A34A)),
                 ),
                 title: const Text('Add New Library Branch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 subtitle: const Text('Configure additional floor, hall or location', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF16A34A)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showAddBranchDialog();
@@ -811,65 +757,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final nameCtrl = TextEditingController();
     final addrCtrl = TextEditingController();
     final seatsCtrl = TextEditingController(text: '35');
+    String? errorText;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Add Library Branch', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Branch Name (e.g. Floor 2 AC Hall)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: addrCtrl,
-              decoration: const InputDecoration(labelText: 'Address / Location', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: seatsCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Total Seats Capacity', border: OutlineInputBorder()),
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Add Library Branch', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Branch Name (e.g. Floor 2 AC Hall) *',
+                  errorText: errorText,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.apartment_rounded),
+                ),
+                onChanged: (_) {
+                  if (errorText != null) setDialogState(() => errorText = null);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: addrCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Address / Location',
+                  hintText: 'e.g. 2nd Floor, Main Street',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: seatsCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Total Seats Capacity',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.event_seat_rounded),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D766E),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) {
+                  setDialogState(() => errorText = 'Please enter branch name');
+                  return;
+                }
+                final addr = addrCtrl.text.trim().isNotEmpty ? addrCtrl.text.trim() : _service.profile.city;
+                final seats = int.tryParse(seatsCtrl.text.trim()) ?? 35;
+                final newBranch = LibraryBranch(
+                  id: 'branch_${DateTime.now().millisecondsSinceEpoch}',
+                  name: name,
+                  address: addr,
+                  totalSeats: seats,
+                );
+                _service.addBranch(newBranch);
+                _service.switchBranch(newBranch.id);
+                setState(() {});
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Branch "$name" created and activated!'),
+                    backgroundColor: const Color(0xFF0D766E),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              child: const Text('Create Branch'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D766E),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              final name = nameCtrl.text.trim();
-              if (name.isEmpty) return;
-              final addr = addrCtrl.text.trim().isNotEmpty ? addrCtrl.text.trim() : _service.profile.city;
-              final seats = int.tryParse(seatsCtrl.text.trim()) ?? 35;
-              final newBranch = LibraryBranch(
-                id: 'branch_${DateTime.now().millisecondsSinceEpoch}',
-                name: name,
-                address: addr,
-                totalSeats: seats,
-              );
-              _service.addBranch(newBranch);
-              _service.switchBranch(newBranch.id);
-              setState(() {});
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Branch "$name" created and activated!'),
-                  backgroundColor: const Color(0xFF0D766E),
-                ),
-              );
-            },
-            child: const Text('Create Branch'),
-          ),
-        ],
       ),
     );
   }
@@ -997,96 +967,288 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
-    final pinCtrl = TextEditingController(text: '1234');
     final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    final confirmPassCtrl = TextEditingController();
     String selectedRole = 'Receptionist & Desk';
+    String selectedBranchId = _service.activeBranchId;
+    bool obscurePass = true;
+    bool obscureConfirm = true;
+    String? validationError;
+
+    int calculateStrength(String pass) {
+      if (pass.isEmpty) return 0;
+      int score = 0;
+      if (pass.length >= 8) score++;
+      if (RegExp(r'[A-Z]').hasMatch(pass)) score++;
+      if (RegExp(r'[a-z]').hasMatch(pass) && RegExp(r'[0-9]').hasMatch(pass)) score++;
+      if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(pass)) score++;
+      return score;
+    }
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (dialogCtx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+        builder: (dialogCtx, setDialogState) {
+          final pass = passCtrl.text;
+          final strengthScore = calculateStrength(pass);
+          Color strengthColor = Colors.grey;
+          String strengthLabel = 'Min 8 chars required';
+          if (pass.isNotEmpty) {
+            if (strengthScore <= 1) {
+              strengthColor = const Color(0xFFEF4444);
+              strengthLabel = 'Weak';
+            } else if (strengthScore == 2) {
+              strengthColor = const Color(0xFFF59E0B);
+              strengthLabel = 'Fair';
+            } else if (strengthScore == 3) {
+              strengthColor = const Color(0xFF0D9488);
+              strengthLabel = 'Strong';
+            } else {
+              strengthColor = const Color(0xFF16A34A);
+              strengthLabel = 'Very Strong';
+            }
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
               children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: '10-Digit Mobile Number (Login ID)', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: pinCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Staff Login PIN / Password', hintText: 'e.g. 1234', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email Address (Optional)', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedRole,
-                  decoration: const InputDecoration(labelText: 'Staff Role & Access', border: OutlineInputBorder()),
-                  items: const [
-                    DropdownMenuItem(value: 'Receptionist & Desk', child: Text('Receptionist & Desk')),
-                    DropdownMenuItem(value: 'Shift Manager', child: Text('Shift Manager')),
-                    DropdownMenuItem(value: 'Accountant', child: Text('Accountant')),
-                    DropdownMenuItem(value: 'Night Supervisor', child: Text('Night Supervisor')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setDialogState(() => selectedRole = val);
-                  },
-                ),
+                Icon(Icons.badge_rounded, color: Color(0xFF0D766E), size: 24),
+                SizedBox(width: 8),
+                Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0D766E),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (validationError != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(validationError!, style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12, fontWeight: FontWeight.bold))),
+                          ],
+                        ),
+                      ),
+                    ],
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name *',
+                        hintText: 'e.g. Ramesh Kumar',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_outline_rounded),
+                      ),
+                      onChanged: (_) {
+                        if (validationError != null) setDialogState(() => validationError = null);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: '10-Digit Mobile Number (Login ID) *',
+                        hintText: 'e.g. 9876543210',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.phone_outlined),
+                      ),
+                      onChanged: (_) {
+                        if (validationError != null) setDialogState(() => validationError = null);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email Address *',
+                        hintText: 'e.g. ramesh@gmail.com',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.mail_outline_rounded),
+                      ),
+                      onChanged: (_) {
+                        if (validationError != null) setDialogState(() => validationError = null);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _service.branches.any((b) => b.id == selectedBranchId) ? selectedBranchId : _service.branches.first.id,
+                      decoration: const InputDecoration(
+                        labelText: 'Assigned Library Branch *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.apartment_rounded),
+                      ),
+                      items: _service.branches.map((b) => DropdownMenuItem(value: b.id, child: Text(b.name, overflow: TextOverflow.ellipsis))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedBranchId = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedRole,
+                      decoration: const InputDecoration(
+                        labelText: 'Staff Role & Permissions *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Receptionist & Desk', child: Text('Receptionist & Desk')),
+                        DropdownMenuItem(value: 'Shift Manager', child: Text('Shift Manager')),
+                        DropdownMenuItem(value: 'Accountant & Fees', child: Text('Accountant & Fees')),
+                        DropdownMenuItem(value: 'Night Supervisor', child: Text('Night Supervisor')),
+                        DropdownMenuItem(value: 'Branch Assistant', child: Text('Branch Assistant')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedRole = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Password with Strong Protection
+                    TextField(
+                      controller: passCtrl,
+                      obscureText: obscurePass,
+                      decoration: InputDecoration(
+                        labelText: 'Password (min 8 chars) *',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscurePass ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                          onPressed: () => setDialogState(() => obscurePass = !obscurePass),
+                        ),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Password strength indicator
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: pass.isEmpty ? 0 : (strengthScore / 4).clamp(0.15, 1.0),
+                              minHeight: 5,
+                              backgroundColor: const Color(0xFFE2E8F0),
+                              valueColor: AlwaysStoppedAnimation<Color>(strengthColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          strengthLabel,
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: strengthColor),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Requires 8+ characters, uppercase, lowercase, number & symbol.',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Confirm Password
+                    TextField(
+                      controller: confirmPassCtrl,
+                      obscureText: obscureConfirm,
+                      decoration: InputDecoration(
+                        labelText: 'Confirm Password *',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock_reset_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                          onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                        ),
+                      ),
+                      onChanged: (_) {
+                        if (validationError != null) setDialogState(() => validationError = null);
+                      },
+                    ),
+                  ],
+                ),
               ),
-              onPressed: () {
-                final name = nameCtrl.text.trim();
-                final phone = phoneCtrl.text.trim();
-                if (name.isEmpty || phone.isEmpty) return;
-                final pin = pinCtrl.text.trim().isNotEmpty ? pinCtrl.text.trim() : '1234';
-                final email = emailCtrl.text.trim().isNotEmpty ? emailCtrl.text.trim() : null;
-                final newStaff = StaffMember(
-                  id: 'staff_${DateTime.now().millisecondsSinceEpoch}',
-                  name: name,
-                  phone: phone,
-                  role: selectedRole,
-                  email: email,
-                  pinHash: LibraryService.hashPin(pin),
-                  addedAt: DateTime.now(),
-                );
-                _service.addStaffMember(newStaff);
-                setState(() {});
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Staff account for $name created! Login PIN: $pin'),
-                    backgroundColor: const Color(0xFF0D766E),
-                  ),
-                );
-              },
-              child: const Text('Save Staff'),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D766E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  final name = nameCtrl.text.trim();
+                  final phone = phoneCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
+                  final email = emailCtrl.text.trim();
+                  final password = passCtrl.text;
+                  final confirm = confirmPassCtrl.text;
+
+                  if (name.isEmpty) {
+                    setDialogState(() => validationError = 'Please enter staff full name.');
+                    return;
+                  }
+                  if (phone.length < 10) {
+                    setDialogState(() => validationError = 'Please enter a valid 10-digit mobile number.');
+                    return;
+                  }
+                  if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+                    setDialogState(() => validationError = 'Please enter a valid email address.');
+                    return;
+                  }
+                  if (password.length < 8) {
+                    setDialogState(() => validationError = 'Password must be at least 8 characters long.');
+                    return;
+                  }
+                  if (strengthScore < 2) {
+                    setDialogState(() => validationError = 'Please choose a stronger password (include numbers & symbols).');
+                    return;
+                  }
+                  if (password != confirm) {
+                    setDialogState(() => validationError = 'Passwords do not match.');
+                    return;
+                  }
+
+                  final newStaff = StaffMember(
+                    id: 'staff_${DateTime.now().millisecondsSinceEpoch}',
+                    name: name,
+                    phone: phone,
+                    role: selectedRole,
+                    email: email,
+                    pinHash: LibraryService.hashPin(password),
+                    addedAt: DateTime.now(),
+                  );
+                  _service.addStaffMember(newStaff);
+                  setState(() {});
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Staff account created for $name ($selectedRole)!'),
+                      backgroundColor: const Color(0xFF0D766E),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                child: const Text('Create Staff Account'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1253,70 +1415,293 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showContactsSyncModal() {
+    String selectedFilter = 'ACTIVE';
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) {
+          final allStudents = _service.currentStudents;
+          List<StudentInfo> targetList;
+          if (selectedFilter == 'ACTIVE') {
+            targetList = allStudents.where((s) => s.status != 'INACTIVE').toList();
+          } else if (selectedFilter == 'DUES') {
+            targetList = allStudents.where((s) => s.status != 'INACTIVE' && (s.hasDues || s.effectiveDues > 0)).toList();
+          } else {
+            targetList = allStudents;
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Save Students to Contacts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('Select where you want to save or sync student contacts:', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                  const SizedBox(height: 14),
+
+                  // Member scope filter
+                  Row(
+                    children: [
+                      ChoiceChip(
+                        label: Text('Active (${allStudents.where((s) => s.status != "INACTIVE").length})'),
+                        selected: selectedFilter == 'ACTIVE',
+                        onSelected: (val) {
+                          if (val) setModalState(() => selectedFilter = 'ACTIVE');
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: Text('Defaulters (${allStudents.where((s) => s.status != "INACTIVE" && (s.hasDues || s.effectiveDues > 0)).length})'),
+                        selected: selectedFilter == 'DUES',
+                        onSelected: (val) {
+                          if (val) setModalState(() => selectedFilter = 'DUES');
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: Text('All (${allStudents.length})'),
+                        selected: selectedFilter == 'ALL',
+                        onSelected: (val) {
+                          if (val) setModalState(() => selectedFilter = 'ALL');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Option 1: SAVE DIRECTLY TO PHONE CONTACTS (vCard .vcf)
+                  InkWell(
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final buffer = StringBuffer();
+                      for (var s in targetList) {
+                        buffer.writeln('BEGIN:VCARD');
+                        buffer.writeln('VERSION:3.0');
+                        buffer.writeln('FN:${s.name} (${_service.profile.libraryName})');
+                        buffer.writeln('N:${s.name};;;;');
+                        buffer.writeln('TEL;TYPE=CELL:${s.phone}');
+                        if (s.email != null && s.email!.isNotEmpty) {
+                          buffer.writeln('EMAIL;TYPE=HOME,INTERNET:${s.email}');
+                        }
+                        buffer.writeln('NOTE:Library: ${_service.profile.libraryName} | Seat: S-${s.seatNumber ?? "Unallocated"} | Shift: ${s.shift} | Fee: INR ${s.monthlyFee}');
+                        buffer.writeln('END:VCARD');
+                      }
+
+                      final success = await FileExportService.download(
+                        fileName: 'TrackMyLibrary_Contacts.vcf',
+                        content: buffer.toString(),
+                        mimeType: 'text/vcard;charset=utf-8',
+                      );
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(success
+                                ? 'Exported ${targetList.length} contacts! Select your Phone Contacts app to save.'
+                                : 'Generated contacts vCard file.'),
+                            backgroundColor: const Color(0xFF10B981),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF86EFAC)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.phone_android_rounded, color: Color(0xFF16A34A), size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Save to Phone Contacts', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: Color(0xFF14532D))),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Directly imports ${targetList.length} contacts into your Phone Contacts app for instant caller ID & WhatsApp sync.',
+                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF166534)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF16A34A), size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Option 2: EXPORT & SYNC VIA EMAIL / GOOGLE CONTACTS
+                  InkWell(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showEmailContactsExportDialog(targetList);
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F9FF),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0F2FE),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.email_outlined, color: Color(0xFF0284C7), size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Export & Save via Email', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: Color(0xFF0369A1))),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Sends Google Contacts CSV & vCard archive to your email for easy cloud backup and Gmail contact sync.',
+                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF0284C7)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF0284C7), size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showEmailContactsExportDialog(List<StudentInfo> targetList) {
+    final emailCtrl = TextEditingController(text: _service.profile.adminEmail);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.email_rounded, color: Color(0xFF0284C7), size: 24),
+            SizedBox(width: 8),
+            Text('Email Contact Export', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: AppColors.textNavy)),
+          ],
+        ),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Save Students to Contacts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
-            const SizedBox(height: 6),
-            const Text('Never miss a caller identity: See student names when they call or search them directly in WhatsApp.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: const Icon(Icons.contacts_rounded),
-                label: const Text('Export Active Contacts (.VCF)', style: TextStyle(fontWeight: FontWeight.bold)),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final students = _service.currentStudents.where((s) => s.status != 'INACTIVE').toList();
-                  final buffer = StringBuffer();
-                  for (var s in students) {
-                    buffer.writeln('BEGIN:VCARD');
-                    buffer.writeln('VERSION:3.0');
-                    buffer.writeln('FN:${s.name} (${_service.profile.libraryName})');
-                    buffer.writeln('N:${s.name};;;;');
-                    buffer.writeln('TEL;TYPE=CELL:${s.phone}');
-                    if (s.seatNumber != null) {
-                      buffer.writeln('NOTE:Seat S-${s.seatNumber} | Shift: ${s.shift} | Monthly Fee: INR ${s.monthlyFee}');
-                    }
-                    buffer.writeln('END:VCARD');
-                  }
-
-                  final success = await FileExportService.download(
-                    fileName: 'TrackMyLibrary_Contacts.vcf',
-                    content: buffer.toString(),
-                    mimeType: 'text/vcard;charset=utf-8',
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(success
-                            ? 'Exported ${students.length} contacts! Open .vcf to import into phone contacts.'
-                            : 'Generated contacts file.'),
-                        backgroundColor: const Color(0xFF10B981),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                },
+            Text('Export ${targetList.length} student contacts formatted for Google Contacts & Email address books.', style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+            const SizedBox(height: 14),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Destination Email Address',
+                hintText: 'e.g. yourname@gmail.com',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.mark_email_read_outlined),
               ),
             ),
           ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0284C7),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('Download CSV'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final buffer = StringBuffer();
+              buffer.writeln('Name,Given Name,Family Name,Phone 1 - Type,Phone 1 - Value,E-mail 1 - Type,E-mail 1 - Value,Organization 1 - Name,Organization 1 - Title,Notes');
+              for (final s in targetList) {
+                final note = 'Seat S-${s.seatNumber ?? "Unallocated"} | Shift: ${s.shift} | Fee: INR ${s.monthlyFee}';
+                buffer.writeln('"${s.name} (${_service.profile.libraryName})","${s.name}","","Mobile","${s.phone}","Home","${s.email ?? ""}","${_service.profile.libraryName}","Student","${note.replaceAll('"', '""')}"');
+              }
+              final ok = await FileExportService.download(
+                fileName: 'Google_Contacts_Export_${DateFormat("yyyyMMdd").format(DateTime.now())}.csv',
+                content: buffer.toString(),
+                mimeType: 'text/csv;charset=utf-8',
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok ? 'Google Contacts CSV exported for ${emailCtrl.text.trim()}!' : 'Export file generated!'),
+                    backgroundColor: const Color(0xFF0284C7),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D766E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.send_rounded, size: 18),
+            label: const Text('Open in Email'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final to = emailCtrl.text.trim();
+              final subject = Uri.encodeComponent('TrackMyLibrary Student Contacts Export (${targetList.length} members)');
+              final bodySummary = Uri.encodeComponent('TrackMyLibrary Student Directory Export\nLibrary: ${_service.profile.libraryName}\nTotal Contacts: ${targetList.length}\n\nDownload the Google Contacts CSV to import all contacts into your Gmail / Google Contacts with 1-click.');
+              final mailUri = Uri.parse('mailto:$to?subject=$subject&body=$bodySummary');
+              if (await canLaunchUrl(mailUri)) {
+                await launchUrl(mailUri);
+              }
+            },
+          ),
+        ],
       ),
     );
   }
@@ -2100,8 +2485,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   iconBg: const Color(0xFFFFEDD5),
                   iconColor: const Color(0xFFF97316),
                   title: 'Branch Switcher',
-                  subtitle: 'Manage multiple libraries',
+                  subtitle: 'Active: ${_service.currentBranch.name} • ${_service.branches.length} ${_service.branches.length == 1 ? "branch" : "branches"}',
                   onTap: _showBranchSwitcherModal,
+                ),
+                _settingsTile(
+                  icon: Icons.add_business_rounded,
+                  iconBg: const Color(0xFFDCFCE7),
+                  iconColor: const Color(0xFF16A34A),
+                  title: 'Add New Library Branch',
+                  subtitle: 'Configure additional floor, hall or location',
+                  onTap: _showAddBranchDialog,
                 ),
                 _settingsTile(
                   icon: Icons.manage_accounts_rounded,
