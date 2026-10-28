@@ -114,12 +114,43 @@ def patch_manifest():
                 content = f.read()
             # Ensure package attribute points to com.trackmylibrary.app if present
             content = re.sub(r'package\s*=\s*["\'][^"\']+["\']', 'package="com.trackmylibrary.app"', content)
+            if 'android.permission.USE_BIOMETRIC' not in content:
+                content = content.replace('<application', '<uses-permission android:name="android.permission.USE_BIOMETRIC"/>\n    <uses-permission android:name="android.permission.USE_FINGERPRINT"/>\n\n    <application')
             if '<queries>' not in content and '</manifest>' in content:
                 content = content.replace('</manifest>', queries_block)
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(content)
             print(f"Patched AndroidManifest at {path}")
 
+def patch_main_activity():
+    activity_files = glob.glob('android/app/src/main/**/MainActivity.*', recursive=True)
+    for file_path in activity_files:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # local_auth requires FlutterFragmentActivity instead of FlutterActivity
+        content = content.replace(
+            'import io.flutter.embedding.android.FlutterActivity',
+            'import io.flutter.embedding.android.FlutterFragmentActivity'
+        )
+        content = content.replace(
+            ': FlutterActivity()',
+            ': FlutterFragmentActivity()'
+        )
+        content = content.replace(
+            'extends FlutterActivity',
+            'extends FlutterFragmentActivity'
+        )
+        if 'FlutterFragmentActivity' not in content:
+            content = re.sub(r'class\s+MainActivity\s*:\s*FlutterActivity\(\)', 'class MainActivity: FlutterFragmentActivity()', content)
+            if 'FlutterFragmentActivity' not in content:
+                content = 'import io.flutter.embedding.android.FlutterFragmentActivity\n' + content
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"Patched {file_path} for FlutterFragmentActivity")
+
 if __name__ == '__main__':
     patch_gradle_files()
     patch_manifest()
+    patch_main_activity()

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/models/library_models.dart';
 import 'package:library_manager/services/library_service.dart';
 import 'package:library_manager/services/local_storage_service.dart';
+import 'package:library_manager/services/biometric_auth_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -9,6 +10,8 @@ void main() {
   late LibraryService service;
 
   setUp(() async {
+    BiometricAuthService.testMode = true;
+    BiometricAuthService.testAuthResult = true;
     service = LibraryService();
     service.ensureInitialized();
     await service.clearAllData();
@@ -164,6 +167,13 @@ void main() {
       expect(res.success, isTrue);
       expect(service.isAuthenticated, isTrue);
       expect(service.isAdmin, isTrue);
+    });
+
+    test('Biometric login rejects when fingerprint hardware verification fails', () async {
+      BiometricAuthService.testAuthResult = false;
+      final res = await service.loginWithBiometrics();
+      expect(res.success, isFalse);
+      expect(res.message, contains('Fingerprint authentication was not completed'));
     });
 
     test('sendPasswordReset rejects non-email identifiers honestly', () async {

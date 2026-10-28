@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../services/library_service.dart';
 import '../services/local_storage_service.dart';
+import '../services/biometric_auth_service.dart';
 import 'main_hub_screen.dart';
 import 'onboarding/workspace_setup_screen.dart';
 import 'onboarding/welcome_carousel_screen.dart';
@@ -51,6 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loadSavedIdentifier() async {
+    final hasHardware = await BiometricAuthService.canAuthenticate();
     final saved = await LocalStorageService.getString('app_last_login_identifier');
     final savedSession = await LocalStorageService.getString('app_active_session');
     if (mounted) {
@@ -60,8 +62,9 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           _emailCtrl.text = '';
         }
-        _canUseBiometrics = (savedSession != null && savedSession.isNotEmpty) ||
-            (saved != null && saved.isNotEmpty);
+        _canUseBiometrics = hasHardware &&
+            ((savedSession != null && savedSession.isNotEmpty) ||
+             (saved != null && saved.isNotEmpty));
       });
     }
   }

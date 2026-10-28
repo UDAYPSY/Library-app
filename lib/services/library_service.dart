@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/library_models.dart';
 import 'local_storage_service.dart';
+import 'biometric_auth_service.dart';
 
 class LibraryService {
   // Static activity logger & note helper (persists all notes without overwriting)
@@ -1505,7 +1506,43 @@ class LibraryService {
 
   Future<AuthResult> loginWithBiometrics() async {
     ensureInitialized();
+
+    // 1. Check if device has registered local credentials
     final sessionStr = await LocalStorageService.getString('app_active_session');
+    final lastIdentifier = await LocalStorageService.getString('app_last_login_identifier');
+    final effectiveId = (lastIdentifier != null && lastIdentifier.isNotEmpty)
+        ? lastIdentifier
+        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : '');
+
+    if ((sessionStr == null || sessionStr.isEmpty) && effectiveId.isEmpty) {
+      return const AuthResult(
+        success: false,
+        message: 'No registered credentials found on this device. Please log in with Google or your credentials first.',
+      );
+    }
+
+    // 2. Check if hardware biometric sensor is available
+    final canUseHardware = await BiometricAuthService.canAuthenticate();
+    if (!canUseHardware) {
+      return const AuthResult(
+        success: false,
+        message: 'Biometric hardware sensor is not available or no fingerprint enrolled on this phone.',
+      );
+    }
+
+    // 3. Prompt native phone OS biometric hardware sensor (BiometricPrompt)
+    final biometricPassed = await BiometricAuthService.authenticate(
+      reason: 'Scan your fingerprint or verify biometrics to log in to TrackMyLibrary',
+    );
+
+    if (!biometricPassed) {
+      return const AuthResult(
+        success: false,
+        message: 'Fingerprint authentication was not completed or was cancelled.',
+      );
+    }
+
+    // 4. Physical fingerprint verified! Restore active session or saved credential
     if (sessionStr != null && sessionStr.isNotEmpty) {
       await restoreSession();
       if (isAuthenticated) {
@@ -1516,18 +1553,6 @@ class LibraryService {
           userId: currentUserId,
         );
       }
-    }
-
-    final lastIdentifier = await LocalStorageService.getString('app_last_login_identifier');
-    final effectiveId = (lastIdentifier != null && lastIdentifier.isNotEmpty)
-        ? lastIdentifier
-        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : '');
-
-    if (effectiveId.isEmpty) {
-      return const AuthResult(
-        success: false,
-        message: 'No registered credentials found on this device. Please log in with Google or your credentials first.',
-      );
     }
 
     // Re-authenticate using local admin session
