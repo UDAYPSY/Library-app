@@ -139,8 +139,6 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
 
         final bool isOverdue = feeDueDate != null && feeDueDate.isBefore(DateTime.now());
         final bool isEntryAllowed = status != 'INACTIVE' && !isOverdue;
-        final bool isOverdue = feeDueDate != null && feeDueDate.isBefore(DateTime.now());
-        final bool isEntryAllowed = status != 'INACTIVE' && !isOverdue;
         final validityText = feeDueDate != null ? DateFormat('dd MMM yyyy').format(feeDueDate) : 'Active Member';
 
         // When a student ID QR is scanned, show ONLY their particular student details / gate pass (no live seat map)
