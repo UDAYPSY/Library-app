@@ -742,6 +742,8 @@ class LibraryService {
     if (norm.isEmpty) return false;
     return _mockStudents.any((s) {
       if (excludeStudentId != null && s.id == excludeStudentId) return false;
+      // Do not consider temporary unallocated QR self-registrations as duplicate conflicts
+      if (s.status == 'UNALLOCATED' && s.seatNumber == null) return false;
       return normalizePhone(s.phone) == norm;
     });
   }
@@ -1082,6 +1084,38 @@ class LibraryService {
       _mockRegistrationRequests[idx] = _mockRegistrationRequests[idx].copyWith(status: 'ACCEPTED');
       notifyRegistrationRequestsChanged();
       await _saveLocalState();
+    }
+  }
+
+  // Mark registration request accepted after seat allotment & registration via wizard
+  Future<void> markRegistrationRequestAccepted({
+    required String requestId,
+    int? seatNumber,
+    String? phone,
+  }) async {
+    ensureInitialized();
+    final tempStudentId = 'st_qr_$requestId';
+    _mockStudents.removeWhere((s) =>
+        s.id == tempStudentId ||
+        (phone != null && s.seatNumber == null && normalizePhone(s.phone) == normalizePhone(phone)));
+
+    final idx = _mockRegistrationRequests.indexWhere((r) => r.id == requestId);
+    if (idx != -1) {
+      _mockRegistrationRequests[idx] = _mockRegistrationRequests[idx].copyWith(
+        status: 'ACCEPTED',
+        seatNumber: seatNumber,
+      );
+      notifyRegistrationRequestsChanged();
+      await _saveLocalState();
+    }
+
+    if (isFirebaseConnected) {
+      try {
+        await _tenantCol('registration_requests').doc(requestId).update({
+          'status': 'ACCEPTED',
+          if (seatNumber != null) 'seat_number': seatNumber,
+        });
+      } catch (_) {}
     }
   }
 

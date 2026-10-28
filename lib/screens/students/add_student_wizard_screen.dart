@@ -14,6 +14,8 @@ class AddStudentWizardScreen extends StatefulWidget {
   final int? initialSeatNumber;
   final String? initialSectionName;
   final String? initialShift;
+  final RegistrationRequest? registrationRequest;
+  final int initialStep;
 
   const AddStudentWizardScreen({
     super.key,
@@ -21,6 +23,8 @@ class AddStudentWizardScreen extends StatefulWidget {
     this.initialSeatNumber,
     this.initialSectionName,
     this.initialShift,
+    this.registrationRequest,
+    this.initialStep = 0,
   });
 
   @override
@@ -32,6 +36,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   int _currentStep = 0; // 0 = Basic Info, 1 = Schedule & Fees, 2 = Review
 
   bool get isEditing => widget.studentToEdit != null;
+
+  String? get _effectiveExcludedStudentId {
+    if (widget.studentToEdit != null) return widget.studentToEdit!.id;
+    if (widget.registrationRequest != null) return 'st_qr_${widget.registrationRequest!.id}';
+    return null;
+  }
 
   // Step 1: Basic Info Controllers
   final TextEditingController _fullNameCtrl = TextEditingController();
@@ -234,6 +244,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   @override
   void initState() {
     super.initState();
+    _currentStep = widget.initialStep;
     final now = DateTime.now();
     _paymentDate = now;
 
@@ -301,6 +312,44 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
 
       final initialDue = _dueAmount;
       _amountPaidCtrl.text = '0';
+    } else if (widget.registrationRequest != null) {
+      final req = widget.registrationRequest!;
+      _fullNameCtrl.text = req.studentName;
+      _phoneCtrl.text = req.phone;
+      _joiningDate = req.createdAt;
+      _fatherNameCtrl.text = req.fatherName;
+      _addressCtrl.text = req.address;
+      _aadhaarCtrl.text = req.aadhaarNumber;
+      _preparationCtrl.text = req.preparationFor;
+      _notesCtrl.text = 'Admitted via QR registration request #${req.id}';
+      if (req.gender.isNotEmpty) _gender = req.gender;
+      _photoBase64 = req.photoBase64;
+
+      if (req.shift.isNotEmpty) {
+        final shiftMatch = _service.shifts.where((sh) => sh.name.toLowerCase() == req.shift.toLowerCase());
+        if (shiftMatch.isNotEmpty) {
+          _selectedShift = shiftMatch.first;
+        }
+      }
+
+      if (req.seatNumber != null) {
+        _selectedSeat = req.seatNumber;
+      } else if (widget.initialSeatNumber != null) {
+        _selectedSeat = widget.initialSeatNumber;
+      }
+
+      if (widget.initialSectionName != null && widget.initialSectionName!.isNotEmpty) {
+        _selectedSection = widget.initialSectionName!;
+      }
+
+      _fromDate = _joiningDate;
+      _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
+
+      final monthly = (req.preferredMonthlyFee != null && req.preferredMonthlyFee! > 0)
+          ? req.preferredMonthlyFee!
+          : _fixedMonthlyFee;
+      _feeCtrl.text = '$monthly';
+      _amountPaidCtrl.text = '${monthly * _selectedDurationMonths}';
     } else {
       if (widget.initialSeatNumber != null) {
         _selectedSeat = widget.initialSeatNumber;
@@ -519,7 +568,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       return;
     }
 
-    if (_service.isDuplicateStudentPhone(phone, excludeStudentId: widget.studentToEdit?.id)) {
+    if (_service.isDuplicateStudentPhone(phone, excludeStudentId: _effectiveExcludedStudentId)) {
       final existing = _service.findStudentByPhone(phone);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -651,7 +700,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       }
     }
 
-    if (_service.isDuplicateStudentPhone(phone, excludeStudentId: widget.studentToEdit?.id)) {
+    if (_service.isDuplicateStudentPhone(phone, excludeStudentId: _effectiveExcludedStudentId)) {
       final existing = _service.findStudentByPhone(phone);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -854,6 +903,14 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         return;
       }
 
+      if (widget.registrationRequest != null) {
+        final req = widget.registrationRequest!;
+        final tempStudentId = 'st_qr_${req.id}';
+        _service.currentStudents.removeWhere((s) =>
+            s.id == tempStudentId ||
+            (s.seatNumber == null && LibraryService.normalizePhone(s.phone) == LibraryService.normalizePhone(req.phone)));
+      }
+
       await _service.assignSeatAndRegisterStudent(
         seatNumber: seatNum,
         studentName: name,
@@ -877,6 +934,14 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         gender: _gender,
         photoBase64: _photoBase64,
       );
+
+      if (widget.registrationRequest != null) {
+        await _service.markRegistrationRequestAccepted(
+          requestId: widget.registrationRequest!.id,
+          seatNumber: seatNum,
+          phone: phone,
+        );
+      }
 
       if (mounted) {
         if (!_isTrial && _service.profile.autoWelcomeMessage) {
@@ -946,7 +1011,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                     ),
                   ),
                   Text(
-                    isEditing ? 'Edit Student' : 'Add Student',
+                    widget.registrationRequest != null
+                        ? 'Allot Seat & Enroll'
+                        : (isEditing ? 'Edit Student' : 'Add Student'),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -987,23 +1054,48 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _stepItem(
-                stepIndex: 0,
-                label: 'Basic Info',
-                isCompleted: _currentStep > 0,
-                isActive: _currentStep == 0,
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setState(() => _currentStep = 0),
+                child: _stepItem(
+                  stepIndex: 0,
+                  label: 'Basic Info',
+                  isCompleted: _currentStep > 0,
+                  isActive: _currentStep == 0,
+                ),
               ),
-              _stepItem(
-                stepIndex: 1,
-                label: 'Schedule & Fees',
-                isCompleted: _currentStep > 1,
-                isActive: _currentStep == 1,
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  if (_currentStep == 0) {
+                    _goToStep2();
+                  } else {
+                    setState(() => _currentStep = 1);
+                  }
+                },
+                child: _stepItem(
+                  stepIndex: 1,
+                  label: 'Schedule & Fees',
+                  isCompleted: _currentStep > 1,
+                  isActive: _currentStep == 1,
+                ),
               ),
-              _stepItem(
-                stepIndex: 2,
-                label: 'Review',
-                isCompleted: false,
-                isActive: _currentStep == 2,
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  if (_currentStep == 0) {
+                    _goToStep2();
+                    if (_currentStep == 1) _goToStep3();
+                  } else if (_currentStep == 1) {
+                    _goToStep3();
+                  }
+                },
+                child: _stepItem(
+                  stepIndex: 2,
+                  label: 'Review',
+                  isCompleted: false,
+                  isActive: _currentStep == 2,
+                ),
               ),
             ],
           ),
@@ -1433,6 +1525,53 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (widget.registrationRequest != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDFA),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF99F6E4)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCCFBF1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F766E), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'QR Admission: ${_fullNameCtrl.text}',
+                          style: const TextStyle(
+                            color: Color(0xFF0F766E),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Personal details imported from QR. Select seat, shift, and fee schedule to complete admission.',
+                          style: TextStyle(
+                            color: Color(0xFF115E59),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _fieldLabel('Select Section', isRequired: false),
           const SizedBox(height: 8),
           SingleChildScrollView(
