@@ -126,7 +126,7 @@ class LibraryService {
     const LibraryBranch(
       id: 'branch_1',
       name: 'Main Campus (Central)',
-      address: 'City Center, Main St',
+      address: '',
       totalSeats: 35,
       isDefault: true,
     ),

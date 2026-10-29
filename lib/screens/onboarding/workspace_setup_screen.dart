@@ -25,8 +25,7 @@ class _WorkspaceSetupScreenState extends State<WorkspaceSetupScreen> {
           : '',
     );
     _cityCtrl = TextEditingController(
-      text: (_service.profile.city.isNotEmpty &&
-              _service.profile.city != 'City Center, Main St')
+      text: _service.profile.city.isNotEmpty
           ? _service.profile.city
           : '',
     );
@@ -200,7 +199,7 @@ class _WorkspaceSetupScreenState extends State<WorkspaceSetupScreen> {
                       TextField(
                         controller: _cityCtrl,
                         decoration: InputDecoration(
-                          hintText: 'e.g. City Center, Main St',
+                          hintText: 'e.g. Near Metro Station, Civil Lines',
                           prefixIcon: const Icon(Icons.location_on_outlined, color: AppColors.textMuted, size: 20),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                           filled: true,

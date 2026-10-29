@@ -91,7 +91,7 @@ class LibraryProfile {
   LibraryProfile({
     this.libraryId = '',
     this.libraryName = '',
-    this.city = 'City Center, Main St',
+    this.city = '',
     this.adminName = 'Admin',
     this.adminEmail = 'manageyourlib@gmail.com',
     this.adminPhone = '9457464850',
@@ -246,7 +246,7 @@ class LibraryProfile {
     return LibraryProfile(
       libraryId: map['library_id'] ?? '',
       libraryName: map['library_name'] ?? '',
-      city: map['city'] ?? 'City Center, Main St',
+      city: (map['city'] as String?) ?? '',
       adminName: map['admin_name'] ?? 'Admin',
       adminEmail: map['admin_email'] ?? '',
       adminPhone: map['admin_phone'] ?? '',

@@ -54,6 +54,10 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
     if (pLibName != null && pLibName.trim().isNotEmpty) {
       _service.profile.libraryName = pLibName.trim();
     }
+    final pCity = _urlParams['city'] ?? _urlParams['location'];
+    if (pCity != null && pCity.trim().isNotEmpty) {
+      _service.profile.city = pCity.trim();
+    }
     final targetLib = _effectiveLibraryId;
     if (targetLib.isNotEmpty) {
       if (targetLib != _service.tenantId) {
@@ -71,6 +75,10 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
           final pLibName = _urlParams['libname'];
           if (pLibName != null && pLibName.trim().isNotEmpty) {
             _service.profile.libraryName = pLibName.trim();
+          }
+          final pCity = _urlParams['city'] ?? _urlParams['location'];
+          if (pCity != null && pCity.trim().isNotEmpty) {
+            _service.profile.city = pCity.trim();
           }
         });
       }
@@ -161,6 +169,8 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
         final feeDueDate = matchedStudent?.feeDueDate ?? (paramValid != null && paramValid.isNotEmpty ? DateTime.tryParse(paramValid) : null);
         final studentPhoto = matchedStudent?.hasPhoto == true ? matchedStudent!.photoBase64 : null;
         final libraryName = (paramLibName != null && paramLibName.trim().isNotEmpty) ? paramLibName.trim() : (profile.libraryName.trim().isNotEmpty ? profile.libraryName.trim() : 'Digital Library');
+        final pCity = params['city'] ?? params['location'];
+        final displayCity = (pCity != null && pCity.trim().isNotEmpty) ? pCity.trim() : profile.city.trim();
 
         final bool isOverdue = feeDueDate != null && feeDueDate.isBefore(DateTime.now());
         final bool isEntryAllowed = status != 'INACTIVE' && !isOverdue;
@@ -287,6 +297,22 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                             ],
                           ),
                         ],
+                        if (displayCity.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on_rounded, color: Color(0xFF64748B), size: 14),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  displayCity,
+                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -392,11 +418,23 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                                 const Icon(Icons.verified_rounded, color: Color(0xFF38BDF8), size: 18),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              profile.city,
-                              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.65)),
-                            ),
+                            if (displayCity.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on_rounded, size: 13, color: Color(0xFF38BDF8)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      displayCity,
+                                      style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.75)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 2),
                             Text(
                               profile.tagline,

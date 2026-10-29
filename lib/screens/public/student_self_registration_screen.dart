@@ -86,6 +86,10 @@ class _StudentSelfRegistrationScreenState
     if (pLibName != null && pLibName.trim().isNotEmpty) {
       _service.profile.libraryName = pLibName.trim();
     }
+    final pCity = _urlParams['city'] ?? _urlParams['location'];
+    if (pCity != null && pCity.trim().isNotEmpty) {
+      _service.profile.city = pCity.trim();
+    }
     final targetLib = _effectiveLibraryId;
     if (targetLib.isNotEmpty) {
       if (targetLib != _service.tenantId) {
@@ -109,6 +113,10 @@ class _StudentSelfRegistrationScreenState
           final pLibName = _urlParams['libname'];
           if (pLibName != null && pLibName.trim().isNotEmpty) {
             _service.profile.libraryName = pLibName.trim();
+          }
+          final pCity = _urlParams['city'] ?? _urlParams['location'];
+          if (pCity != null && pCity.trim().isNotEmpty) {
+            _service.profile.city = pCity.trim();
           }
         });
       }
@@ -300,8 +308,10 @@ class _StudentSelfRegistrationScreenState
     final libName = (pLibName != null && pLibName.trim().isNotEmpty)
         ? pLibName.trim()
         : (profile.libraryName.trim().isNotEmpty ? profile.libraryName.trim() : 'Digital Library');
-    final city = profile.city.isNotEmpty ? profile.city : 'Central Branch';
-    final address = city;
+    final pCity = _urlParams['city'] ?? _urlParams['location'];
+    final address = (pCity != null && pCity.trim().isNotEmpty)
+        ? pCity.trim()
+        : profile.city.trim();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -501,20 +511,24 @@ class _StudentSelfRegistrationScreenState
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFF99F6E4)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          address,
-                          style: const TextStyle(fontSize: 12, color: Color(0xFFCCFBF1)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  if (address.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFF99F6E4)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              address,
+                              style: const TextStyle(fontSize: 12, color: Color(0xFFCCFBF1)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
                 ],
               ),
             ),

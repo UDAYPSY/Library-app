@@ -947,6 +947,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
         : 'https://udaypsy.github.io/Library-app';
     final dueIso = _student.feeDueDate?.toIso8601String() ?? '';
     final libName = _service.profile.libraryName;
+    final city = _service.profile.city;
     return '$baseUrl/#/portal?lib=${_service.tenantId}'
         '&verify=${_student.id}'
         '&seat=${_student.seatNumber ?? 0}'
@@ -955,7 +956,8 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
         '&valid=${Uri.encodeComponent(dueIso)}'
         '&status=${Uri.encodeComponent(_student.status)}'
         '&phone=${Uri.encodeComponent(_student.phone)}'
-        '&libname=${Uri.encodeComponent(libName)}';
+        '&libname=${Uri.encodeComponent(libName)}'
+        '&city=${Uri.encodeComponent(city)}';
   }
 
   String _buildIdCardPassText() {
