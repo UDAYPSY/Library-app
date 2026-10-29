@@ -712,6 +712,16 @@ class LibraryService {
     _mockExpenses.clear();
     _mockRegistrationRequests.clear();
     staffList.clear();
+    branches = [
+      const LibraryBranch(
+        id: 'branch_1',
+        name: 'Main Campus',
+        address: 'Main Branch',
+        totalSeats: 35,
+        isDefault: true,
+      ),
+    ];
+    activeBranchId = 'branch_1';
     _mockSeats = List.generate(
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
@@ -737,6 +747,9 @@ class LibraryService {
     await LocalStorageService.remove('app_library_expenses');
     await LocalStorageService.remove('app_library_staff');
     await LocalStorageService.remove('app_library_registration_requests');
+    await LocalStorageService.remove('app_library_branches');
+    await LocalStorageService.remove('app_library_active_branch');
+    await LocalStorageService.remove('app_active_session');
   }
 
   // Permanently delete user account, wipe cloud tenant data, delete Firebase user, and purge all local storage
@@ -1630,11 +1643,13 @@ class LibraryService {
         final rawRole = staff.role.trim();
         currentUserRole = normalizeRole(rawRole);
         isAuthenticated = true;
-        if (staff.branchId.isNotEmpty && branches.any((b) => b.id == staff.branchId)) {
+        if (staff.branchId.isNotEmpty) {
           activeBranchId = staff.branchId;
-          final b = currentBranch;
-          profile.libraryName = b.name;
-          profile.city = b.address;
+          if (branches.any((b) => b.id == staff.branchId)) {
+            final b = currentBranch;
+            profile.libraryName = b.name;
+            profile.city = b.address;
+          }
         } else if (branches.isNotEmpty) {
           activeBranchId = branches.first.id;
           final b = currentBranch;

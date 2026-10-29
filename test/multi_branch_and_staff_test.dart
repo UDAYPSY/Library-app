@@ -78,6 +78,7 @@ void main() {
         shift: 'Morning Shift',
         feeAmount: 600,
         monthlyFee: 600,
+        branchId: 'branch_1',
       );
 
       expect(service.allStudents.length, equals(1));
@@ -162,6 +163,7 @@ void main() {
         phone: '9123400001',
         shift: 'Full Day',
         feeAmount: 1000,
+        branchId: 'branch_1',
       );
 
       final rolesToTest = [
