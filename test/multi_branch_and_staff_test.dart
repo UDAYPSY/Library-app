@@ -269,6 +269,7 @@ void main() {
         pinHash: LibraryService.hashPin('pass8899'),
         branchId: 'branch_1',
         isActive: true,
+        addedAt: DateTime.now(),
       );
       service.addStaffMember(staff);
 
@@ -314,6 +315,7 @@ void main() {
         pinHash: LibraryService.hashPin('pass1234'),
         branchId: 'branch_1',
         isActive: true,
+        addedAt: DateTime.now(),
       );
       service.addStaffMember(staff);
 
@@ -347,6 +349,7 @@ void main() {
         name: 'Rogue Member',
         phone: '9111111111',
         role: 'Administrator',
+        addedAt: DateTime.now(),
       );
       service.addStaffMember(rogueStaff);
       expect(service.staffList.any((s) => s.id == 'staff_rogue'), isFalse); // Blocked!

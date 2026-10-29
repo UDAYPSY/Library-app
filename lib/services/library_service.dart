@@ -752,6 +752,7 @@ class LibraryService {
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
     }
     notifyStreamControllers();
+    profile = LibraryProfile();
     await LocalStorageService.remove('app_library_students');
     await LocalStorageService.remove('app_library_payments');
     await LocalStorageService.remove('app_library_expenses');
@@ -760,6 +761,9 @@ class LibraryService {
     await LocalStorageService.remove('app_library_branches');
     await LocalStorageService.remove('app_library_active_branch');
     await LocalStorageService.remove('app_active_session');
+    await LocalStorageService.remove('app_admin_password_hash');
+    await LocalStorageService.remove('app_library_profile');
+    await LocalStorageService.remove('app_admin_profile');
   }
 
   // Permanently delete user account, wipe cloud tenant data, delete Firebase user, and purge all local storage

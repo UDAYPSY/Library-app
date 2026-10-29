@@ -458,6 +458,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
     final students = _service.currentStudents;
     final payments = _service.currentPayments;
     final expenses = _service.currentExpenses;
+    final isConnected = _service.isFirebaseConnected;
     if (!_service.isAdmin) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
