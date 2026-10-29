@@ -765,15 +765,7 @@ class LibraryService {
     _mockExpenses.clear();
     _mockRegistrationRequests.clear();
     staffList.clear();
-    branches = [
-      const LibraryBranch(
-        id: 'branch_1',
-        name: 'Main Campus (Central)',
-        address: '',
-        totalSeats: 35,
-        isDefault: true,
-      ),
-    ];
+    branches.clear();
     sections = [
       SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
     ];
