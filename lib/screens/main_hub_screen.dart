@@ -167,10 +167,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: (AppColors.isDark(context) ? AppColors.primaryTeal.withValues(alpha: 0.15) : AppColors.primaryTeal.withValues(alpha: 0.08)),
+                                color: (AppColors.isDark(context) ? AppColors.primaryTeal.withOpacity(0.15) : AppColors.primaryTeal.withOpacity(0.08)),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppColors.primaryTeal.withValues(alpha: 0.3),
+                                  color: AppColors.primaryTeal.withOpacity(0.3),
                                   width: 1,
                                 ),
                               ),
