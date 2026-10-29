@@ -222,6 +222,7 @@ void main() {
           isActive: true,
           addedAt: DateTime.now(),
         );
+        service.currentUserRole = 'Admin';
         service.addStaffMember(staff);
 
         await service.signOut();

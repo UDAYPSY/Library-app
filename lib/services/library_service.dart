@@ -752,7 +752,7 @@ class LibraryService {
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
     }
     notifyStreamControllers();
-    profile = LibraryProfile();
+    profile = LibraryProfile(libraryId: 'default_library');
     await LocalStorageService.remove('app_library_students');
     await LocalStorageService.remove('app_library_payments');
     await LocalStorageService.remove('app_library_expenses');
