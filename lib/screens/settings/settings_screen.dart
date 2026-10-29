@@ -2188,7 +2188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final currentRole = _service.currentUserRole;
     final displayName = (_service.currentUserName.isNotEmpty && _service.currentUserName != 'Guest')
         ? _service.currentUserName
-        : (profile.adminName.isNotEmpty && profile.adminName != 'Nivi' ? profile.adminName : 'Admin');
+        : (profile.adminName.isNotEmpty ? profile.adminName : 'Admin');
     final displayEmail = _service.currentUserEmail.isNotEmpty
         ? _service.currentUserEmail
         : (profile.adminEmail.isNotEmpty ? profile.adminEmail : 'admin@gmail.com');

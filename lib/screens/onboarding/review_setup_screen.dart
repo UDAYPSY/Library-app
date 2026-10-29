@@ -293,7 +293,7 @@ class ReviewSetupScreen extends StatelessWidget {
                             children: [
                               const Text('Backup Account:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                               Text(
-                                service.profile.adminEmail.isNotEmpty ? service.profile.adminEmail : 'manageyourlib@gmail.com',
+                                service.profile.adminEmail.isNotEmpty ? service.profile.adminEmail : (service.currentUserEmail.isNotEmpty ? service.currentUserEmail : 'Not configured'),
                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
                               ),
                             ],
@@ -424,12 +424,17 @@ class ReviewSetupScreen extends StatelessWidget {
                   onPressed: () async {
                     final savedPass = (await LocalStorageService.getString('app_admin_password')) ??
                         'admin_${DateTime.now().millisecondsSinceEpoch}';
+                    final regEmail = service.profile.adminEmail.isNotEmpty
+                        ? service.profile.adminEmail
+                        : (service.currentUserEmail.isNotEmpty
+                            ? service.currentUserEmail
+                            : 'admin_${DateTime.now().millisecondsSinceEpoch}@library.local');
                     final regRes = await service.registerAdminAccount(
-                      email: service.profile.adminEmail.isNotEmpty ? service.profile.adminEmail : 'manageyourlib@gmail.com',
+                      email: regEmail,
                       password: savedPass,
                       adminName: service.profile.adminName.isNotEmpty ? service.profile.adminName : 'Administrator',
                       libraryName: service.profile.libraryName.isNotEmpty ? service.profile.libraryName : 'My Library',
-                      phone: service.profile.adminPhone.isNotEmpty ? service.profile.adminPhone : '9457464850',
+                      phone: service.profile.adminPhone,
                     );
                     if (!regRes.success) {
                       if (context.mounted) {

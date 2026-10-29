@@ -1849,9 +1849,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
         ? students.firstWhere((s) => s.status != 'INACTIVE', orElse: () => students.first)
         : null;
 
-    final baseUrl = profile.portalBaseUrl.trim().isNotEmpty
-        ? profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
-        : 'https://udaypsy.github.io/Library-app';
+    final baseUrl = profile.effectivePortalBaseUrl;
     final dueIso = student?.feeDueDate?.toIso8601String() ?? '';
     final qrVerifyUrl = student != null
         ? '$baseUrl/#/portal?lib=${_service.tenantId}'
@@ -1863,6 +1861,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
           '&status=${Uri.encodeComponent(student.status)}'
           '&phone=${Uri.encodeComponent(student.phone)}'
           '&libname=${Uri.encodeComponent(profile.libraryName)}'
+          '&city=${Uri.encodeComponent(profile.city)}'
         : '$baseUrl/#/portal?lib=${_service.tenantId}';
 
     showModalBottomSheet(
@@ -2138,10 +2137,10 @@ $qrVerifyUrl
 
   void _showQRCodeModal() {
     final profile = _service.profile;
-    final baseUrl = profile.portalBaseUrl.trim().isNotEmpty
-        ? profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
-        : 'https://udaypsy.github.io/Library-app';
-    final portalUrl = '$baseUrl/#/portal?lib=${_service.tenantId}';
+    final baseUrl = profile.effectivePortalBaseUrl;
+    final libName = Uri.encodeComponent(profile.libraryName);
+    final city = Uri.encodeComponent(profile.city);
+    final portalUrl = '$baseUrl/#/portal?lib=${_service.tenantId}&libname=$libName&city=$city';
 
     showModalBottomSheet(
       context: context,

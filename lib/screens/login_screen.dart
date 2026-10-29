@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _emailCtrl.text = _service.profile.adminEmail.isNotEmpty
           ? _service.profile.adminEmail
-          : 'admin@library.com';
+          : (_service.currentUserEmail.isNotEmpty ? _service.currentUserEmail : 'admin');
       _passCtrl.text = '1234';
       _errorMessage = null;
     });
@@ -123,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _fillStaffDemo() {
     final staffPhone = _service.staffList.isNotEmpty
         ? _service.staffList.first.phone
-        : '9457464850';
+        : '';
     setState(() {
       _emailCtrl.text = staffPhone;
       _passCtrl.text = '1234';

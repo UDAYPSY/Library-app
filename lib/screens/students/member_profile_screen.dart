@@ -942,9 +942,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
   }
 
   String _buildGatePassUrl() {
-    final baseUrl = _service.profile.portalBaseUrl.trim().isNotEmpty
-        ? _service.profile.portalBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')
-        : 'https://udaypsy.github.io/Library-app';
+    final baseUrl = _service.profile.effectivePortalBaseUrl;
     final dueIso = _student.feeDueDate?.toIso8601String() ?? '';
     final libName = _service.profile.libraryName;
     final city = _service.profile.city;

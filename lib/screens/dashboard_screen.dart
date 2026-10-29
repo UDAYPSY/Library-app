@@ -536,7 +536,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 trailing: IconButton(
                   icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF22C55E)),
                   tooltip: 'Send WhatsApp fee reminder',
-                  onPressed: () => _sendWhatsAppReminder(s.name, s.phone),
+                  onPressed: () => _sendWhatsAppReminder(s),
                 ),
               ),
             );
@@ -546,8 +546,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _sendWhatsAppReminder(String name, String phone) async {
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+  Future<void> _sendWhatsAppReminder(StudentInfo s) async {
+    final cleanPhone = s.phone.replaceAll(RegExp(r'\D'), '');
     if (cleanPhone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid student phone number')),
@@ -558,8 +558,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final libName = _service.profile.libraryName.trim().isNotEmpty
         ? _service.profile.libraryName.trim()
         : 'the library';
+    final feeAmount = s.effectiveDues > 0 ? s.effectiveDues : (s.monthlyFee > 0 ? s.monthlyFee : 500);
     final message =
-        'Hello $name, this is a reminder from $libName that your monthly seat renewal fee of Rs.500 is scheduled. Please confirm renewal at the desk.';
+        'Hello ${s.name}, this is a reminder from $libName that your monthly seat renewal fee of ₹$feeAmount is scheduled. Please confirm renewal at the desk.';
     final url = Uri.parse(
       'https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(message)}',
     );

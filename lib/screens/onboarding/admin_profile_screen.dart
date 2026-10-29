@@ -29,32 +29,21 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final initialName = (_service.currentUserName.isNotEmpty &&
-            _service.currentUserName != 'Nivi' &&
-            _service.currentUserName != 'Admin')
+    final initialName = (_service.currentUserName.isNotEmpty && _service.currentUserName != 'Admin')
         ? _service.currentUserName
-        : (_service.profile.adminName.isNotEmpty &&
-                _service.profile.adminName != 'Nivi' &&
-                _service.profile.adminName != 'Admin')
+        : (_service.profile.adminName.isNotEmpty && _service.profile.adminName != 'Admin'
             ? _service.profile.adminName
-            : '';
+            : '');
     _nameCtrl = TextEditingController(text: initialName);
 
-    final initialEmail = (_service.currentUserEmail.isNotEmpty &&
-            _service.currentUserEmail != 'manageyourlib@gmail.com')
+    final initialEmail = _service.currentUserEmail.isNotEmpty
         ? _service.currentUserEmail
-        : (_service.profile.adminEmail.isNotEmpty &&
-                _service.profile.adminEmail != 'manageyourlib@gmail.com')
-            ? _service.profile.adminEmail
-            : '';
+        : _service.profile.adminEmail;
     _emailCtrl = TextEditingController(text: initialEmail);
 
-    final initialPhone = (_service.profile.adminPhone.isNotEmpty &&
-            _service.profile.adminPhone != '9457464850')
-        ? _service.profile.adminPhone
-        : '';
+    final initialPhone = _service.profile.adminPhone;
     _phoneCtrl = TextEditingController(text: initialPhone);
-    _upiCtrl = TextEditingController(text: _service.profile.upiId != '9457464850@upi' ? _service.profile.upiId : '');
+    _upiCtrl = TextEditingController(text: _service.profile.upiId);
     _driveEmailCtrl = TextEditingController(text: initialEmail);
 
     _emailCtrl.addListener(() {
@@ -114,7 +103,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
         final p10 = cleanPhone.substring(cleanPhone.length - 10);
         _service.profile.upiId = '$p10@upi';
       } else {
-        _service.profile.upiId = '9457464850@upi';
+        _service.profile.upiId = '';
       }
     }
 
@@ -313,7 +302,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                       _buildField(
                         label: 'PHONE NUMBER',
                         controller: _phoneCtrl,
-                        hintText: '9457464850',
+                        hintText: 'e.g. 9876543210',
                         prefixIcon: Icons.phone_outlined,
                         keyboardType: TextInputType.phone,
                         isError: _showErrors && !_isPhoneValid,
@@ -325,7 +314,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                       _buildField(
                         label: 'RECEIVE PAYMENTS (UPI ID / VPA)',
                         controller: _upiCtrl,
-                        hintText: 'e.g. 9457464850@upi or yourname@okaxis',
+                        hintText: 'e.g. yourname@upi or mobile@okhdfcbank',
                         prefixIcon: Icons.qr_code_2_rounded,
                         keyboardType: TextInputType.emailAddress,
                         errorMessage: 'Enter a valid UPI ID',
@@ -342,7 +331,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                   ? cleanPhone.substring(cleanPhone.length - 10)
                                   : (_upiCtrl.text.split('@').first.isNotEmpty
                                       ? _upiCtrl.text.split('@').first
-                                      : '9457464850');
+                                      : 'mobile');
                               _upiCtrl.text = '$prefix$suffix';
                               setState(() {});
                             },

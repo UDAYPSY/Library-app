@@ -101,26 +101,7 @@ class LibraryService {
     ),
   ];
 
-  List<StaffMember> staffList = [
-    StaffMember(
-      id: 'staff_1',
-      name: 'Ramesh Kumar',
-      phone: '9876543210',
-      role: 'Receptionist & Desk',
-      pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
-      addedAt: DateTime.now().subtract(const Duration(days: 45)),
-      isActive: true,
-    ),
-    StaffMember(
-      id: 'staff_2',
-      name: 'Sunita Mishra',
-      phone: '9812345678',
-      role: 'Shift Manager',
-      pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
-      addedAt: DateTime.now().subtract(const Duration(days: 20)),
-      isActive: true,
-    ),
-  ];
+  List<StaffMember> staffList = [];
 
   List<LibraryBranch> branches = [
     const LibraryBranch(
@@ -1454,12 +1435,12 @@ class LibraryService {
     // Check Admin Credentials
     final storedAdminHash = await LocalStorageService.getString('app_admin_password_hash');
     const defaultAdminHash = 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f';
-    final isAdminMatch = (cleanId.toLowerCase() == profile.adminEmail.toLowerCase() ||
-        cleanId.toLowerCase() == profile.adminPhone.replaceAll(RegExp(r'\D'), '') ||
+    final isAdminMatch = (
+        (profile.adminEmail.isNotEmpty && cleanId.toLowerCase() == profile.adminEmail.toLowerCase()) ||
+        (profile.adminPhone.isNotEmpty && cleanId.replaceAll(RegExp(r'\D'), '') == profile.adminPhone.replaceAll(RegExp(r'\D'), '')) ||
         cleanId.toLowerCase() == 'admin' ||
-        cleanId.toLowerCase() == 'manageyourlib@gmail.com' ||
-        cleanId.toLowerCase() == '9457464850' ||
-        cleanId.toLowerCase() == 'nivi@library.com');
+        (currentUserId != null && cleanId == currentUserId)
+    );
 
     if (isAdminMatch) {
       if (verifyPin(cleanPass, storedAdminHash ?? defaultAdminHash)) {
@@ -1752,13 +1733,13 @@ class LibraryService {
       }
     }
 
-    final googleEmail = (profile.adminEmail.isNotEmpty && profile.adminEmail != 'manageyourlib@gmail.com')
+    final googleEmail = profile.adminEmail.isNotEmpty
         ? profile.adminEmail
-        : 'admin@gmail.com';
+        : 'admin@library.local';
     currentUserId = 'google_user_${DateTime.now().millisecondsSinceEpoch % 10000}';
-    final derivedName = (profile.adminName.isNotEmpty && profile.adminName != 'Nivi' && profile.adminName != 'Admin')
+    final derivedName = (profile.adminName.isNotEmpty && profile.adminName != 'Admin')
         ? profile.adminName
-        : 'Google Admin';
+        : 'Administrator';
     currentUserName = derivedName;
     profile.adminName = derivedName;
     currentUserEmail = googleEmail;

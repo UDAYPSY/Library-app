@@ -27,7 +27,7 @@ class SetupSuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final service = LibraryService();
-    final name = (service.profile.adminName.isNotEmpty && service.profile.adminName != 'Nivi')
+    final name = service.profile.adminName.isNotEmpty
         ? service.profile.adminName
         : 'Admin';
     final totalSeats = service.totalSeatsCount;

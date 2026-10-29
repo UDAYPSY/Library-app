@@ -42,7 +42,22 @@ class LibraryProfile {
       final p10 = cleanPhone.substring(cleanPhone.length - 10);
       return '$p10@upi';
     }
-    return '9457464850@upi';
+    return '';
+  }
+
+  String get effectivePortalBaseUrl {
+    final configured = portalBaseUrl.trim();
+    if (configured.isNotEmpty) {
+      return configured.replaceAll(RegExp(r'/+$'), '');
+    }
+    try {
+      final origin = Uri.base.origin;
+      if (origin.isNotEmpty && !origin.contains('localhost') && origin != 'null') {
+        final path = Uri.base.path.replaceAll(RegExp(r'/+$'), '');
+        return '$origin$path';
+      }
+    } catch (_) {}
+    return 'https://udaypsy.github.io/Library-app';
   }
 
   String generateUpiPaymentUrl({
@@ -93,14 +108,14 @@ class LibraryProfile {
     this.libraryName = '',
     this.city = '',
     this.adminName = 'Admin',
-    this.adminEmail = 'manageyourlib@gmail.com',
-    this.adminPhone = '9457464850',
-    this.upiId = '9457464850@upi',
+    this.adminEmail = '',
+    this.adminPhone = '',
+    this.upiId = '',
     this.logoEmblem = 'Book & Torch',
     this.logoBase64,
     this.logoUrl,
     this.tagline = 'Silence • Focus • Success',
-    this.portalBaseUrl = 'https://udaypsy.github.io/Library-app',
+    this.portalBaseUrl = '',
     this.accentColorHex = '#0D9488',
     this.cardThemeStyle = 'Modern Glassmorphism',
     this.noticeAnnouncement = 'Silence is Golden • High-Speed 5G Wi-Fi • Fully AC',
@@ -250,12 +265,12 @@ class LibraryProfile {
       adminName: map['admin_name'] ?? 'Admin',
       adminEmail: map['admin_email'] ?? '',
       adminPhone: map['admin_phone'] ?? '',
-      upiId: map['upi_id'] ?? '9457464850@upi',
+      upiId: map['upi_id'] ?? '',
       logoEmblem: map['logo_emblem'] ?? 'Book & Torch',
       logoBase64: map['logo_base64'] as String?,
       logoUrl: map['logo_url'] as String?,
       tagline: map['tagline'] ?? 'Silence • Focus • Success',
-      portalBaseUrl: map['portal_base_url'] ?? 'https://udaypsy.github.io/Library-app',
+      portalBaseUrl: map['portal_base_url'] ?? '',
       accentColorHex: map['accent_color_hex'] ?? '#0D9488',
       cardThemeStyle: map['card_theme_style'] ?? 'Modern Glassmorphism',
       noticeAnnouncement: map['notice_announcement'] ?? 'Silence is Golden • High-Speed 5G Wi-Fi • Fully AC',

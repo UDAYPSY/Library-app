@@ -71,8 +71,16 @@ class _WhatsAppAutomationScreenState extends State<WhatsAppAutomationScreen> {
 
   Future<void> _openWhatsAppSupport(String message) async {
     final cleanPhone = _service.profile.adminPhone.replaceAll(RegExp(r'\D'), '');
-    final phoneToUse = cleanPhone.isNotEmpty ? cleanPhone : '9457464850';
-    final ok = await LibraryService.sendWhatsAppDirect(phone: phoneToUse, message: message);
+    if (cleanPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Admin phone is not configured. Please configure your phone in Settings.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    final ok = await LibraryService.sendWhatsAppDirect(phone: cleanPhone, message: message);
     if (!ok && mounted) {
       Clipboard.setData(ClipboardData(text: message));
       ScaffoldMessenger.of(context).showSnackBar(

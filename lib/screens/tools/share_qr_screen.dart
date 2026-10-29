@@ -22,11 +22,7 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
   int _selectedQrMode = 0; // 0 = Desk Self-Admission QR, 1 = Live Seat Availability
 
   String get _effectiveBaseUrl {
-    final base = _service.profile.portalBaseUrl.trim();
-    if (base.isNotEmpty) {
-      return base.replaceAll(RegExp(r'/+$'), '');
-    }
-    return 'https://udaypsy.github.io/Library-app';
+    return _service.profile.effectivePortalBaseUrl;
   }
 
   String get _registrationUrl {

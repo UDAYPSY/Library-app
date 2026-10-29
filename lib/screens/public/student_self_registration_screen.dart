@@ -287,11 +287,21 @@ class _StudentSelfRegistrationScreenState
 
   Future<void> _chatWithDesk() async {
     final phone = _service.profile.adminPhone.replaceAll(RegExp(r'\D'), '');
-    final deskPhone = phone.isNotEmpty ? phone : '9457464850';
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Front desk contact is not configured yet. Please contact reception.'),
+          backgroundColor: Color(0xFF0F766E),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    final deskPhone = phone.length == 10 ? '91$phone' : phone;
     final pLibName = _urlParams['libname'];
     final resolvedLib = (pLibName != null && pLibName.trim().isNotEmpty) ? pLibName.trim() : (_service.profile.libraryName.trim().isNotEmpty ? _service.profile.libraryName.trim() : 'Library Admin');
     final text = 'Hello $resolvedLib, I have submitted my registration request (ID: $_submittedRequestId) for ${_nameCtrl.text.trim()}. Please allot my seat.';
-    final uri = Uri.parse('https://wa.me/91$deskPhone?text=${Uri.encodeComponent(text)}');
+    final uri = Uri.parse('https://wa.me/$deskPhone?text=${Uri.encodeComponent(text)}');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
