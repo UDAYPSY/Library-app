@@ -1595,7 +1595,14 @@ class LibraryService {
         currentUserId = staff.id;
         currentUserName = staff.name;
         currentUserEmail = staff.email ?? '${staff.phone}@staff.local';
-        currentUserRole = staff.role.toLowerCase().contains('admin') ? 'Admin' : staff.role;
+        final rawRole = staff.role.trim();
+        if (rawRole.toLowerCase().contains('admin')) {
+          currentUserRole = 'Admin';
+        } else if (rawRole.toLowerCase().contains('receptionist')) {
+          currentUserRole = 'Receptionist';
+        } else {
+          currentUserRole = rawRole;
+        }
         isAuthenticated = true;
         if (staff.branchId.isNotEmpty && branches.any((b) => b.id == staff.branchId)) {
           activeBranchId = staff.branchId;
