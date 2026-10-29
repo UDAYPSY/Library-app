@@ -31,12 +31,14 @@ class _ShareQrScreenState extends State<ShareQrScreen> {
 
   String get _registrationUrl {
     final tenant = _service.tenantId;
-    return '$_effectiveBaseUrl/#/join?lib=$tenant';
+    final libName = Uri.encodeComponent(_service.profile.libraryName);
+    return '$_effectiveBaseUrl/#/join?lib=$tenant&libname=$libName';
   }
 
   String get _portalUrl {
     final tenant = _service.tenantId;
-    return '$_effectiveBaseUrl/#/portal?lib=$tenant';
+    final libName = Uri.encodeComponent(_service.profile.libraryName);
+    return '$_effectiveBaseUrl/#/portal?lib=$tenant&libname=$libName';
   }
 
   String get _publicUrl => _selectedQrMode == 0 ? _registrationUrl : _portalUrl;

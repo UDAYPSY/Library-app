@@ -67,16 +67,52 @@ class _StudentSelfRegistrationScreenState
     return _service.tenantId;
   }
 
+  Map<String, String> get _urlParams {
+    final Map<String, String> params = {};
+    params.addAll(Uri.base.queryParameters);
+    final frag = Uri.base.fragment;
+    if (frag.isNotEmpty) {
+      final fUri = Uri.parse(frag.startsWith('/') ? frag : '/$frag');
+      params.addAll(fUri.queryParameters);
+    }
+    return params;
+  }
+
   @override
   void initState() {
     super.initState();
     _service.ensureInitialized();
+    final pLibName = _urlParams['libname'];
+    if (pLibName != null && pLibName.trim().isNotEmpty) {
+      _service.profile.libraryName = pLibName.trim();
+    }
+    final targetLib = _effectiveLibraryId;
+    if (targetLib.isNotEmpty) {
+      if (targetLib != _service.tenantId) {
+        _service.switchTenant(targetLib);
+      }
+      _fetchCloudLibraryProfile(targetLib);
+    }
     final shifts = _service.shifts.where((s) => s.isActive).toList();
     if (shifts.isNotEmpty) {
       _selectedShift = shifts.first.name;
     } else if (_service.shifts.isNotEmpty) {
       _selectedShift = _service.shifts.first.name;
     }
+  }
+
+  Future<void> _fetchCloudLibraryProfile(String targetLib) async {
+    try {
+      final loaded = await _service.fetchTenantProfile(targetLib);
+      if (loaded != null && mounted) {
+        setState(() {
+          final pLibName = _urlParams['libname'];
+          if (pLibName != null && pLibName.trim().isNotEmpty) {
+            _service.profile.libraryName = pLibName.trim();
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -244,7 +280,9 @@ class _StudentSelfRegistrationScreenState
   Future<void> _chatWithDesk() async {
     final phone = _service.profile.adminPhone.replaceAll(RegExp(r'\D'), '');
     final deskPhone = phone.isNotEmpty ? phone : '9457464850';
-    final text = 'Hello ${_service.profile.libraryName}, I have submitted my registration request (ID: $_submittedRequestId) for ${_nameCtrl.text.trim()}. Please allot my seat.';
+    final pLibName = _urlParams['libname'];
+    final resolvedLib = (pLibName != null && pLibName.trim().isNotEmpty) ? pLibName.trim() : (_service.profile.libraryName.trim().isNotEmpty ? _service.profile.libraryName.trim() : 'Library Admin');
+    final text = 'Hello $resolvedLib, I have submitted my registration request (ID: $_submittedRequestId) for ${_nameCtrl.text.trim()}. Please allot my seat.';
     final uri = Uri.parse('https://wa.me/91$deskPhone?text=${Uri.encodeComponent(text)}');
     try {
       if (await canLaunchUrl(uri)) {
@@ -258,7 +296,10 @@ class _StudentSelfRegistrationScreenState
   @override
   Widget build(BuildContext context) {
     final profile = _service.profile;
-    final libName = profile.libraryName.isNotEmpty ? profile.libraryName : 'Oxford Study Library';
+    final pLibName = _urlParams['libname'];
+    final libName = (pLibName != null && pLibName.trim().isNotEmpty)
+        ? pLibName.trim()
+        : (profile.libraryName.trim().isNotEmpty ? profile.libraryName.trim() : 'Digital Library');
     final city = profile.city.isNotEmpty ? profile.city : 'Central Branch';
     final address = city;
 

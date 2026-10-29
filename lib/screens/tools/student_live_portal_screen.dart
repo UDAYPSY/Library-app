@@ -50,17 +50,42 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
   void initState() {
     super.initState();
     _service.ensureInitialized();
-    final targetLib = _effectiveLibraryId;
-    if (targetLib.isNotEmpty && targetLib != _service.tenantId) {
-      _service.switchTenant(targetLib);
+    final pLibName = _urlParams['libname'];
+    if (pLibName != null && pLibName.trim().isNotEmpty) {
+      _service.profile.libraryName = pLibName.trim();
     }
+    final targetLib = _effectiveLibraryId;
+    if (targetLib.isNotEmpty) {
+      if (targetLib != _service.tenantId) {
+        _service.switchTenant(targetLib);
+      }
+      _fetchCloudLibraryProfile(targetLib);
+    }
+  }
+
+  Future<void> _fetchCloudLibraryProfile(String targetLib) async {
+    try {
+      final loaded = await _service.fetchTenantProfile(targetLib);
+      if (loaded != null && mounted) {
+        setState(() {
+          final pLibName = _urlParams['libname'];
+          if (pLibName != null && pLibName.trim().isNotEmpty) {
+            _service.profile.libraryName = pLibName.trim();
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _sendWhatsAppInquiry({int? seatNum, String? shiftName}) async {
     final cleanPhone = _service.profile.adminPhone.replaceAll(RegExp(r'[^0-9]'), '');
     final shiftText = shiftName ?? _selectedShift;
     final seatText = seatNum != null ? 'Seat #S-$seatNum' : 'a vacant seat';
-    final msg = 'Hello ${_service.profile.libraryName}! I scanned your library QR Code and want to inquire about booking $seatText for the $shiftText. Are admissions open?';
+    final pLib = _urlParams['libname'];
+    final currentLibName = (pLib != null && pLib.trim().isNotEmpty)
+        ? pLib.trim()
+        : (_service.profile.libraryName.trim().isNotEmpty ? _service.profile.libraryName.trim() : 'Digital Library');
+    final msg = 'Hello $currentLibName! I scanned your library QR Code and want to inquire about booking $seatText for the $shiftText. Are admissions open?';
     
     final uri = Uri.parse('https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(msg)}');
     try {
@@ -135,7 +160,7 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
         final studentPhone = matchedStudent?.phone ?? paramPhone ?? '';
         final feeDueDate = matchedStudent?.feeDueDate ?? (paramValid != null && paramValid.isNotEmpty ? DateTime.tryParse(paramValid) : null);
         final studentPhoto = matchedStudent?.hasPhoto == true ? matchedStudent!.photoBase64 : null;
-        final libraryName = profile.libraryName.isNotEmpty ? profile.libraryName : (paramLibName ?? 'Takshashila Library');
+        final libraryName = (paramLibName != null && paramLibName.trim().isNotEmpty) ? paramLibName.trim() : (profile.libraryName.trim().isNotEmpty ? profile.libraryName.trim() : 'Digital Library');
 
         final bool isOverdue = feeDueDate != null && feeDueDate.isBefore(DateTime.now());
         final bool isEntryAllowed = status != 'INACTIVE' && !isOverdue;
@@ -357,7 +382,7 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    profile.libraryName,
+                                    libraryName,
                                     style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Colors.white),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,

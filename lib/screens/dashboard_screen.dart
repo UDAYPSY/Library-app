@@ -33,8 +33,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Icon(Icons.local_library_rounded, color: Color(0xFF4F46E5)),
             SizedBox(width: 8),
             Text(
-              'Digital Library Hub',
-              style: TextStyle(
+              _service.profile.libraryName.trim().isNotEmpty ? _service.profile.libraryName.trim() : 'Digital Library Hub',
+              style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 19,
                 color: Color(0xFF1E293B),
@@ -555,8 +555,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
+    final libName = _service.profile.libraryName.trim().isNotEmpty
+        ? _service.profile.libraryName.trim()
+        : 'the library';
     final message =
-        'Hello $name, this is a reminder from Digital Library Hub that your monthly seat renewal fee of Rs.500 is scheduled. Please confirm renewal at the desk.';
+        'Hello $name, this is a reminder from $libName that your monthly seat renewal fee of Rs.500 is scheduled. Please confirm renewal at the desk.';
     final url = Uri.parse(
       'https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(message)}',
     );

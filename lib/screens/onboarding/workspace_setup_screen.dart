@@ -20,8 +20,7 @@ class _WorkspaceSetupScreenState extends State<WorkspaceSetupScreen> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(
-      text: (_service.profile.libraryName.isNotEmpty &&
-              _service.profile.libraryName != 'Patna Central Library')
+      text: _service.profile.libraryName.isNotEmpty
           ? _service.profile.libraryName
           : '',
     );
@@ -166,7 +165,7 @@ class _WorkspaceSetupScreenState extends State<WorkspaceSetupScreen> {
                       TextField(
                         controller: _nameCtrl,
                         decoration: InputDecoration(
-                          hintText: 'e.g. Patna Central Library',
+                          hintText: 'e.g. Apex Study Hub',
                           prefixIcon: const Icon(Icons.business_rounded, color: AppColors.textMuted, size: 20),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                           filled: true,

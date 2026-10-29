@@ -2012,50 +2012,27 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                        ] else ...[
                                          Row(
                                            children: [
-                                             Expanded(
-                                               child: ElevatedButton.icon(
-                                                 style: ElevatedButton.styleFrom(
-                                                   backgroundColor: st.seatNumber == null ? const Color(0xFF0F766E) : AppColors.primaryTeal,
-                                                   foregroundColor: Colors.white,
-                                                   padding: const EdgeInsets.symmetric(vertical: 12),
-                                                   elevation: 0,
-                                                   shape: RoundedRectangleBorder(
-                                                     borderRadius: BorderRadius.circular(14),
-                                                   ),
-                                                 ),
-                                                 icon: Icon(st.seatNumber == null ? Icons.chair_alt_rounded : Icons.visibility_outlined, size: 18, color: Colors.white),
-                                                 label: Text(
-                                                   st.seatNumber == null ? "Allot Seat" : "View Profile",
-                                                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
-                                                 ),
-                                                 onPressed: () {
-                                                   if (st.seatNumber == null) {
-                                                     final req = _service.currentRegistrationRequests.firstWhere(
-                                                       (r) => (r.id.isNotEmpty && st.id.contains(r.id)) || (r.phone.isNotEmpty && LibraryService.normalizePhone(r.phone) == LibraryService.normalizePhone(st.phone)),
-                                                       orElse: () => RegistrationRequest(
-                                                         id: "req_${st.id}",
-                                                         studentName: st.name,
-                                                         phone: st.phone,
-                                                         shift: st.shift,
-                                                         status: "PENDING",
-                                                         createdAt: st.joinedAt ?? DateTime.now(),
-                                                         libraryId: _service.tenantId,
-                                                         fatherName: st.fatherName,
-                                                         address: st.address,
-                                                         aadhaarNumber: st.aadhaarNumber,
-                                                         preparationFor: st.preparationFor,
-                                                         gender: st.gender,
-                                                         photoBase64: st.photoBase64,
-                                                         preferredMonthlyFee: st.monthlyFee,
-                                                       ),
-                                                     );
-                                                     _showSeatAllotmentSheet(req);
-                                                   } else {
-                                                     _openViewStudentSheet(st, memberId);
-                                                   }
-                                                 },
-                                               ),
-                                             ),
+                                              Expanded(
+                                                child: ElevatedButton.icon(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: AppColors.primaryTeal,
+                                                    foregroundColor: Colors.white,
+                                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                                    elevation: 0,
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(14),
+                                                    ),
+                                                  ),
+                                                  icon: const Icon(Icons.visibility_outlined, size: 18, color: Colors.white),
+                                                  label: const Text(
+                                                    "View Profile",
+                                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                                                  ),
+                                                  onPressed: () {
+                                                    _openViewStudentSheet(st, memberId);
+                                                  },
+                                                ),
+                                              ),
                                              const SizedBox(width: 8),
                                              InkWell(
                                                borderRadius: BorderRadius.circular(14),

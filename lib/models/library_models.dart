@@ -89,8 +89,8 @@ class LibraryProfile {
   }
 
   LibraryProfile({
-    this.libraryId = 'lib_patna_central',
-    this.libraryName = 'Patna Central Library',
+    this.libraryId = '',
+    this.libraryName = '',
     this.city = 'City Center, Main St',
     this.adminName = 'Admin',
     this.adminEmail = 'manageyourlib@gmail.com',
@@ -244,8 +244,8 @@ class LibraryProfile {
 
   factory LibraryProfile.fromMap(Map<String, dynamic> map) {
     return LibraryProfile(
-      libraryId: map['library_id'] ?? 'lib_patna_central',
-      libraryName: map['library_name'] ?? 'Patna Central Library',
+      libraryId: map['library_id'] ?? '',
+      libraryName: map['library_name'] ?? '',
       city: map['city'] ?? 'City Center, Main St',
       adminName: map['admin_name'] ?? 'Admin',
       adminEmail: map['admin_email'] ?? '',

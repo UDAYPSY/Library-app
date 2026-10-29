@@ -126,7 +126,7 @@ class LibraryService {
     const LibraryBranch(
       id: 'branch_1',
       name: 'Main Campus (Central)',
-      address: 'City Center, Main St, Patna',
+      address: 'City Center, Main St',
       totalSeats: 35,
       isDefault: true,
     ),
@@ -139,7 +139,7 @@ class LibraryService {
     } catch (_) {
       return branches.isNotEmpty
           ? branches.first
-          : const LibraryBranch(id: 'branch_1', name: 'Main Campus', address: 'Patna', totalSeats: 35);
+          : const LibraryBranch(id: 'branch_1', name: 'Main Campus', address: 'Main Branch', totalSeats: 35);
     }
   }
 
@@ -1337,6 +1337,22 @@ class LibraryService {
     }
   }
 
+  Future<LibraryProfile?> fetchTenantProfile(String targetTenantId) async {
+    final clean = targetTenantId.trim();
+    if (clean.isEmpty) return null;
+    if (isFirebaseConnected) {
+      try {
+        final doc = await _db.collection('libraries').doc(clean).get();
+        if (doc.exists && doc.data() != null) {
+          final loaded = LibraryProfile.fromMap(doc.data()!);
+          profile = loaded;
+          return loaded;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
   CollectionReference<Map<String, dynamic>> _tenantCol(String collectionName) {
     return _db.collection('libraries').doc(tenantId).collection(collectionName);
   }
@@ -1544,7 +1560,7 @@ class LibraryService {
         if (libDoc.exists && libDoc.data() != null) {
           final data = libDoc.data()!;
           final name = data['library_name']?.toString().trim() ?? '';
-          if (name.isNotEmpty && name != 'Patna Central Library') {
+          if (name.isNotEmpty) {
             profile = LibraryProfile.fromMap(data);
             await LocalStorageService.saveString('app_setup_completed', 'true');
             await _saveLocalState();
@@ -1556,7 +1572,7 @@ class LibraryService {
         if (brandingDoc.exists && brandingDoc.data() != null) {
           final data = brandingDoc.data()!;
           final name = data['library_name']?.toString().trim() ?? '';
-          if (name.isNotEmpty && name != 'Patna Central Library') {
+          if (name.isNotEmpty) {
             profile = LibraryProfile.fromMap(data);
             await LocalStorageService.saveString('app_setup_completed', 'true');
             await _saveLocalState();
@@ -1578,13 +1594,13 @@ class LibraryService {
           final decoded = json.decode(profileStr);
           if (decoded is Map && decoded['library_name'] != null) {
             final name = decoded['library_name'].toString().trim();
-            if (name.isNotEmpty && name != 'Patna Central Library') {
+            if (name.isNotEmpty) {
               return true;
             }
           }
         } catch (_) {}
       }
-      if (profile.libraryName.isNotEmpty && profile.libraryName != 'Patna Central Library') {
+      if (profile.libraryName.isNotEmpty) {
         return true;
       }
       return false;
@@ -1597,7 +1613,7 @@ class LibraryService {
         final decoded = json.decode(profileStr);
         if (decoded is Map && decoded['library_name'] != null) {
           final name = decoded['library_name'].toString().trim();
-          if (name.isNotEmpty && name != 'Patna Central Library') {
+          if (name.isNotEmpty) {
             return true;
           }
         }
@@ -1605,7 +1621,7 @@ class LibraryService {
     }
 
     // 4. In-memory profile has a custom library name
-    if (profile.libraryName.isNotEmpty && profile.libraryName != 'Patna Central Library') {
+    if (profile.libraryName.isNotEmpty) {
       return true;
     }
 
@@ -1641,7 +1657,7 @@ class LibraryService {
             if (libDoc.exists && libDoc.data() != null) {
               final data = libDoc.data()!;
               final name = data['library_name']?.toString().trim() ?? '';
-              if (name.isNotEmpty && name != 'Patna Central Library') {
+              if (name.isNotEmpty) {
                 profile = LibraryProfile.fromMap(data);
                 await LocalStorageService.saveString('app_setup_completed', 'true');
                 await _saveLocalState();
@@ -1653,7 +1669,7 @@ class LibraryService {
               if (brandingDoc.exists && brandingDoc.data() != null) {
                 final data = brandingDoc.data()!;
                 final name = data['library_name']?.toString().trim() ?? '';
-                if (name.isNotEmpty && name != 'Patna Central Library') {
+                if (name.isNotEmpty) {
                   profile = LibraryProfile.fromMap(data);
                   await LocalStorageService.saveString('app_setup_completed', 'true');
                   await _saveLocalState();
@@ -1897,7 +1913,7 @@ class LibraryService {
       profile.adminPhone = phone.trim();
     }
     currentUserId ??= 'admin_${DateTime.now().millisecondsSinceEpoch}';
-    if (profile.libraryId == 'lib_patna_central' || profile.libraryId.isEmpty) {
+    if (profile.libraryId.isEmpty || profile.libraryId == 'lib_patna_central') {
       profile.libraryId = currentUserId!;
     }
     currentUserName = profile.adminName;
