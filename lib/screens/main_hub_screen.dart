@@ -3189,7 +3189,7 @@ Have a productive study session!
                       decoration: BoxDecoration(
                         color: _service.activeBranchId == 'all'
                             ? (AppColors.isDark(context) ? const Color(0xFF064E3B) : const Color(0xFFF0FDF4))
-                            : AppColors.surface(context),
+                            : AppColors.subSurface(context),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: _service.activeBranchId == 'all'
@@ -3265,7 +3265,7 @@ Have a productive study session!
                       decoration: BoxDecoration(
                         color: isCurrent
                             ? (AppColors.isDark(context) ? const Color(0xFF064E3B) : const Color(0xFFF0FDF4))
-                            : AppColors.surface(context),
+                            : AppColors.subSurface(context),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: isCurrent ? const Color(0xFF86EFAC) : AppColors.cardBorderColor(context),
