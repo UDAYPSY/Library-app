@@ -885,7 +885,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   backgroundColor: Color(0xFFE0F2FE),
                   child: Icon(Icons.person, color: Color(0xFF0284C7)),
                 ),
-                title: Text(_service.profile.adminName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                title: Text(_service.profile.adminName.isNotEmpty ? _service.profile.adminName : 'Administrator', style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: const Text('Owner • Administrator (Full Control)'),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -971,7 +971,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final passCtrl = TextEditingController();
     final confirmPassCtrl = TextEditingController();
     String selectedRole = 'Receptionist & Desk';
-    String selectedBranchId = _service.activeBranchId;
+    final initialBranches = _service.effectiveBranches;
+    String selectedBranchId = initialBranches.any((b) => b.id == _service.activeBranchId)
+        ? _service.activeBranchId
+        : (initialBranches.isNotEmpty ? initialBranches.first.id : 'branch_1');
     bool obscurePass = true;
     bool obscureConfirm = true;
     String? validationError;
@@ -1010,6 +1013,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
           }
 
+          final availableBranches = _service.effectiveBranches;
+          final validSelectedBranchId = availableBranches.any((b) => b.id == selectedBranchId)
+              ? selectedBranchId
+              : (availableBranches.isNotEmpty ? availableBranches.first.id : 'branch_1');
+
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Row(
@@ -1019,8 +1027,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textNavy)),
               ],
             ),
-            content: SizedBox(
-              width: 440,
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 440,
+                maxHeight: MediaQuery.of(dialogCtx).size.height * 0.75,
+              ),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1048,7 +1059,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       controller: nameCtrl,
                       decoration: const InputDecoration(
                         labelText: 'Full Name *',
-                        hintText: 'e.g. Ramesh Kumar',
+                        hintText: 'e.g. Pooja Sharma',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person_outline_rounded),
                       ),
@@ -1076,7 +1087,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         labelText: 'Email Address *',
-                        hintText: 'e.g. ramesh@gmail.com',
+                        hintText: 'e.g. staff@library.com',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.mail_outline_rounded),
                       ),
@@ -1085,19 +1096,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _service.branches.any((b) => b.id == selectedBranchId) ? selectedBranchId : _service.branches.first.id,
-                      decoration: const InputDecoration(
-                        labelText: 'Assigned Library Branch *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.apartment_rounded),
+                    if (availableBranches.length > 1) ...[
+                      DropdownButtonFormField<String>(
+                        value: validSelectedBranchId,
+                        decoration: const InputDecoration(
+                          labelText: 'Assigned Library Branch *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.apartment_rounded),
+                        ),
+                        items: availableBranches
+                            .map((b) => DropdownMenuItem(
+                                  value: b.id,
+                                  child: Text(b.name, overflow: TextOverflow.ellipsis),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => selectedBranchId = val);
+                        },
                       ),
-                      items: _service.branches.map((b) => DropdownMenuItem(value: b.id, child: Text(b.name, overflow: TextOverflow.ellipsis))).toList(),
-                      onChanged: (val) {
-                        if (val != null) setDialogState(() => selectedBranchId = val);
-                      },
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.apartment_rounded, color: Color(0xFF0F766E), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Assigned Branch', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                                  Text(
+                                    availableBranches.isNotEmpty ? availableBranches.first.name : 'Main Campus',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     DropdownButtonFormField<String>(
                       value: selectedRole,
                       decoration: const InputDecoration(

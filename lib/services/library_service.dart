@@ -114,6 +114,21 @@ class LibraryService {
   ];
   String activeBranchId = 'branch_1';
 
+  List<LibraryBranch> get effectiveBranches {
+    if (branches.isEmpty) {
+      return [
+        LibraryBranch(
+          id: 'branch_1',
+          name: profile.libraryName.isNotEmpty ? profile.libraryName : 'Main Campus',
+          address: profile.city.isNotEmpty ? profile.city : 'Main Branch',
+          totalSeats: totalSeatsCount > 0 ? totalSeatsCount : 35,
+          isDefault: true,
+        ),
+      ];
+    }
+    return branches;
+  }
+
   LibraryBranch get currentBranch {
     try {
       return branches.firstWhere((b) => b.id == activeBranchId);
@@ -145,7 +160,7 @@ class LibraryService {
     if (branches.length > 1) {
       branches.removeWhere((b) => b.id == branchId);
       if (activeBranchId == branchId) {
-        activeBranchId = branches.first.id;
+        activeBranchId = branches.isNotEmpty ? branches.first.id : 'branch_1';
         final b = currentBranch;
         profile.libraryName = b.name;
         profile.city = b.address;
@@ -158,26 +173,35 @@ class LibraryService {
   void addStaffMember(StaffMember staff) {
     staffList.add(staff);
     _saveLocalState();
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        _tenantCol('staff').doc(staff.id).set(staff.toMap(), SetOptions(merge: true));
+      } catch (_) {}
+    }
   }
 
   void removeStaffMember(String staffId) {
     staffList.removeWhere((s) => s.id == staffId);
     _saveLocalState();
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        _tenantCol('staff').doc(staffId).delete();
+      } catch (_) {}
+    }
   }
 
   void toggleStaffActive(String staffId) {
     final idx = staffList.indexWhere((s) => s.id == staffId);
     if (idx != -1) {
       final cur = staffList[idx];
-      staffList[idx] = StaffMember(
-        id: cur.id,
-        name: cur.name,
-        phone: cur.phone,
-        role: cur.role,
-        addedAt: cur.addedAt,
-        isActive: !cur.isActive,
-      );
+      final updated = cur.copyWith(isActive: !cur.isActive);
+      staffList[idx] = updated;
       _saveLocalState();
+      if (isFirebaseConnected && currentUserId != null) {
+        try {
+          _tenantCol('staff').doc(cur.id).set(updated.toMap(), SetOptions(merge: true));
+        } catch (_) {}
+      }
     }
   }
 
@@ -371,6 +395,17 @@ class LibraryService {
         if (decoded is List && decoded.isNotEmpty) {
           branches = decoded.map((b) => LibraryBranch.fromMap(Map<String, dynamic>.from(b))).toList();
         }
+      }
+      if (branches.isEmpty) {
+        branches = [
+          LibraryBranch(
+            id: 'branch_1',
+            name: profile.libraryName.isNotEmpty ? profile.libraryName : 'Main Campus',
+            address: profile.city.isNotEmpty ? profile.city : 'Main Branch',
+            totalSeats: totalSeatsCount > 0 ? totalSeatsCount : 35,
+            isDefault: true,
+          ),
+        ];
       }
 
       final activeBranchStr = await LocalStorageService.getString('app_library_active_branch');
@@ -730,7 +765,15 @@ class LibraryService {
     _mockExpenses.clear();
     _mockRegistrationRequests.clear();
     staffList.clear();
-    branches.clear();
+    branches = [
+      const LibraryBranch(
+        id: 'branch_1',
+        name: 'Main Campus (Central)',
+        address: '',
+        totalSeats: 35,
+        isDefault: true,
+      ),
+    ];
     sections = [
       SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
     ];
@@ -752,7 +795,7 @@ class LibraryService {
     currentUserRole = 'Admin';
     currentUserName = '';
     currentUserEmail = '';
-    activeBranchId = 'branch_main';
+    activeBranchId = 'branch_1';
     _loadedFromLocalStorage = false;
     _initialized = false;
 
