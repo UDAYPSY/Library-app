@@ -676,28 +676,29 @@ class LibraryService {
 
   Future<void> clearAllData() async {
     if (isFirebaseConnected) {
+      final authUid = FirebaseAuth.instance.currentUser?.uid;
       final tenantIdsToDelete = <String>{
-        tenantId,
+        if (authUid != null && authUid.isNotEmpty) authUid,
         if (profile.libraryId.isNotEmpty) profile.libraryId,
         if (currentUserId != null && currentUserId!.isNotEmpty) currentUserId!,
-        if (FirebaseAuth.instance.currentUser != null) FirebaseAuth.instance.currentUser!.uid,
-        'default_library',
-      };
+        tenantId,
+      }..remove('default_library');
+
       final collections = ['payments', 'students', 'seats', 'expenses', 'staff', 'branches', 'registration_requests'];
       for (final tId in tenantIdsToDelete) {
+        if (tId.isEmpty) continue;
         for (final col in collections) {
           try {
             final colRef = _db.collection('libraries').doc(tId).collection(col);
-            final snaps = await colRef.get();
-            if (snaps.docs.isNotEmpty) {
-              for (var i = 0; i < snaps.docs.length; i += 400) {
-                final batch = _db.batch();
-                final end = (i + 400 < snaps.docs.length) ? i + 400 : snaps.docs.length;
-                for (var j = i; j < end; j++) {
-                  batch.delete(snaps.docs[j].reference);
-                }
-                await batch.commit();
+            while (true) {
+              final snaps = await colRef.limit(200).get();
+              if (snaps.docs.isEmpty) break;
+              final batch = _db.batch();
+              for (final doc in snaps.docs) {
+                batch.delete(doc.reference);
               }
+              await batch.commit();
+              if (snaps.docs.length < 200) break;
             }
           } catch (_) {
             try {
@@ -767,17 +768,19 @@ class LibraryService {
   }
 
   // Permanently delete user account, wipe cloud tenant data, delete Firebase user, and purge all local storage
-  Future<void> deleteAccountPermanently() async {
+  Future<void> deleteAccountPermanently({String? password}) async {
     ensureInitialized();
 
     if (isFirebaseConnected) {
+      final authUser = FirebaseAuth.instance.currentUser;
+      final authUid = authUser?.uid;
+
       final tenantIdsToDelete = <String>{
-        tenantId,
+        if (authUid != null && authUid.isNotEmpty) authUid,
         if (profile.libraryId.isNotEmpty) profile.libraryId,
         if (currentUserId != null && currentUserId!.isNotEmpty) currentUserId!,
-        if (FirebaseAuth.instance.currentUser != null) FirebaseAuth.instance.currentUser!.uid,
-        'default_library',
-      };
+        tenantId,
+      }..remove('default_library');
 
       final collections = [
         'payments', // Wipe payments first to ensure zero residual revenue records
@@ -792,19 +795,19 @@ class LibraryService {
       ];
 
       for (final tId in tenantIdsToDelete) {
+        if (tId.isEmpty) continue;
         for (final col in collections) {
           try {
             final colRef = _db.collection('libraries').doc(tId).collection(col);
-            final snaps = await colRef.get();
-            if (snaps.docs.isNotEmpty) {
-              for (var i = 0; i < snaps.docs.length; i += 400) {
-                final batch = _db.batch();
-                final end = (i + 400 < snaps.docs.length) ? i + 400 : snaps.docs.length;
-                for (var j = i; j < end; j++) {
-                  batch.delete(snaps.docs[j].reference);
-                }
-                await batch.commit();
+            while (true) {
+              final snaps = await colRef.limit(200).get();
+              if (snaps.docs.isEmpty) break;
+              final batch = _db.batch();
+              for (final doc in snaps.docs) {
+                batch.delete(doc.reference);
               }
+              await batch.commit();
+              if (snaps.docs.length < 200) break;
             }
           } catch (_) {
             try {
@@ -825,16 +828,24 @@ class LibraryService {
         } catch (_) {}
       }
 
-      // Delete Firebase user auth account if possible, or sign out cleanly
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          await user.delete();
+      // Try reauthenticating if password provided to allow user.delete() without requires-recent-login
+      if (authUser != null) {
+        if (password != null && password.trim().isNotEmpty && authUser.email != null) {
+          try {
+            final cred = EmailAuthProvider.credential(
+              email: authUser.email!,
+              password: password.trim(),
+            );
+            await authUser.reauthenticateWithCredential(cred);
+          } catch (_) {}
         }
-      } catch (_) {
         try {
-          await FirebaseAuth.instance.signOut();
-        } catch (_) {}
+          await authUser.delete();
+        } catch (_) {
+          try {
+            await FirebaseAuth.instance.signOut();
+          } catch (_) {}
+        }
       }
     }
 
@@ -856,7 +867,7 @@ class LibraryService {
       libraryId: '',
       libraryName: '',
       city: '',
-      adminName: '',
+      adminName: 'Admin',
       adminEmail: '',
       adminPhone: '',
       upiId: '',
@@ -864,7 +875,7 @@ class LibraryService {
     isAuthenticated = false;
     currentUserId = null;
     currentUserRole = 'Admin';
-    currentUserName = '';
+    currentUserName = 'Admin';
     currentUserEmail = '';
     activeBranchId = 'branch_1';
     _loadedFromLocalStorage = false;
@@ -894,6 +905,7 @@ class LibraryService {
     await LocalStorageService.remove('app_library_expenses');
     await LocalStorageService.remove('app_library_staff');
     await LocalStorageService.remove('app_library_profile');
+    await LocalStorageService.remove('app_admin_profile');
     await LocalStorageService.remove('app_library_sections');
     await LocalStorageService.remove('app_library_shifts');
     await LocalStorageService.remove('app_library_branches');
@@ -906,6 +918,10 @@ class LibraryService {
     await LocalStorageService.remove('app_admin_password_hash');
     await LocalStorageService.remove('gdrive_auto_backup_enabled');
     await LocalStorageService.remove('gdrive_backup_email');
+    await LocalStorageService.remove('gdrive_last_snapshot_content');
+    await LocalStorageService.remove('gdrive_last_backup_time');
+    await LocalStorageService.remove('gdrive_last_backup_size');
+    await LocalStorageService.remove('gdrive_last_backup_status');
 
     // Completely wipe persistent local storage (memory cache, JSON file, web localStorage)
     await LocalStorageService.clearAll();
@@ -1546,14 +1562,72 @@ class LibraryService {
           password: cleanPass,
         );
         if (credential.user != null) {
-          currentUserId = credential.user!.uid;
-          profile.libraryId = credential.user!.uid; // Strictly bound to Firebase Auth UID
-          currentUserEmail = credential.user!.email ?? cleanId;
-          currentUserRole = (cleanId.toLowerCase() == profile.adminEmail.toLowerCase())
-              ? 'Admin'
-              : 'Receptionist';
-          currentUserName = profile.adminName;
+          final user = credential.user!;
+          currentUserId = user.uid;
+          profile.libraryId = user.uid; // Strictly bound to Firebase Auth UID
+          currentUserEmail = user.email ?? cleanId;
+          final normEmail = currentUserEmail.toLowerCase();
+          final staffMatch = staffList.where((s) => s.email != null && s.email!.toLowerCase() == normEmail);
+          if (staffMatch.isNotEmpty) {
+            currentUserRole = normalizeRole(staffMatch.first.role);
+            currentUserName = staffMatch.first.name;
+          } else {
+            currentUserRole = 'Admin';
+            currentUserName = (profile.adminName.isNotEmpty && profile.adminName != 'Admin')
+                ? profile.adminName
+                : (currentUserEmail.contains('@') ? currentUserEmail.split('@')[0] : 'Administrator');
+            profile.adminName = currentUserName;
+            profile.adminEmail = currentUserEmail;
+          }
           isAuthenticated = true;
+
+          // Attempt to restore existing cloud library profile if user has previously configured one
+          bool restoredCloudProfile = false;
+          try {
+            final libDoc = await _db.collection('libraries').doc(user.uid).get();
+            if (libDoc.exists && libDoc.data() != null) {
+              final data = libDoc.data()!;
+              final name = data['library_name']?.toString().trim() ?? '';
+              if (name.isNotEmpty) {
+                profile = LibraryProfile.fromMap(data);
+                await LocalStorageService.saveString('app_setup_completed', 'true');
+                await _saveLocalState();
+                restoredCloudProfile = true;
+              }
+            }
+            if (!restoredCloudProfile) {
+              final brandingDoc = await _db.collection('libraries').doc(user.uid).collection('settings').doc('branding').get();
+              if (brandingDoc.exists && brandingDoc.data() != null) {
+                final data = brandingDoc.data()!;
+                final name = data['library_name']?.toString().trim() ?? '';
+                if (name.isNotEmpty) {
+                  profile = LibraryProfile.fromMap(data);
+                  await LocalStorageService.saveString('app_setup_completed', 'true');
+                  await _saveLocalState();
+                  restoredCloudProfile = true;
+                }
+              }
+            }
+          } catch (_) {}
+
+          if (!restoredCloudProfile) {
+            // First time user or account was permanently deleted:
+            // Ensure local state is clean so they are routed to library creation wizard
+            profile.libraryName = '';
+            profile.city = '';
+            _mockStudents.clear();
+            _mockPayments.clear();
+            _mockExpenses.clear();
+            _mockRegistrationRequests.clear();
+            staffList.clear();
+            branches.clear();
+            await LocalStorageService.remove('app_setup_completed');
+            await LocalStorageService.remove('app_library_profile');
+            await LocalStorageService.remove('app_library_payments');
+            await LocalStorageService.remove('app_library_students');
+            await LocalStorageService.remove('app_library_expenses');
+          }
+
           await LocalStorageService.saveString(
             'app_active_session',
             json.encode({
@@ -1564,6 +1638,9 @@ class LibraryService {
               'library_id': profile.libraryId,
             }),
           );
+          if (currentUserEmail.isNotEmpty) {
+            await LocalStorageService.saveString('app_last_login_identifier', currentUserEmail);
+          }
           return AuthResult(
             success: true,
             role: currentUserRole,
@@ -2131,8 +2208,47 @@ class LibraryService {
       }
       currentUserRole = 'Admin';
       currentUserEmail = credential.user?.email ?? email.trim();
-      currentUserName = profile.adminName.isNotEmpty ? profile.adminName : 'Administrator';
+      currentUserName = profile.adminName.isNotEmpty && profile.adminName != 'Admin'
+          ? profile.adminName
+          : (currentUserEmail.contains('@') ? currentUserEmail.split('@')[0] : 'Administrator');
+      profile.adminName = currentUserName;
+      profile.adminEmail = currentUserEmail;
       isAuthenticated = true;
+
+      // Attempt to restore existing cloud library profile if user has previously configured one
+      bool restoredCloudProfile = false;
+      try {
+        final libDoc = await _db.collection('libraries').doc(uid).get();
+        if (libDoc.exists && libDoc.data() != null) {
+          final data = libDoc.data()!;
+          final name = data['library_name']?.toString().trim() ?? '';
+          if (name.isNotEmpty) {
+            profile = LibraryProfile.fromMap(data);
+            await LocalStorageService.saveString('app_setup_completed', 'true');
+            await _saveLocalState();
+            restoredCloudProfile = true;
+          }
+        }
+      } catch (_) {}
+
+      if (!restoredCloudProfile) {
+        // First time user or account was permanently deleted:
+        // Ensure local state is clean so they are routed to library creation wizard
+        profile.libraryName = '';
+        profile.city = '';
+        _mockStudents.clear();
+        _mockPayments.clear();
+        _mockExpenses.clear();
+        _mockRegistrationRequests.clear();
+        staffList.clear();
+        branches.clear();
+        await LocalStorageService.remove('app_setup_completed');
+        await LocalStorageService.remove('app_library_profile');
+        await LocalStorageService.remove('app_library_payments');
+        await LocalStorageService.remove('app_library_students');
+        await LocalStorageService.remove('app_library_expenses');
+      }
+
       await LocalStorageService.saveString(
         'app_active_session',
         json.encode({
@@ -2143,6 +2259,9 @@ class LibraryService {
           'library_id': profile.libraryId,
         }),
       );
+      if (currentUserEmail.isNotEmpty) {
+        await LocalStorageService.saveString('app_last_login_identifier', currentUserEmail);
+      }
       return {'success': true, 'role': 'Admin', 'uid': uid};
     } on FirebaseAuthException catch (e) {
       String message = 'Login failed';

@@ -2227,6 +2227,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       return;
     }
+    final passwordCtrl = TextEditingController();
+    final isEmailAuth = FirebaseAuth.instance.currentUser?.email != null &&
+        FirebaseAuth.instance.currentUser!.email!.isNotEmpty;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2238,9 +2242,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Text('Delete Account?', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEF4444))),
           ],
         ),
-        content: const Text(
-          'This action is irreversible. All student profiles, fee transactions, expense records, seat allocation maps, library settings, and login credentials will be permanently erased.',
-          style: TextStyle(fontSize: 14, height: 1.4),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This action is irreversible. All student profiles, fee transactions, payment records, expense records, seat allocation maps, library settings, and login credentials will be permanently erased.',
+                style: TextStyle(fontSize: 14, height: 1.4),
+              ),
+              if (isEmailAuth) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Enter admin password to authorize permanent deletion:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: passwordCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    hintText: 'Admin password (optional)',
+                    prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -2254,6 +2284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () async {
+              final enteredPass = passwordCtrl.text.trim();
               Navigator.pop(ctx);
 
               // Show blocking progress indicator
@@ -2281,7 +2312,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
 
               try {
-                await _service.deleteAccountPermanently();
+                await _service.deleteAccountPermanently(password: enteredPass);
               } catch (_) {}
 
               if (context.mounted) {

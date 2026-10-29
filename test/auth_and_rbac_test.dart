@@ -226,12 +226,19 @@ void main() {
       expect(service.branches, isEmpty);
       expect(service.currentPayments, isEmpty);
       expect(service.mockPaymentsList, isEmpty);
+      expect(await service.streamPayments().first, isEmpty);
       expect(await LocalStorageService.getString('app_library_payments'), isNull);
       expect(await LocalStorageService.getString('app_library_expenses'), isNull);
       expect(await LocalStorageService.getString('app_library_students'), isNull);
       expect(await LocalStorageService.getString('app_setup_completed'), isNull);
       expect(await LocalStorageService.getString('app_last_login_identifier'), isNull);
       expect(await LocalStorageService.getString('app_active_session'), isNull);
+      expect(await service.hasConfiguredLibrary(), isFalse);
+
+      // Logging in again after account deletion must have 0 residual payments and unconfigured library
+      final reLoginRes = await service.login(identifier: 'admin@test.com', password: 'password123');
+      expect(service.currentPayments, isEmpty);
+      expect(await service.streamPayments().first, isEmpty);
       expect(await service.hasConfiguredLibrary(), isFalse);
 
       // Biometrics must fail when no credentials exist
