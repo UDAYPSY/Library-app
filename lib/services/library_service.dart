@@ -2405,8 +2405,8 @@ class LibraryService {
       final isDuePayment = currentDues > 0 || notes.toLowerCase().contains('due');
       if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
         effectiveNotes = notes.isNotEmpty
-            ? ' • Due payment for period: '
-            : 'Due payment for period: ';
+            ? '$notes • Due payment for period: $periodStr'
+            : 'Due payment for period: $periodStr';
       }
 
       final newDues = currentDues > 0 ? (currentDues - amount).clamp(0, 999999) : 0;
@@ -2416,8 +2416,8 @@ class LibraryService {
       }
       final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
       final payLog = isDuePayment
-          ? 'Due payment of ₹ collected via  on .'
-          : 'Payment of ₹ collected via  on .';
+          ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
+          : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
       final updatedNote = appendNote(s.note, payLog);
 
       _mockStudents[matchIdx] = s.copyWith(
@@ -2469,8 +2469,8 @@ class LibraryService {
             final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
             final curNote = (data['note'] as String?) ?? '';
             final payLog = isDuePayment
-                ? 'Due payment of ₹ collected via  on .'
-                : 'Payment of ₹ collected via  on .';
+                ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
+                : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
             final updatedNote = appendNote(curNote, payLog);
 
             final updates = <String, dynamic>{
