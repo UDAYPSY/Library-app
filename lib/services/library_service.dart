@@ -602,34 +602,73 @@ class LibraryService {
 
   Future<void> clearAllData() async {
     if (isFirebaseConnected) {
-      try {
-        final collections = ['students', 'seats', 'payments', 'expenses', 'staff'];
+      final tenantIdsToDelete = <String>{
+        tenantId,
+        if (profile.libraryId.isNotEmpty) profile.libraryId,
+        if (currentUserId != null && currentUserId!.isNotEmpty) currentUserId!,
+        if (FirebaseAuth.instance.currentUser != null) FirebaseAuth.instance.currentUser!.uid,
+        'default_library',
+      };
+      final collections = ['payments', 'students', 'seats', 'expenses', 'staff', 'branches', 'registration_requests'];
+      for (final tId in tenantIdsToDelete) {
         for (final col in collections) {
-          final snaps = await _tenantCol(col).get();
-          final batch = _db.batch();
-          for (final doc in snaps.docs) {
-            batch.delete(doc.reference);
+          try {
+            final colRef = _db.collection('libraries').doc(tId).collection(col);
+            final snaps = await colRef.get();
+            if (snaps.docs.isNotEmpty) {
+              for (var i = 0; i < snaps.docs.length; i += 400) {
+                final batch = _db.batch();
+                final end = (i + 400 < snaps.docs.length) ? i + 400 : snaps.docs.length;
+                for (var j = i; j < end; j++) {
+                  batch.delete(snaps.docs[j].reference);
+                }
+                await batch.commit();
+              }
+            }
+          } catch (_) {
+            try {
+              final colRef = _db.collection('libraries').doc(tId).collection(col);
+              final snaps = await colRef.get();
+              for (final doc in snaps.docs) {
+                try {
+                  await doc.reference.delete();
+                } catch (_) {}
+              }
+            } catch (_) {}
           }
-          await batch.commit();
         }
-      } catch (_) {}
+      }
     }
     _mockStudents.clear();
     _mockPayments.clear();
     _mockExpenses.clear();
+    _mockRegistrationRequests.clear();
     staffList.clear();
     _mockSeats = List.generate(
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
     );
-    _mockStudentsController.add(List.unmodifiable(_mockStudents));
-    _mockPaymentsController.add(List.unmodifiable(_mockPayments));
-    _mockExpensesController.add(List.unmodifiable(_mockExpenses));
-    _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    if (!_mockStudentsController.isClosed) {
+      _mockStudentsController.add(const []);
+    }
+    if (!_mockPaymentsController.isClosed) {
+      _mockPaymentsController.add(const []);
+    }
+    if (!_mockExpensesController.isClosed) {
+      _mockExpensesController.add(const []);
+    }
+    if (!_mockRegistrationRequestsController.isClosed) {
+      _mockRegistrationRequestsController.add(const []);
+    }
+    if (!_mockSeatsController.isClosed) {
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    }
+    notifyStreamControllers();
     await LocalStorageService.remove('app_library_students');
     await LocalStorageService.remove('app_library_payments');
     await LocalStorageService.remove('app_library_expenses');
     await LocalStorageService.remove('app_library_staff');
+    await LocalStorageService.remove('app_library_registration_requests');
   }
 
   // Permanently delete user account, wipe cloud tenant data, delete Firebase user, and purge all local storage
@@ -637,47 +676,74 @@ class LibraryService {
     ensureInitialized();
 
     if (isFirebaseConnected) {
-      try {
-        final collections = [
-          'students',
-          'seats',
-          'payments',
-          'expenses',
-          'staff',
-          'settings',
-          'backups',
-          'branches',
-          'registration_requests',
-        ];
+      final tenantIdsToDelete = <String>{
+        tenantId,
+        if (profile.libraryId.isNotEmpty) profile.libraryId,
+        if (currentUserId != null && currentUserId!.isNotEmpty) currentUserId!,
+        if (FirebaseAuth.instance.currentUser != null) FirebaseAuth.instance.currentUser!.uid,
+        'default_library',
+      };
+
+      final collections = [
+        'payments', // Wipe payments first to ensure zero residual revenue records
+        'students',
+        'seats',
+        'expenses',
+        'staff',
+        'settings',
+        'backups',
+        'branches',
+        'registration_requests',
+      ];
+
+      for (final tId in tenantIdsToDelete) {
         for (final col in collections) {
-          final snaps = await _tenantCol(col).get();
-          final batch = _db.batch();
-          for (final doc in snaps.docs) {
-            batch.delete(doc.reference);
-          }
-          await batch.commit();
-        }
-
-        // Delete parent library doc if it exists
-        try {
-          await _db.collection('libraries').doc(tenantId).delete();
-        } catch (_) {}
-
-        // Delete Firebase user auth account if possible, or sign out
-        try {
-          final user = FirebaseAuth.instance.currentUser;
-          if (user != null) {
-            await user.delete();
-          }
-        } catch (_) {
           try {
-            await FirebaseAuth.instance.signOut();
-          } catch (_) {}
+            final colRef = _db.collection('libraries').doc(tId).collection(col);
+            final snaps = await colRef.get();
+            if (snaps.docs.isNotEmpty) {
+              for (var i = 0; i < snaps.docs.length; i += 400) {
+                final batch = _db.batch();
+                final end = (i + 400 < snaps.docs.length) ? i + 400 : snaps.docs.length;
+                for (var j = i; j < end; j++) {
+                  batch.delete(snaps.docs[j].reference);
+                }
+                await batch.commit();
+              }
+            }
+          } catch (_) {
+            try {
+              final colRef = _db.collection('libraries').doc(tId).collection(col);
+              final snaps = await colRef.get();
+              for (final doc in snaps.docs) {
+                try {
+                  await doc.reference.delete();
+                } catch (_) {}
+              }
+            } catch (_) {}
+          }
         }
-      } catch (_) {}
+
+        // Delete parent library root document
+        try {
+          await _db.collection('libraries').doc(tId).delete();
+        } catch (_) {}
+      }
+
+      // Delete Firebase user auth account if possible, or sign out cleanly
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await user.delete();
+        }
+      } catch (_) {
+        try {
+          await FirebaseAuth.instance.signOut();
+        } catch (_) {}
+      }
     }
 
-    // Reset all in-memory state cleanly
+    // Reset all in-memory collections cleanly
     _mockStudents.clear();
     _mockPayments.clear();
     _mockExpenses.clear();
@@ -705,6 +771,9 @@ class LibraryService {
     currentUserRole = 'Admin';
     currentUserName = '';
     currentUserEmail = '';
+    activeBranchId = 'branch_main';
+    _loadedFromLocalStorage = false;
+    _initialized = false;
 
     // Notify all UI streams of complete reset
     if (!_mockStudentsController.isClosed) {
@@ -722,6 +791,26 @@ class LibraryService {
     if (!_mockSeatsController.isClosed) {
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
     }
+    notifyStreamControllers();
+
+    // Explicitly purge every known key to prevent any persistence leaks
+    await LocalStorageService.remove('app_library_students');
+    await LocalStorageService.remove('app_library_payments');
+    await LocalStorageService.remove('app_library_expenses');
+    await LocalStorageService.remove('app_library_staff');
+    await LocalStorageService.remove('app_library_profile');
+    await LocalStorageService.remove('app_library_sections');
+    await LocalStorageService.remove('app_library_shifts');
+    await LocalStorageService.remove('app_library_branches');
+    await LocalStorageService.remove('app_library_active_branch');
+    await LocalStorageService.remove('app_library_registration_requests');
+    await LocalStorageService.remove('app_setup_completed');
+    await LocalStorageService.remove('app_active_session');
+    await LocalStorageService.remove('app_last_login_identifier');
+    await LocalStorageService.remove('app_admin_password');
+    await LocalStorageService.remove('app_admin_password_hash');
+    await LocalStorageService.remove('gdrive_auto_backup_enabled');
+    await LocalStorageService.remove('gdrive_backup_email');
 
     // Completely wipe persistent local storage (memory cache, JSON file, web localStorage)
     await LocalStorageService.clearAll();

@@ -29,7 +29,8 @@ service cloud.firestore {
         allow create: if isLibraryOwner(libraryId)
                       && request.resource.data.amount is number
                       && request.resource.data.amount > 0;
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if isLibraryOwner(libraryId);
       }
 
       match /expenses/{expenseId} {

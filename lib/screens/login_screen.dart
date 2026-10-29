@@ -180,10 +180,20 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainHubScreen()),
-        );
+        final hasLibrary = await _service.hasConfiguredLibrary();
+        if (!mounted) return;
+
+        if (hasLibrary) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainHubScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const WorkspaceSetupScreen()),
+          );
+        }
       } else {
         setState(() {
           _isLoading = false;

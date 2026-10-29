@@ -198,6 +198,12 @@ void main() {
 
     test('deleteAccountPermanently completely wipes state, storage, and library configuration', () async {
       service.profile.libraryName = 'Test Deletion Library';
+      await service.recordPayment(
+        studentName: 'Test Payer',
+        amount: 800,
+        paymentMode: 'UPI',
+      );
+      expect(service.currentPayments, isNotEmpty);
       await LocalStorageService.saveString('app_setup_completed', 'true');
       await LocalStorageService.saveString('app_last_login_identifier', 'admin@test.com');
       await LocalStorageService.saveString('app_active_session', '{"user_id":"123"}');
@@ -209,6 +215,11 @@ void main() {
       expect(service.isAuthenticated, isFalse);
       expect(service.staffList, isEmpty);
       expect(service.branches, isEmpty);
+      expect(service.currentPayments, isEmpty);
+      expect(service.mockPaymentsList, isEmpty);
+      expect(await LocalStorageService.getString('app_library_payments'), isNull);
+      expect(await LocalStorageService.getString('app_library_expenses'), isNull);
+      expect(await LocalStorageService.getString('app_library_students'), isNull);
       expect(await LocalStorageService.getString('app_setup_completed'), isNull);
       expect(await LocalStorageService.getString('app_last_login_identifier'), isNull);
       expect(await LocalStorageService.getString('app_active_session'), isNull);
