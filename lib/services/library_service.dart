@@ -145,6 +145,9 @@ class LibraryService {
   bool get canEditSettings => isAdmin;
   bool get canDeleteRecords => isAdmin;
   bool get canManageSeats => isAdmin || currentUserRole != 'Accountant & Fees';
+  bool get canCollectFees => true;
+  bool get canViewStudents => true;
+  List<StudentInfo> get allStudents => List.unmodifiable(_mockStudents);
 
   void switchBranch(String branchId) {
     if (branches.any((b) => b.id == branchId) || branchId == 'all') {
@@ -272,9 +275,9 @@ class LibraryService {
   }
 
   List<StudentInfo> get activeBranchStudents {
-    if (activeBranchId == 'all') return List.unmodifiable(_mockStudents);
+    if (activeBranchId == 'all' || branches.length <= 1) return List.unmodifiable(_mockStudents);
     return List.unmodifiable(_mockStudents.where(
-      (s) => s.branchId == activeBranchId || (activeBranchId == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1')),
+      (s) => s.branchId == activeBranchId || s.branchId.isEmpty || (activeBranchId == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1')),
     ));
   }
 
@@ -332,7 +335,7 @@ class LibraryService {
       (index) => SeatInfo(seatNumber: index + 1),
     );
     final branchStudents = _mockStudents.where(
-      (s) => (s.branchId == activeBranchId || (activeBranchId == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1')) || activeBranchId == 'all'),
+      (s) => (branches.length <= 1 || s.branchId == activeBranchId || s.branchId.isEmpty || (activeBranchId == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1')) || activeBranchId == 'all'),
     ).toList();
     for (int seatNum = 1; seatNum <= seatCount; seatNum++) {
       final occupants = branchStudents.where(
@@ -1017,7 +1020,7 @@ class LibraryService {
     if (seatNum <= 0) return false;
     final targetBranch = branchId ?? activeBranchId;
     final activeOccupants = _mockStudents.where(
-      (s) => (targetBranch == 'all' || s.branchId == targetBranch || (targetBranch == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1'))) &&
+      (s) => (branches.length <= 1 || targetBranch == 'all' || s.branchId == targetBranch || s.branchId.isEmpty || (targetBranch == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1'))) &&
           s.seatNumber == seatNum && s.status != 'INACTIVE' && (excludeStudentId == null || s.id != excludeStudentId),
     ).toList();
     if (activeOccupants.isEmpty) return false;
@@ -1035,7 +1038,7 @@ class LibraryService {
     ensureInitialized();
     final targetBranch = branchId ?? activeBranchId;
     final activeOccupants = _mockStudents.where(
-      (s) => (targetBranch == 'all' || s.branchId == targetBranch || (targetBranch == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1'))) &&
+      (s) => (branches.length <= 1 || targetBranch == 'all' || s.branchId == targetBranch || s.branchId.isEmpty || (targetBranch == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1'))) &&
           s.seatNumber == seatNum && s.status != 'INACTIVE',
     ).toList();
     if (activeOccupants.isEmpty) return null;
@@ -1064,68 +1067,67 @@ class LibraryService {
   List<ExpenseItem> get currentExpenses => List.unmodifiable(_mockExpenses);
   List<RegistrationRequest> get currentRegistrationRequests => List.unmodifiable(_mockRegistrationRequests);
 
-  Stream<List<RegistrationRequest>> streamRegistrationRequests() {
-    if (isFirebaseConnected) {
-      return _tenantCol('registration_requests')
-          .orderBy('created_at', descending: true)
-          .snapshots()
-          .map((snap) {
-        final list = snap.docs
-            .map((d) => RegistrationRequest.fromMap({'id': d.id, ...d.data()}))
-            .toList();
-        _mockRegistrationRequests.clear();
-        _mockRegistrationRequests.addAll(list);
+  Stream<List<RegistrationRequest>> streamRegistrationRequests() async* {
+    ensureInitialized();
+    yield List.unmodifiable(_mockRegistrationRequests);
+    if (isCloudSyncActive) {
+      try {
+        final cloudStream = _tenantCol('registration_requests')
+            .orderBy('created_at', descending: true)
+            .snapshots()
+            .map((snap) {
+          final list = snap.docs
+              .map((d) => RegistrationRequest.fromMap({'id': d.id, ...d.data()}))
+              .toList();
+          _mockRegistrationRequests.clear();
+          _mockRegistrationRequests.addAll(list);
 
-        // Seamlessly sync pending QR admissions into the in-memory student directory
-        bool studentsUpdated = false;
-        for (final req in list) {
-          if (req.status == 'PENDING') {
-            final studentId = 'st_qr_${req.id}';
-            final alreadyPresent = _mockStudents.any(
-              (s) => s.id == studentId || (s.phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(req.phone)),
-            );
-            if (!alreadyPresent) {
-              final dateStr = DateFormat('dd-MMM-yyyy').format(req.createdAt);
-              _mockStudents.insert(0, StudentInfo(
-                id: studentId,
-                name: req.studentName,
-                phone: req.phone,
-                shift: req.shift,
-                seatNumber: null,
-                joinedAt: req.createdAt,
-                duesAmount: 0,
-                monthlyFee: req.preferredMonthlyFee ?? 0,
-                status: 'UNALLOCATED',
-                fatherName: req.fatherName,
-                address: req.address,
-                aadhaarNumber: req.aadhaarNumber,
-                preparationFor: req.preparationFor,
-                gender: req.gender,
-                photoBase64: req.photoBase64,
-                note: 'Registered via QR Admission Portal on $dateStr. Pending seat allotment.',
-              ));
-              studentsUpdated = true;
+          // Seamlessly sync pending QR admissions into the in-memory student directory
+          bool studentsUpdated = false;
+          for (final req in list) {
+            if (req.status == 'PENDING') {
+              final studentId = 'st_qr_${req.id}';
+              final alreadyPresent = _mockStudents.any(
+                (s) => s.id == studentId || (s.phone.isNotEmpty && normalizePhone(s.phone) == normalizePhone(req.phone)),
+              );
+              if (!alreadyPresent) {
+                final dateStr = DateFormat('dd-MMM-yyyy').format(req.createdAt);
+                _mockStudents.insert(0, StudentInfo(
+                  id: studentId,
+                  name: req.studentName,
+                  phone: req.phone,
+                  shift: req.shift,
+                  seatNumber: null,
+                  joinedAt: req.createdAt,
+                  duesAmount: 0,
+                  monthlyFee: req.preferredMonthlyFee ?? 0,
+                  status: 'UNALLOCATED',
+                  fatherName: req.fatherName,
+                  address: req.address,
+                  aadhaarNumber: req.aadhaarNumber,
+                  preparationFor: req.preparationFor,
+                  gender: req.gender,
+                  photoBase64: req.photoBase64,
+                  note: 'Registered via QR Admission Portal on $dateStr. Pending seat allotment.',
+                ));
+                studentsUpdated = true;
+              }
             }
           }
-        }
-        if (studentsUpdated) {
-          _syncSeatsWithStudents();
-          if (!_mockStudentsController.isClosed) {
-            _mockStudentsController.add(List.unmodifiable(_mockStudents));
+          if (studentsUpdated) {
+            _syncSeatsWithStudents();
+            if (!_mockStudentsController.isClosed) {
+              _mockStudentsController.add(List.unmodifiable(_mockStudents));
+            }
           }
-        }
 
-        return list;
-      });
-    } else {
-      ensureInitialized();
-      Future.microtask(() {
-        if (!_mockRegistrationRequestsController.isClosed) {
-          _mockRegistrationRequestsController.add(List.unmodifiable(_mockRegistrationRequests));
-        }
-      });
-      return _mockRegistrationRequestsController.stream;
+          return list;
+        }).handleError((_) => List.unmodifiable(_mockRegistrationRequests));
+        yield* cloudStream;
+        return;
+      } catch (_) {}
     }
+    yield* _mockRegistrationRequestsController.stream;
   }
 
   void notifyRegistrationRequestsChanged() {
@@ -1439,8 +1441,26 @@ class LibraryService {
   String currentUserRole = 'Admin'; // 'Admin' or 'Receptionist'
   bool isAuthenticated = false;
 
+  static String normalizeRole(String raw) {
+    final lower = raw.trim().toLowerCase();
+    if (lower.contains('admin')) return 'Admin';
+    if (lower.contains('reception')) return 'Receptionist';
+    if (lower.contains('account') || lower.contains('fee')) return 'Accountant & Fees';
+    if (lower.contains('shift')) return 'Shift Manager';
+    if (lower.contains('night')) return 'Night Supervisor';
+    if (lower.contains('assist') || lower.contains('branch')) return 'Branch Assistant';
+    return raw.trim();
+  }
+
   bool get isAdmin => currentUserRole == 'Admin';
   bool get isReceptionist => currentUserRole == 'Receptionist';
+  bool get isStaff => !isAdmin;
+  bool get isBranchAssistant => currentUserRole == 'Branch Assistant';
+  bool get isShiftManager => currentUserRole == 'Shift Manager';
+  bool get isAccountant => currentUserRole == 'Accountant & Fees';
+  bool get isNightSupervisor => currentUserRole == 'Night Supervisor';
+
+  bool get isCloudSyncActive => isFirebaseConnected && FirebaseAuth.instance.currentUser != null;
 
   Future<void> restoreSession() async {
     final sessionStr = await LocalStorageService.getString('app_active_session');
@@ -1518,13 +1538,21 @@ class LibraryService {
           );
         }
       } on FirebaseAuthException catch (e) {
-        String msg = 'Authentication failed: ${e.message ?? e.code}';
-        if (e.code == 'user-not-found') msg = 'No account found with this email.';
-        if (e.code == 'wrong-password' || e.code == 'invalid-credential') msg = 'Incorrect password. Please verify and retry.';
-        if (e.code == 'invalid-email') msg = 'The email address is badly formatted.';
-        if (e.code == 'user-disabled') msg = 'This user account has been disabled.';
-        if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
-        return AuthResult(success: false, message: msg);
+        // If account is not in Firebase Auth, fall through if registered in local staffList or local admin
+        final normPhone = normalizePhone(cleanId);
+        final hasStaffMatch = staffList.any((s) =>
+            (s.email != null && s.email!.toLowerCase() == cleanId.toLowerCase()) ||
+            normalizePhone(s.phone) == normPhone ||
+            s.id == cleanId);
+        if (!hasStaffMatch && !isAdminMatch) {
+          String msg = 'Authentication failed: ${e.message ?? e.code}';
+          if (e.code == 'user-not-found') msg = 'No account found with this email.';
+          if (e.code == 'wrong-password' || e.code == 'invalid-credential') msg = 'Incorrect password. Please verify and retry.';
+          if (e.code == 'invalid-email') msg = 'The email address is badly formatted.';
+          if (e.code == 'user-disabled') msg = 'This user account has been disabled.';
+          if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
+          return AuthResult(success: false, message: msg);
+        }
       } catch (_) {}
     }
 
@@ -1553,8 +1581,11 @@ class LibraryService {
             'email': currentUserEmail,
             'role': currentUserRole,
             'name': currentUserName,
+            'branch_id': activeBranchId,
+            'library_id': profile.libraryId.isNotEmpty ? profile.libraryId : tenantId,
           }),
         );
+        notifyStreamControllers();
         if (cleanId.isNotEmpty) {
           await LocalStorageService.saveString('app_last_login_identifier', cleanId);
         }
@@ -1596,21 +1627,20 @@ class LibraryService {
         currentUserName = staff.name;
         currentUserEmail = staff.email ?? '${staff.phone}@staff.local';
         final rawRole = staff.role.trim();
-        if (rawRole.toLowerCase().contains('admin')) {
-          currentUserRole = 'Admin';
-        } else if (rawRole.toLowerCase().contains('receptionist')) {
-          currentUserRole = 'Receptionist';
-        } else {
-          currentUserRole = rawRole;
-        }
+        currentUserRole = normalizeRole(rawRole);
         isAuthenticated = true;
         if (staff.branchId.isNotEmpty && branches.any((b) => b.id == staff.branchId)) {
           activeBranchId = staff.branchId;
           final b = currentBranch;
           profile.libraryName = b.name;
           profile.city = b.address;
-          _syncSeatsWithStudents();
+        } else if (branches.isNotEmpty) {
+          activeBranchId = branches.first.id;
+          final b = currentBranch;
+          profile.libraryName = b.name;
+          profile.city = b.address;
         }
+        _syncSeatsWithStudents();
         await LocalStorageService.saveString(
           'app_active_session',
           json.encode({
@@ -1619,8 +1649,10 @@ class LibraryService {
             'role': currentUserRole,
             'name': currentUserName,
             'branch_id': activeBranchId,
+            'library_id': profile.libraryId.isNotEmpty ? profile.libraryId : tenantId,
           }),
         );
+        notifyStreamControllers();
         return AuthResult(
           success: true,
           role: currentUserRole,
@@ -2149,83 +2181,86 @@ class LibraryService {
   }
 
   // Real-time seat stream (Cloud Firestore or In-Memory Demo)
-  Stream<List<SeatInfo>> streamSeats() {
+  Stream<List<SeatInfo>> streamSeats() async* {
     ensureInitialized();
-    if (isFirebaseConnected) {
-      return _tenantCol('seats').snapshots().map((snapshot) {
-        final seatMap = <int, SeatInfo>{};
-        for (var doc in snapshot.docs) {
-          final data = doc.data();
-          final seatNum = (data['seat_number'] as num?)?.toInt();
-          if (seatNum != null) {
-            seatMap[seatNum] = SeatInfo.fromMap(seatNum, data);
+    yield List.unmodifiable(_mockSeats);
+    if (isCloudSyncActive) {
+      try {
+        final cloudStream = _tenantCol('seats').snapshots().map((snapshot) {
+          final seatMap = <int, SeatInfo>{};
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+            final seatNum = (data['seat_number'] as num?)?.toInt();
+            if (seatNum != null) {
+              seatMap[seatNum] = SeatInfo.fromMap(seatNum, data);
+            }
           }
-        }
-        return List.generate(totalSeatsCount, (index) {
-          final num = index + 1;
-          return seatMap[num] ?? SeatInfo(seatNumber: num);
-        });
-      });
-    } else {
-      Timer.run(() {
-        if (!_mockSeatsController.isClosed) {
-          _mockSeatsController.add(List.unmodifiable(_mockSeats));
-        }
-      });
-      return _mockSeatsController.stream;
+          final list = List.generate(totalSeatsCount, (index) {
+            final num = index + 1;
+            return seatMap[num] ?? SeatInfo(seatNumber: num);
+          });
+          _mockSeats = list;
+          return list;
+        }).handleError((_) => List.unmodifiable(_mockSeats));
+        yield* cloudStream;
+        return;
+      } catch (_) {}
     }
+    yield* _mockSeatsController.stream;
   }
 
   // Real-time student list stream
-  Stream<List<StudentInfo>> streamStudents() {
+  Stream<List<StudentInfo>> streamStudents() async* {
     ensureInitialized();
-    if (isFirebaseConnected) {
-      return _tenantCol('students')
-          .orderBy('joined_at', descending: true)
-          .snapshots()
-          .map((snapshot) {
-        final list = snapshot.docs
-            .map((d) => StudentInfo.fromFirestore(d.id, d.data()))
-            .toList();
-        _mockStudents.clear();
-        _mockStudents.addAll(list);
-        _syncSeatsWithStudents();
-        return list;
-      });
-    } else {
-      Timer.run(() {
-        if (!_mockStudentsController.isClosed) {
-          _mockStudentsController.add(List.unmodifiable(_mockStudents));
-        }
-      });
-      return _mockStudentsController.stream;
+    yield List.unmodifiable(_mockStudents);
+    if (isCloudSyncActive) {
+      try {
+        final cloudStream = _tenantCol('students')
+            .orderBy('joined_at', descending: true)
+            .snapshots()
+            .map((snapshot) {
+          final list = snapshot.docs
+              .map((d) => StudentInfo.fromFirestore(d.id, d.data()))
+              .toList();
+          _mockStudents.clear();
+          _mockStudents.addAll(list);
+          _syncSeatsWithStudents();
+          _saveLocalState();
+          return list;
+        }).handleError((_) => List.unmodifiable(_mockStudents));
+        yield* cloudStream;
+        return;
+      } catch (_) {}
     }
+    yield* _mockStudentsController.stream;
   }
 
   // Real-time expenses stream with optional limit
-  Stream<List<ExpenseItem>> streamExpenses({int? limit}) {
+  Stream<List<ExpenseItem>> streamExpenses({int? limit}) async* {
     ensureInitialized();
-    if (isFirebaseConnected) {
-      var query = _tenantCol('expenses').orderBy('date', descending: true);
-      if (limit != null && limit > 0) {
-        query = query.limit(limit);
-      }
-      return query.snapshots().map((snapshot) {
-        return snapshot.docs
-            .map((d) => ExpenseItem.fromFirestore(d.id, d.data()))
-            .toList();
-      });
-    } else {
-      Timer.run(() {
-        if (!_mockExpensesController.isClosed) {
-          final items = (limit != null && limit > 0)
-              ? _mockExpenses.take(limit).toList()
-              : _mockExpenses;
-          _mockExpensesController.add(List.unmodifiable(items));
+    final localList = (limit != null && limit > 0)
+        ? _mockExpenses.take(limit).toList()
+        : _mockExpenses;
+    yield List.unmodifiable(localList);
+    if (isCloudSyncActive) {
+      try {
+        var query = _tenantCol('expenses').orderBy('date', descending: true);
+        if (limit != null && limit > 0) {
+          query = query.limit(limit);
         }
-      });
-      return _mockExpensesController.stream;
+        final cloudStream = query.snapshots().map((snapshot) {
+          final list = snapshot.docs
+              .map((d) => ExpenseItem.fromFirestore(d.id, d.data()))
+              .toList();
+          _mockExpenses.clear();
+          _mockExpenses.addAll(list);
+          return list;
+        }).handleError((_) => List.unmodifiable(localList));
+        yield* cloudStream;
+        return;
+      } catch (_) {}
     }
+    yield* _mockExpensesController.stream;
   }
 
   // Add Expense
@@ -2241,33 +2276,33 @@ class LibraryService {
     ensureInitialized();
     final effectiveBranchId = branchId ?? (activeBranchId == 'all' ? 'branch_1' : activeBranchId);
     final expId = 'exp_${DateTime.now().millisecondsSinceEpoch}';
-    if (isFirebaseConnected) {
-      await _tenantCol('expenses').doc(expId).set({
-        'id': expId,
-        'title': title,
-        'category': category,
-        'amount': amount,
-        'date': Timestamp.fromDate(date),
-        'payment_mode': paymentMode,
-        'note': note,
-        'branch_id': effectiveBranchId,
-      });
-    } else {
-      _mockExpenses.insert(
-        0,
-        ExpenseItem(
-          id: expId,
-          title: title,
-          category: category,
-          amount: amount,
-          date: date,
-          paymentMode: paymentMode,
-          note: note,
-          branchId: effectiveBranchId,
-        ),
-      );
-      _mockExpensesController.add(List.unmodifiable(_mockExpenses));
-      await _saveLocalState();
+    final item = ExpenseItem(
+      id: expId,
+      title: title,
+      category: category,
+      amount: amount,
+      date: date,
+      paymentMode: paymentMode,
+      note: note,
+      branchId: effectiveBranchId,
+    );
+    _mockExpenses.insert(0, item);
+    _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+    await _saveLocalState();
+
+    if (isCloudSyncActive) {
+      try {
+        await _tenantCol('expenses').doc(expId).set({
+          'id': expId,
+          'title': title,
+          'category': category,
+          'amount': amount,
+          'date': Timestamp.fromDate(date),
+          'payment_mode': paymentMode,
+          'note': note,
+          'branch_id': effectiveBranchId,
+        });
+      } catch (_) {}
     }
   }
 
@@ -2292,25 +2327,26 @@ class LibraryService {
   }
 
   // Stream Payment Transactions with optional limit
-  Stream<List<PaymentTransaction>> streamPayments({int? limit}) {
-    if (isFirebaseConnected) {
-      var query = _tenantCol('payments').orderBy('date', descending: true);
-      if (limit != null && limit > 0) {
-        query = query.limit(limit);
-      }
-      return query.snapshots().map((snapshot) => snapshot.docs
-          .map((doc) => PaymentTransaction.fromFirestore(doc.id, doc.data()))
-          .toList());
-    } else {
-      ensureInitialized();
-      Future.microtask(() {
-        final items = (limit != null && limit > 0)
-            ? _mockPayments.take(limit).toList()
-            : _mockPayments;
-        _mockPaymentsController.add(List.unmodifiable(items));
-      });
-      return _mockPaymentsController.stream;
+  Stream<List<PaymentTransaction>> streamPayments({int? limit}) async* {
+    ensureInitialized();
+    final localList = (limit != null && limit > 0)
+        ? _mockPayments.take(limit).toList()
+        : _mockPayments;
+    yield List.unmodifiable(localList);
+    if (isCloudSyncActive) {
+      try {
+        var query = _tenantCol('payments').orderBy('date', descending: true);
+        if (limit != null && limit > 0) {
+          query = query.limit(limit);
+        }
+        final cloudStream = query.snapshots().map((snapshot) => snapshot.docs
+            .map((doc) => PaymentTransaction.fromFirestore(doc.id, doc.data()))
+            .toList()).handleError((_) => List.unmodifiable(localList));
+        yield* cloudStream;
+        return;
+      } catch (_) {}
     }
+    yield* _mockPaymentsController.stream;
   }
 
   Future<void> recordPayment({
@@ -2354,7 +2390,69 @@ class LibraryService {
       periodStr = '${DateFormat('dd-MMM-yyyy').format(approxStart)} to ${DateFormat('dd-MMM-yyyy').format(validUntil)}';
     }
 
-    if (isFirebaseConnected) {
+    // 1. Reconcile dues & activity log in local in-memory student cache
+    final matchIdx = _mockStudents.indexWhere((s) =>
+        (studentId != null && studentId.isNotEmpty && s.id == studentId) ||
+        ((studentId == null || studentId.isEmpty) &&
+            phone != null &&
+            phone.isNotEmpty &&
+            normalizePhone(s.phone) == normalizePhone(phone)));
+
+    if (matchIdx != -1) {
+      final s = _mockStudents[matchIdx];
+      final currentDues = s.effectiveDues;
+      final isDuePayment = currentDues > 0 || notes.toLowerCase().contains('due');
+      if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
+        effectiveNotes = notes.isNotEmpty
+            ? ' • Due payment for period: '
+            : 'Due payment for period: ';
+      }
+
+      final newDues = currentDues > 0 ? (currentDues - amount).clamp(0, 999999) : 0;
+      DateTime? updatedDueDate = s.feeDueDate;
+      if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
+        updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
+      }
+      final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
+      final payLog = isDuePayment
+          ? 'Due payment of ₹ collected via  on .'
+          : 'Payment of ₹ collected via  on .';
+      final updatedNote = appendNote(s.note, payLog);
+
+      _mockStudents[matchIdx] = s.copyWith(
+        duesAmount: newDues,
+        status: newDues == 0 ? 'ACTIVE' : 'DUES',
+        feeDueDate: updatedDueDate,
+        note: updatedNote,
+      );
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    }
+
+    _mockPayments.insert(
+      0,
+      PaymentTransaction(
+        id: paymentId,
+        studentId: studentId ?? '',
+        studentName: studentName,
+        studentPhone: phone ?? '',
+        seatNumber: seatNumber,
+        shift: shift,
+        amount: amount,
+        date: payDate,
+        paymentMode: paymentMode,
+        notes: effectiveNotes,
+        validFrom: validFrom,
+        validUntil: validUntil,
+        durationMonths: durationMonths,
+        branchId: targetBranch,
+      ),
+    );
+    _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+    _syncSeatsWithStudents();
+    await _saveLocalState();
+
+    // 2. Cloud Firestore synchronization (Active only when authenticated with Firebase cloud)
+    if (isCloudSyncActive) {
       if (studentId != null && studentId.isNotEmpty) {
         try {
           final studentDoc = await _tenantCol('students').doc(studentId).get();
@@ -2366,18 +2464,12 @@ class LibraryService {
             if (dueDateRaw is Timestamp) currentDueDate = dueDateRaw.toDate();
 
             final isDuePayment = curDues > 0 || notes.toLowerCase().contains('due');
-            if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
-              effectiveNotes = notes.isNotEmpty
-                  ? '$notes • Due payment for period: $periodStr'
-                  : 'Due payment for period: $periodStr';
-            }
-
             final newDues = curDues > 0 ? (curDues - amount).clamp(0, 999999) : 0;
             final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
             final curNote = (data['note'] as String?) ?? '';
             final payLog = isDuePayment
-                ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
-                : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
+                ? 'Due payment of ₹ collected via  on .'
+                : 'Payment of ₹ collected via  on .';
             final updatedNote = appendNote(curNote, payLog);
 
             final updates = <String, dynamic>{
@@ -2393,83 +2485,24 @@ class LibraryService {
         } catch (_) {}
       }
 
-      await _tenantCol('payments').doc(paymentId).set({
-        'payment_id': paymentId,
-        'student_id': studentId ?? '',
-        'student_name': studentName,
-        'student_phone': phone ?? '',
-        'seat_number': seatNumber,
-        'shift': shift,
-        'amount': amount,
-        'date': Timestamp.fromDate(payDate),
-        'payment_mode': paymentMode,
-        'notes': effectiveNotes,
-        'branch_id': targetBranch,
-        if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom),
-        if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil),
-        if (durationMonths != null) 'duration_months': durationMonths,
-      });
-    } else {
-      // Reconcile dues & activity log in student if registered
-      final matchIdx = _mockStudents.indexWhere((s) =>
-          (studentId != null && studentId.isNotEmpty && s.id == studentId) ||
-          ((studentId == null || studentId.isEmpty) &&
-              phone != null &&
-              phone.isNotEmpty &&
-              normalizePhone(s.phone) == normalizePhone(phone)));
-
-      if (matchIdx != -1) {
-        final s = _mockStudents[matchIdx];
-        final currentDues = s.effectiveDues;
-        final isDuePayment = currentDues > 0 || notes.toLowerCase().contains('due');
-        if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
-          effectiveNotes = notes.isNotEmpty
-              ? '$notes • Due payment for period: $periodStr'
-              : 'Due payment for period: $periodStr';
-        }
-
-        final newDues = currentDues > 0 ? (currentDues - amount).clamp(0, 999999) : 0;
-        DateTime? updatedDueDate = s.feeDueDate;
-        if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
-          updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
-        }
-        final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
-        final payLog = isDuePayment
-            ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
-            : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
-        final updatedNote = appendNote(s.note, payLog);
-
-        _mockStudents[matchIdx] = s.copyWith(
-          duesAmount: newDues,
-          status: newDues == 0 ? 'ACTIVE' : 'DUES',
-          feeDueDate: updatedDueDate,
-          note: updatedNote,
-        );
-        _mockStudentsController.add(List.unmodifiable(_mockStudents));
-      }
-
-      _mockPayments.insert(
-        0,
-        PaymentTransaction(
-          id: paymentId,
-          studentId: studentId ?? '',
-          studentName: studentName,
-          studentPhone: phone ?? '',
-          seatNumber: seatNumber,
-          shift: shift,
-          amount: amount,
-          date: payDate,
-          paymentMode: paymentMode,
-          notes: effectiveNotes,
-          validFrom: validFrom,
-          validUntil: validUntil,
-          durationMonths: durationMonths,
-          branchId: targetBranch,
-        ),
-      );
-      _mockPaymentsController.add(List.unmodifiable(_mockPayments));
-
-      await _saveLocalState();
+      try {
+        await _tenantCol('payments').doc(paymentId).set({
+          'payment_id': paymentId,
+          'student_id': studentId ?? '',
+          'student_name': studentName,
+          'student_phone': phone ?? '',
+          'seat_number': seatNumber,
+          'shift': shift,
+          'amount': amount,
+          'date': Timestamp.fromDate(payDate),
+          'payment_mode': paymentMode,
+          'notes': effectiveNotes,
+          'branch_id': targetBranch,
+          if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom),
+          if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil),
+          if (durationMonths != null) 'duration_months': durationMonths,
+        });
+      } catch (_) {}
     }
   }
 
@@ -2965,162 +2998,152 @@ class LibraryService {
       }
     }
 
-    if (isFirebaseConnected) {
-      final studentDocRef = (studentId != null && studentId.isNotEmpty)
-          ? _tenantCol('students').doc(studentId)
-          : _tenantCol('students').doc();
-      final paymentDocRef = _tenantCol('payments').doc();
+    // 1. In-memory local registration (Always executes immediately for responsive, offline-first operation)
+    final effectiveStudentId = (studentId != null && studentId.isNotEmpty)
+        ? studentId
+        : 'std_${DateTime.now().millisecondsSinceEpoch}_${++_uniqueIdCounter}';
 
-      await _db.runTransaction((transaction) async {
-        if (seatNumber != null) {
-          final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
-          final seatSnapshot = await transaction.get(seatDocRef);
-
-          if (seatSnapshot.exists) {
-            final data = seatSnapshot.data();
-            if (data != null && data['is_occupied'] == true) {
-              throw Exception('Seat $seatNumber is already occupied!');
-            }
-          }
-
-          transaction.set(
-            seatDocRef,
-            {
-              'seat_number': seatNumber,
-              'is_occupied': true,
-              'student_id': studentDocRef.id,
-              'student_name': studentName,
-              'shift': shift,
-              'last_updated_by': deviceUserId,
-            },
-            SetOptions(merge: true),
-          );
-        }
-
-        // 1. Create Student record
-        final dateStr = DateFormat('dd-MMM-yyyy').format(effectiveJoiningDate);
-        final seatStr = seatNumber != null ? 'S-$seatNumber' : 'Unallocated';
-        final admitLog = 'Admission on $dateStr: Shift $shift (Seat $seatStr, ₹$effectiveMonthly/mo)${feeAmount > 0 ? ", Initial fee ₹$feeAmount paid via $paymentMode" : ""}${duesAmount > 0 ? ", Pending dues ₹$duesAmount" : ""}.';
-        final effectiveNote = appendNote(note, admitLog);
-
-        transaction.set(studentDocRef, {
-          'id': studentDocRef.id,
-          'name': studentName,
-          'phone': phone,
-          'seat_number': seatNumber,
-          'shift': shift,
-          'fee_due_date': Timestamp.fromDate(effectiveValidUntil),
-          'status': status,
-          'joined_at': Timestamp.fromDate(now),
-          'monthly_fee': effectiveMonthly,
-          'payment_mode': paymentMode,
-          'note': effectiveNote,
-          'dues_amount': duesAmount,
-          'advance_amount': advanceAmount,
-          'father_name': fatherName,
-          'address': address,
-          'aadhaar_number': aadhaarNumber,
-          'preparation_for': preparationFor,
-          'gender': gender,
-          'photo_base64': photoBase64,
-          'branch_id': targetBranch,
-        });
-
-        // 2. Log payment if not trial and fee > 0
-        if (status != 'TRIAL' && feeAmount > 0) {
-          transaction.set(paymentDocRef, {
-            'payment_id': paymentDocRef.id,
-            'student_id': studentDocRef.id,
-            'student_name': studentName,
-            'student_phone': phone,
-            'seat_number': seatNumber,
-            'shift': shift,
-            'amount': feeAmount,
-            'date': Timestamp.fromDate(payDate),
-            'valid_until': Timestamp.fromDate(effectiveValidUntil),
-            'collected_by': deviceUserId,
-            'payment_mode': paymentMode,
-            'notes': durationMonths > 1
-                ? '$durationMonths Months Advance Fees'
-                : 'Initial registration fee',
-            'branch_id': targetBranch,
-          });
-        }
-      });
-    } else {
-      // In-memory mock assignment
-      final effectiveStudentId = (studentId != null && studentId.isNotEmpty)
-          ? studentId
-          : 'std_${DateTime.now().millisecondsSinceEpoch}_${++_uniqueIdCounter}';
-      if (seatNumber != null) {
-        // Unassign seat only from previous occupants who have conflicting shifts
-        for (int i = 0; i < _mockStudents.length; i++) {
-          if (_mockStudents[i].seatNumber == seatNumber &&
-              doShiftsConflict(_mockStudents[i].shift, shift, allShifts: shifts)) {
-            _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null, clearSeatNumber: true);
-          }
+    if (seatNumber != null) {
+      // Unassign seat only from previous occupants who have conflicting shifts
+      for (int i = 0; i < _mockStudents.length; i++) {
+        if (_mockStudents[i].seatNumber == seatNumber &&
+            doShiftsConflict(_mockStudents[i].shift, shift, allShifts: shifts)) {
+          _mockStudents[i] = _mockStudents[i].copyWith(seatNumber: null, clearSeatNumber: true);
         }
       }
+    }
 
-      final dateStr = DateFormat('dd-MMM-yyyy').format(effectiveJoiningDate);
-      final seatStr = seatNumber != null ? 'S-$seatNumber' : 'Unallocated';
-      final admitLog = 'Admission on $dateStr: Shift $shift (Seat $seatStr, ₹$effectiveMonthly/mo)${feeAmount > 0 ? ", Initial fee ₹$feeAmount paid via $paymentMode" : ""}${duesAmount > 0 ? ", Pending dues ₹$duesAmount" : ""}.';
-      final effectiveNote = appendNote(note, admitLog);
+    final dateStr = DateFormat('dd-MMM-yyyy').format(effectiveJoiningDate);
+    final seatStr = seatNumber != null ? 'S-$seatNumber' : 'Unallocated';
+    final admitLog = 'Admission on $dateStr: Shift $shift (Seat $seatStr, ₹$effectiveMonthly/mo)${feeAmount > 0 ? ", Initial fee ₹$feeAmount paid via $paymentMode" : ""}${duesAmount > 0 ? ", Pending dues ₹$duesAmount" : ""}.';
+    final effectiveNote = appendNote(note, admitLog);
 
-      _mockStudents.insert(
+    _mockStudents.insert(
+      0,
+      StudentInfo(
+        id: effectiveStudentId,
+        name: studentName,
+        phone: phone,
+        seatNumber: seatNumber,
+        shift: shift,
+        status: status,
+        feeDueDate: effectiveValidUntil,
+        joinedAt: now,
+        monthlyFee: effectiveMonthly,
+        paymentMode: paymentMode,
+        note: effectiveNote,
+        duesAmount: duesAmount,
+        advanceAmount: advanceAmount,
+        fatherName: fatherName,
+        address: address,
+        aadhaarNumber: aadhaarNumber,
+        preparationFor: preparationFor,
+        gender: gender,
+        photoBase64: photoBase64,
+        branchId: targetBranch,
+      ),
+    );
+
+    String? createdPaymentId;
+    if (status != 'TRIAL' && feeAmount > 0) {
+      createdPaymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
+      _mockPayments.insert(
         0,
-        StudentInfo(
-          id: effectiveStudentId,
-          name: studentName,
-          phone: phone,
+        PaymentTransaction(
+          id: createdPaymentId,
+          studentId: effectiveStudentId,
+          studentName: studentName,
+          studentPhone: phone,
           seatNumber: seatNumber,
           shift: shift,
-          status: status,
-          feeDueDate: effectiveValidUntil,
-          joinedAt: now,
-          monthlyFee: effectiveMonthly,
+          amount: feeAmount,
+          date: payDate,
           paymentMode: paymentMode,
-          note: effectiveNote,
-          duesAmount: duesAmount,
-          advanceAmount: advanceAmount,
-          fatherName: fatherName,
-          address: address,
-          aadhaarNumber: aadhaarNumber,
-          preparationFor: preparationFor,
-          gender: gender,
-          photoBase64: photoBase64,
+          notes: durationMonths > 1
+              ? '$durationMonths Months Advance Fees'
+              : 'Initial registration fee',
+          validFrom: effectiveJoiningDate,
+          validUntil: effectiveValidUntil,
+          durationMonths: durationMonths,
           branchId: targetBranch,
         ),
       );
+      _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+    }
 
-      if (status != 'TRIAL' && feeAmount > 0) {
-        _mockPayments.insert(
-          0,
-          PaymentTransaction(
-            id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
-            studentId: effectiveStudentId,
-            studentName: studentName,
-            studentPhone: phone,
-            seatNumber: seatNumber,
-            shift: shift,
-            amount: feeAmount,
-            date: payDate,
-            paymentMode: paymentMode,
-            notes: durationMonths > 1
-                ? '$durationMonths Months Advance Fees'
-                : 'Initial registration fee',
-            validFrom: effectiveJoiningDate,
-            validUntil: effectiveValidUntil,
-            durationMonths: durationMonths,
-            branchId: targetBranch,
-          ),
-        );
-        _mockPaymentsController.add(List.unmodifiable(_mockPayments));
-      }
+    _syncSeatsWithStudents();
+    _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    await _saveLocalState();
 
-      _syncSeatsWithStudents();
-      _mockStudentsController.add(List.unmodifiable(_mockStudents));
-      _saveLocalState();
+    // 2. Cloud Firestore synchronization (Active only when authenticated with Firebase cloud)
+    if (isCloudSyncActive) {
+      try {
+        final studentDocRef = _tenantCol('students').doc(effectiveStudentId);
+        final paymentDocRef = createdPaymentId != null
+            ? _tenantCol('payments').doc(createdPaymentId)
+            : _tenantCol('payments').doc();
+
+        await _db.runTransaction((transaction) async {
+          if (seatNumber != null) {
+            final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
+            transaction.set(
+              seatDocRef,
+              {
+                'seat_number': seatNumber,
+                'is_occupied': true,
+                'student_id': studentDocRef.id,
+                'student_name': studentName,
+                'shift': shift,
+                'last_updated_by': deviceUserId,
+              },
+              SetOptions(merge: true),
+            );
+          }
+
+          transaction.set(studentDocRef, {
+            'id': studentDocRef.id,
+            'name': studentName,
+            'phone': phone,
+            'seat_number': seatNumber,
+            'shift': shift,
+            'fee_due_date': Timestamp.fromDate(effectiveValidUntil),
+            'status': status,
+            'joined_at': Timestamp.fromDate(now),
+            'monthly_fee': effectiveMonthly,
+            'payment_mode': paymentMode,
+            'note': effectiveNote,
+            'dues_amount': duesAmount,
+            'advance_amount': advanceAmount,
+            'father_name': fatherName,
+            'address': address,
+            'aadhaar_number': aadhaarNumber,
+            'preparation_for': preparationFor,
+            'gender': gender,
+            'photo_base64': photoBase64,
+            'branch_id': targetBranch,
+          });
+
+          if (status != 'TRIAL' && feeAmount > 0) {
+            transaction.set(paymentDocRef, {
+              'payment_id': paymentDocRef.id,
+              'student_id': studentDocRef.id,
+              'student_name': studentName,
+              'student_phone': phone,
+              'seat_number': seatNumber,
+              'shift': shift,
+              'amount': feeAmount,
+              'date': Timestamp.fromDate(payDate),
+              'valid_until': Timestamp.fromDate(effectiveValidUntil),
+              'collected_by': deviceUserId,
+              'payment_mode': paymentMode,
+              'notes': durationMonths > 1
+                  ? '$durationMonths Months Advance Fees'
+                  : 'Initial registration fee',
+              'branch_id': targetBranch,
+            });
+          }
+        });
+      } catch (_) {}
     }
   }
 
@@ -3131,68 +3154,68 @@ class LibraryService {
     final dateStr = DateFormat('dd-MMM-yyyy').format(now);
     final vacateLog = 'Seat unassigned / vacated from S-$seatNumber on $dateStr.';
 
-    if (isFirebaseConnected) {
-      final batch = _db.batch();
+    if (studentId != null && studentId.isNotEmpty) {
+      final studentIndex =
+          _mockStudents.indexWhere((s) => s.id == studentId);
+      if (studentIndex != -1) {
+        final s = _mockStudents[studentIndex];
+        final updatedNote = appendNote(s.note, vacateLog);
+        _mockStudents[studentIndex] = s.copyWith(
+          seatNumber: null,
+          clearSeatNumber: true,
+          note: updatedNote,
+        );
+      }
+    }
 
-      if (studentId != null && studentId.trim().isNotEmpty) {
-        final sId = studentId.trim();
-        final studentDocRef = _tenantCol('students').doc(sId);
-        try {
-          final snap = await studentDocRef.get();
-          if (snap.exists) {
-            final curNote = (snap.data()?['note'] as String?) ?? '';
-            final updatedNote = appendNote(curNote, vacateLog);
-            batch.update(studentDocRef, {
-              'seat_number': null,
-              'note': updatedNote,
-            });
+    _syncSeatsWithStudents();
+    _mockStudentsController.add(List.unmodifiable(_mockStudents));
+    _saveLocalState();
+
+    if (isCloudSyncActive) {
+      try {
+        final batch = _db.batch();
+        if (studentId != null && studentId.trim().isNotEmpty) {
+          final sId = studentId.trim();
+          final studentDocRef = _tenantCol('students').doc(sId);
+          try {
+            final snap = await studentDocRef.get();
+            if (snap.exists) {
+              final curNote = (snap.data()?['note'] as String?) ?? '';
+              final updatedNote = appendNote(curNote, vacateLog);
+              batch.update(studentDocRef, {
+                'seat_number': null,
+                'note': updatedNote,
+              });
+            }
+          } catch (_) {
+            batch.update(studentDocRef, {'seat_number': null});
           }
-        } catch (_) {
-          batch.update(studentDocRef, {'seat_number': null});
         }
-      }
 
-      final otherStudents = _mockStudents.where(
-        (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
-      ).toList();
+        final otherStudents = _mockStudents.where(
+          (s) => s.seatNumber == seatNumber && s.id != studentId && s.status != 'INACTIVE',
+        ).toList();
 
-      final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
-      if (otherStudents.isNotEmpty) {
-        final remaining = otherStudents.first;
-        batch.update(seatDocRef, {
-          'is_occupied': true,
-          'student_id': remaining.id,
-          'student_name': remaining.name,
-          'shift': remaining.shift,
-        });
-      } else {
-        batch.update(seatDocRef, {
-          'is_occupied': false,
-          'student_id': null,
-          'student_name': null,
-          'shift': null,
-        });
-      }
-
-      await batch.commit();
-    } else {
-      if (studentId != null && studentId.isNotEmpty) {
-        final studentIndex =
-            _mockStudents.indexWhere((s) => s.id == studentId);
-        if (studentIndex != -1) {
-          final s = _mockStudents[studentIndex];
-          final updatedNote = appendNote(s.note, vacateLog);
-          _mockStudents[studentIndex] = s.copyWith(
-            seatNumber: null,
-            clearSeatNumber: true,
-            note: updatedNote,
-          );
+        final seatDocRef = _tenantCol('seats').doc('seat_$seatNumber');
+        if (otherStudents.isNotEmpty) {
+          final remaining = otherStudents.first;
+          batch.update(seatDocRef, {
+            'is_occupied': true,
+            'student_id': remaining.id,
+            'student_name': remaining.name,
+            'shift': remaining.shift,
+          });
+        } else {
+          batch.update(seatDocRef, {
+            'is_occupied': false,
+            'student_id': null,
+            'student_name': null,
+            'shift': null,
+          });
         }
-      }
-
-      _syncSeatsWithStudents();
-      _mockStudentsController.add(List.unmodifiable(_mockStudents));
-      _saveLocalState();
+        await batch.commit();
+      } catch (_) {}
     }
   }
 

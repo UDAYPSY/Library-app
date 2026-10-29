@@ -950,6 +950,13 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
         // Apply Search & Filters
         final query = _searchCtrl.text.trim().toLowerCase();
         final filteredStudents = allStudents.where((s) {
+          // Branch filter: Staff members see students belonging to their assigned branch (admins and single-campus see all)
+          if (!_service.isAdmin && _service.branches.length > 1 && _service.activeBranchId != 'all') {
+            final matchesBranch = s.branchId == _service.activeBranchId ||
+                (_service.activeBranchId == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1'));
+            if (!matchesBranch) return false;
+          }
+
           // Search filter
           if (query.isNotEmpty) {
             final matchName = s.name.toLowerCase().contains(query);

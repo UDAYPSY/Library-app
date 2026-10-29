@@ -559,6 +559,19 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           subtitle: 'Deep insights',
                           onTap: _openFinancialAnalytics,
                         ),
+                        const SizedBox(width: 12),
+                        _quickActionCard(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+                          ),
+                          icon: Icons.qr_code_scanner_rounded,
+                          title: 'Student Portal',
+                          subtitle: 'Live QR & Standee',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ShareQrScreen()),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -897,7 +910,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         icon: Icons.qr_code_2_rounded,
                         iconBg: const Color(0xFFF3E8FF),
                         iconColor: const Color(0xFF8B5CF6),
-                        label: 'QR Code',
+                        label: 'Student Portal',
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(

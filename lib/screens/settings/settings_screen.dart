@@ -2207,7 +2207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showDeleteAccountDialog() {
-    if (_service.isReceptionist) {
+    if (!_service.isAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Access Denied: Only Library Administrator can delete the account.'),
@@ -2426,7 +2426,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        isAdmin ? 'ADMIN (FULL ACCESS)' : 'RECEPTIONIST (DESK ACCESS)',
+                                        isAdmin ? 'ADMIN (FULL ACCESS)' : '${_service.currentUserRole.toUpperCase()} (DESK ACCESS)',
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w900,
@@ -2706,8 +2706,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Icons.qr_code_2_rounded,
                   iconBg: const Color(0xFFCCFBF1),
                   iconColor: const Color(0xFF0D9488),
-                  title: 'Library QR Code',
-                  subtitle: 'Real-time seat availability for students',
+                  title: 'Student Self-Service Portal & QR Standee',
+                  subtitle: 'Live seat portal, self-admission & desk poster',
                   showDivider: false,
                   onTap: () => Navigator.push(
                     context,
