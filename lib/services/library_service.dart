@@ -728,6 +728,10 @@ class LibraryService {
       ),
     ];
     activeBranchId = 'branch_1';
+    currentUserRole = 'Admin';
+    currentUserName = 'Admin';
+    currentUserId = null;
+    isAuthenticated = false;
     _mockSeats = List.generate(
       totalSeatsCount,
       (index) => SeatInfo(seatNumber: index + 1),
