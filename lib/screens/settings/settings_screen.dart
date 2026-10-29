@@ -2228,8 +2228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     final passwordCtrl = TextEditingController();
-    final isEmailAuth = FirebaseAuth.instance.currentUser?.email != null &&
-        FirebaseAuth.instance.currentUser!.email!.isNotEmpty;
+    final isEmailAuth = _service.currentUserEmail.contains('@');
 
     showDialog(
       context: context,
