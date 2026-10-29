@@ -295,6 +295,47 @@ class _RevenueScreenState extends State<RevenueScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_service.canViewRevenue) {
+      return Scaffold(
+        backgroundColor: AppColors.scaffold(context),
+        appBar: AppBar(
+          title: const Text('Payments & Revenue', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+          backgroundColor: AppColors.card(context),
+          foregroundColor: AppColors.text(context),
+          elevation: 0,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF2F2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock_rounded, size: 48, color: Color(0xFFEF4444)),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Access Restricted',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Financial revenue and payment ledgers are restricted to Library Owner and Accountant. Your role (${_service.currentUserRole}) is scoped to desk operations.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return StreamBuilder<List<PaymentTransaction>>(
       stream: _service.streamPayments(),
       initialData: _service.currentPayments,

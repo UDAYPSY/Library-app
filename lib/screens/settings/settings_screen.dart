@@ -402,6 +402,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showBranchSwitcherModal() {
+    if (!_service.canSwitchBranch) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Branch switching is locked to the Library Owner.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2604,79 +2614,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Name, email, and contact details',
                   onTap: _showEditProfileModal,
                 ),
-                _settingsTile(
-                  icon: Icons.apartment_rounded,
-                  iconBg: const Color(0xFFFFEDD5),
-                  iconColor: const Color(0xFFF97316),
-                  title: 'Branch Switcher',
-                  subtitle: 'Active: ${_service.currentBranch.name} • ${_service.branches.length} ${_service.branches.length == 1 ? "branch" : "branches"}',
-                  onTap: _showBranchSwitcherModal,
-                ),
-                _settingsTile(
-                  icon: Icons.add_business_rounded,
-                  iconBg: const Color(0xFFDCFCE7),
-                  iconColor: const Color(0xFF16A34A),
-                  title: 'Add New Library Branch',
-                  subtitle: 'Configure additional floor, hall or location',
-                  onTap: _showAddBranchDialog,
-                ),
-                _settingsTile(
-                  icon: Icons.manage_accounts_rounded,
-                  iconBg: const Color(0xFFF3E8FF),
-                  iconColor: const Color(0xFF9333EA),
-                  title: 'User Management',
-                  subtitle: 'Add or remove staff accounts',
-                  onTap: _showUserManagementModal,
-                ),
-                _settingsTile(
-                  icon: Icons.shield_outlined,
-                  iconBg: const Color(0xFFEFF6FF),
-                  iconColor: const Color(0xFF2563EB),
-                  title: 'Security & Master Password',
-                  subtitle: 'Cloud Auth UID & Admin Password change',
-                  onTap: _showSecurityModal,
-                ),
-                _settingsTile(
-                  icon: Icons.cloud_sync_rounded,
-                  iconBg: const Color(0xFFFEF3C7),
-                  iconColor: const Color(0xFFD97706),
-                  title: 'Google Drive & Cloud Recovery',
-                  subtitle: 'Auto-sync Excel snapshots & 1-click disaster recovery',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const DisasterRecoveryScreen()),
+                if (_service.canSwitchBranch)
+                  _settingsTile(
+                    icon: Icons.apartment_rounded,
+                    iconBg: const Color(0xFFFFEDD5),
+                    iconColor: const Color(0xFFF97316),
+                    title: 'Branch Switcher',
+                    subtitle: 'Active: ${_service.currentBranch.name} • ${_service.branches.length} ${_service.branches.length == 1 ? "branch" : "branches"}',
+                    onTap: _showBranchSwitcherModal,
+                  )
+                else
+                  _settingsTile(
+                    icon: Icons.apartment_rounded,
+                    iconBg: const Color(0xFFF1F5F9),
+                    iconColor: const Color(0xFF64748B),
+                    title: 'Assigned Branch',
+                    subtitle: '${_service.currentBranch.name} (Locked by Owner)',
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Branch switching is locked to the Library Owner.'),
+                          backgroundColor: Color(0xFF64748B),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
                   ),
-                ),
-                _settingsTile(
-                  icon: Icons.auto_fix_high_rounded,
-                  iconBg: const Color(0xFFFCE7F3),
-                  iconColor: const Color(0xFFEC4899),
-                  title: 'Library Branding',
-                  subtitle: 'Upload logo for invoices & receipts',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LibraryBrandingScreen()),
+                if (_service.isAdmin)
+                  _settingsTile(
+                    icon: Icons.add_business_rounded,
+                    iconBg: const Color(0xFFDCFCE7),
+                    iconColor: const Color(0xFF16A34A),
+                    title: 'Add New Library Branch',
+                    subtitle: 'Configure additional floor, hall or location',
+                    onTap: _showAddBranchDialog,
                   ),
-                ),
-                _settingsTile(
-                  icon: Icons.cloud_upload_outlined,
-                  iconBg: const Color(0xFFECFDF5),
-                  iconColor: const Color(0xFF10B981),
-                  title: 'Bulk Student Import',
-                  subtitle: 'Import multiple students via CSV',
-                  onTap: _showBulkImportModal,
-                ),
-                _settingsTile(
-                  icon: Icons.insert_chart_outlined_rounded,
-                  iconBg: const Color(0xFFCCFBF1),
-                  iconColor: const Color(0xFF0D9488),
-                  title: 'Reports & Exports',
-                  subtitle: 'Monthly reports & full data downloads',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ReportsExportsScreen()),
+                if (_service.isAdmin)
+                  _settingsTile(
+                    icon: Icons.manage_accounts_rounded,
+                    iconBg: const Color(0xFFF3E8FF),
+                    iconColor: const Color(0xFF9333EA),
+                    title: 'User Management',
+                    subtitle: 'Add or remove staff accounts',
+                    onTap: _showUserManagementModal,
                   ),
-                ),
+                if (_service.isAdmin)
+                  _settingsTile(
+                    icon: Icons.shield_outlined,
+                    iconBg: const Color(0xFFEFF6FF),
+                    iconColor: const Color(0xFF2563EB),
+                    title: 'Security & Master Password',
+                    subtitle: 'Cloud Auth UID & Admin Password change',
+                    onTap: _showSecurityModal,
+                  ),
+                if (_service.isAdmin)
+                  _settingsTile(
+                    icon: Icons.cloud_sync_rounded,
+                    iconBg: const Color(0xFFFEF3C7),
+                    iconColor: const Color(0xFFD97706),
+                    title: 'Google Drive & Cloud Recovery',
+                    subtitle: 'Auto-sync Excel snapshots & 1-click disaster recovery',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DisasterRecoveryScreen()),
+                    ),
+                  ),
+                if (_service.isAdmin)
+                  _settingsTile(
+                    icon: Icons.auto_fix_high_rounded,
+                    iconBg: const Color(0xFFFCE7F3),
+                    iconColor: const Color(0xFFEC4899),
+                    title: 'Library Branding',
+                    subtitle: 'Upload logo for invoices & receipts',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LibraryBrandingScreen()),
+                    ),
+                  ),
+                if (_service.isAdmin)
+                  _settingsTile(
+                    icon: Icons.cloud_upload_outlined,
+                    iconBg: const Color(0xFFECFDF5),
+                    iconColor: const Color(0xFF10B981),
+                    title: 'Bulk Student Import',
+                    subtitle: 'Import multiple students via CSV',
+                    onTap: _showBulkImportModal,
+                  ),
+                if (_service.canViewRevenue)
+                  _settingsTile(
+                    icon: Icons.insert_chart_outlined_rounded,
+                    iconBg: const Color(0xFFCCFBF1),
+                    iconColor: const Color(0xFF0D9488),
+                    title: 'Reports & Exports',
+                    subtitle: 'Monthly reports & full data downloads',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ReportsExportsScreen()),
+                    ),
+                  ),
                 _settingsTile(
                   icon: Icons.group_add_outlined,
                   iconBg: const Color(0xFFDCFCE7),

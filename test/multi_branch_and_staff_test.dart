@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/models/library_models.dart';
 import 'package:library_manager/services/library_service.dart';
+import 'package:library_manager/services/disaster_recovery_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -241,6 +242,114 @@ void main() {
         expect(service.canManageStaff, equals(r['canManageStaff']));
         expect(service.canSwitchBranch, equals(r['canSwitchBranch']));
       }
+    });
+
+    test('Staff login never changes Google Drive backup email and staff cannot alter backup settings', () async {
+      final recovery = DisasterRecoveryService(service: service);
+
+      // 1. Owner sets up library with owner email and Google Drive backup email
+      service.profile = LibraryProfile(
+        libraryId: 'lib_test_01',
+        libraryName: 'Apex Central',
+        adminName: 'Owner Sir',
+        adminEmail: 'owner@apexlibrary.in',
+        adminPhone: '9888888888',
+        city: 'Patna',
+      );
+      await recovery.setBackupEmail('owner.backup@gmail.com');
+      expect(await recovery.getBackupEmail(), equals('owner.backup@gmail.com'));
+
+      // 2. Owner adds Branch Assistant with staff email
+      final staff = StaffMember(
+        id: 'staff_ba_safe_01',
+        name: 'Suresh Assistant',
+        phone: '9555544444',
+        email: 'suresh.staff@gmail.com',
+        role: 'Branch Assistant',
+        pinHash: LibraryService.hashPin('pass8899'),
+        branchId: 'branch_1',
+        isActive: true,
+      );
+      service.addStaffMember(staff);
+
+      // 3. Staff logs in
+      await service.signOut();
+      final loginRes = await service.login(identifier: '9555544444', password: 'pass8899');
+      expect(loginRes.success, isTrue);
+      expect(service.isStaff, isTrue);
+      expect(service.isAdmin, isFalse);
+
+      // 4. VERIFY: Google Drive backup email MUST still be the Owner's email, NOT the staff's email!
+      final currentBackupEmail = await recovery.getBackupEmail();
+      expect(currentBackupEmail, equals('owner.backup@gmail.com'));
+      expect(currentBackupEmail, isNot(equals('suresh.staff@gmail.com')));
+
+      // 5. Staff attempts to change backup email -> MUST be rejected by ownership guard
+      await recovery.setBackupEmail('hacked_drive@gmail.com');
+      expect(await recovery.getBackupEmail(), equals('owner.backup@gmail.com'));
+
+      // 6. Staff attempts to disable auto-backup -> MUST be rejected by ownership guard
+      final beforeEnabled = await recovery.isAutoBackupEnabled();
+      await recovery.setAutoBackupEnabled(!beforeEnabled);
+      expect(await recovery.isAutoBackupEnabled(), equals(beforeEnabled));
+    });
+
+    test('Staff member cannot switch branch, add branch, or add staff', () async {
+      // 1. Setup multi-branch as Admin
+      final newBranch = const LibraryBranch(
+        id: 'branch_floor_2',
+        name: 'Floor 2 AC Hall',
+        address: 'Boring Road',
+        totalSeats: 40,
+      );
+      service.addBranch(newBranch);
+      expect(service.branches.any((b) => b.id == 'branch_floor_2'), isTrue);
+
+      // 2. Add Branch Assistant pinned to branch_1
+      final staff = StaffMember(
+        id: 'staff_ba_branch_lock',
+        name: 'Rohan Assistant',
+        phone: '9444433333',
+        role: 'Branch Assistant',
+        pinHash: LibraryService.hashPin('pass1234'),
+        branchId: 'branch_1',
+        isActive: true,
+      );
+      service.addStaffMember(staff);
+
+      // 3. Staff logs in
+      await service.signOut();
+      final loginRes = await service.login(identifier: '9444433333', password: 'pass1234');
+      expect(loginRes.success, isTrue);
+      expect(service.activeBranchId, equals('branch_1'));
+      expect(service.canSwitchBranch, isFalse);
+
+      // 4. Staff attempts to switch to branch_floor_2 -> MUST be blocked
+      service.switchBranch('branch_floor_2');
+      expect(service.activeBranchId, equals('branch_1')); // Blocked!
+
+      // 5. Staff attempts to switch to 'all' -> MUST be blocked
+      service.switchBranch('all');
+      expect(service.activeBranchId, equals('branch_1')); // Blocked!
+
+      // 6. Staff attempts to add another branch -> MUST be blocked
+      final unauthorizedBranch = const LibraryBranch(
+        id: 'branch_unauth',
+        name: 'Rogue Branch',
+        address: 'Nowhere',
+      );
+      service.addBranch(unauthorizedBranch);
+      expect(service.branches.any((b) => b.id == 'branch_unauth'), isFalse); // Blocked!
+
+      // 7. Staff attempts to add another staff member -> MUST be blocked
+      final rogueStaff = StaffMember(
+        id: 'staff_rogue',
+        name: 'Rogue Member',
+        phone: '9111111111',
+        role: 'Administrator',
+      );
+      service.addStaffMember(rogueStaff);
+      expect(service.staffList.any((s) => s.id == 'staff_rogue'), isFalse); // Blocked!
     });
   });
 }

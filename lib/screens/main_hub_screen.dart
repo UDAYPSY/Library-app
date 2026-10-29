@@ -38,6 +38,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
   String _paymentTimeFilter = 'MONTHLY';
 
   void _openFinancialAnalytics() {
+    if (!_service.canViewRevenue) {
+      setState(() => _currentTabIndex = 2); // Jump to Seats for desk staff
+      return;
+    }
     setState(() => _currentTabIndex = 4); // Jump to Analytics tab
   }
 
@@ -49,6 +53,10 @@ class _MainHubScreenState extends State<MainHubScreen> {
   }
 
   void _openRevenueScreen(String filter) {
+    if (!_service.canViewRevenue) {
+      setState(() => _currentTabIndex = 2); // Jump to Seats for desk staff
+      return;
+    }
     setState(() {
       _paymentTimeFilter = filter;
       _currentTabIndex = 3; // Jump to Payments / Revenue tab (Image 2)
@@ -404,7 +412,9 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '$activeStudents active • ₹$todayEarnings earned today',
+                                  _service.canViewRevenue
+                                      ? '$activeStudents active • ₹$todayEarnings earned today'
+                                      : '$activeStudents active • $occupiedSeats seats occupied',
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.85),
                                     fontSize: 13,
@@ -444,7 +454,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // 2x2 Metric Grid (Image 1)
+                  // 2x2 Metric Grid (Image 1) - Scoped to role
                   Row(
                     children: [
                       Expanded(
@@ -459,14 +469,23 @@ class _MainHubScreenState extends State<MainHubScreen> {
                       ),
                       const SizedBox(width: 14),
                       Expanded(
-                        child: _overviewCard(
-                          icon: Icons.calendar_today_rounded,
-                          iconBg: AppColors.todayPurpleBg,
-                          iconColor: AppColors.todayPurpleIcon,
-                          value: '₹$todayEarnings',
-                          label: 'TODAY',
-                          onTap: () => _openRevenueScreen('TODAY'),
-                        ),
+                        child: _service.canViewRevenue
+                            ? _overviewCard(
+                                icon: Icons.calendar_today_rounded,
+                                iconBg: AppColors.todayPurpleBg,
+                                iconColor: AppColors.todayPurpleIcon,
+                                value: '₹$todayEarnings',
+                                label: 'TODAY',
+                                onTap: () => _openRevenueScreen('TODAY'),
+                              )
+                            : _overviewCard(
+                                icon: Icons.chair_rounded,
+                                iconBg: AppColors.todayPurpleBg,
+                                iconColor: AppColors.todayPurpleIcon,
+                                value: '$occupiedSeats',
+                                label: 'OCCUPIED',
+                                onTap: () => setState(() => _currentTabIndex = 2),
+                              ),
                       ),
                     ],
                   ),
@@ -474,25 +493,43 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _overviewCard(
-                          icon: Icons.account_balance_wallet_rounded,
-                          iconBg: AppColors.monthlyAmberBg,
-                          iconColor: AppColors.monthlyAmberIcon,
-                          value: '₹$monthEarnings',
-                          label: 'MONTHLY',
-                          onTap: () => _openRevenueScreen('MONTHLY'),
-                        ),
+                        child: _service.canViewRevenue
+                            ? _overviewCard(
+                                icon: Icons.account_balance_wallet_rounded,
+                                iconBg: AppColors.monthlyAmberBg,
+                                iconColor: AppColors.monthlyAmberIcon,
+                                value: '₹$monthEarnings',
+                                label: 'MONTHLY',
+                                onTap: () => _openRevenueScreen('MONTHLY'),
+                              )
+                            : _overviewCard(
+                                icon: Icons.event_seat_rounded,
+                                iconBg: AppColors.monthlyAmberBg,
+                                iconColor: AppColors.monthlyAmberIcon,
+                                value: '${_service.totalSeatsCount - occupiedSeats}',
+                                label: 'AVAILABLE',
+                                onTap: () => setState(() => _currentTabIndex = 2),
+                              ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
-                        child: _overviewCard(
-                          icon: Icons.bar_chart_rounded,
-                          iconBg: AppColors.totalBlueBg,
-                          iconColor: AppColors.totalBlueIcon,
-                          value: '${_service.totalSeatsCount}',
-                          label: 'TOTAL',
-                          onTap: () => _openStudentsWithFilter('RECENT'), // Opens Student Directory, same page as Active tab
-                        ),
+                        child: _service.canViewRevenue
+                            ? _overviewCard(
+                                icon: Icons.bar_chart_rounded,
+                                iconBg: AppColors.totalBlueBg,
+                                iconColor: AppColors.totalBlueIcon,
+                                value: '${_service.totalSeatsCount}',
+                                label: 'TOTAL',
+                                onTap: () => _openStudentsWithFilter('RECENT'),
+                              )
+                            : _overviewCard(
+                                icon: Icons.assignment_late_rounded,
+                                iconBg: const Color(0xFFFEE2E2),
+                                iconColor: const Color(0xFFEF4444),
+                                value: '$dueStudentsCount',
+                                label: 'FEES DUE',
+                                onTap: () => _openStudentsWithFilter('DUES'),
+                              ),
                       ),
                     ],
                   ),
@@ -550,15 +587,26 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           onTap: () => showAddExpenseModal(context),
                         ),
                         const SizedBox(width: 12),
-                        _quickActionCard(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                        if (_service.canViewRevenue)
+                          _quickActionCard(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                            ),
+                            icon: Icons.bar_chart_rounded,
+                            title: 'View Reports',
+                            subtitle: 'Deep insights',
+                            onTap: _openFinancialAnalytics,
+                          )
+                        else
+                          _quickActionCard(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                            ),
+                            icon: Icons.chair_alt_rounded,
+                            title: 'Seat Layout',
+                            subtitle: 'Live seat map',
+                            onTap: () => setState(() => _currentTabIndex = 2),
                           ),
-                          icon: Icons.bar_chart_rounded,
-                          title: 'View Reports',
-                          subtitle: 'Deep insights',
-                          onTap: _openFinancialAnalytics,
-                        ),
                         const SizedBox(width: 12),
                         _quickActionCard(
                           gradient: const LinearGradient(
@@ -3142,6 +3190,16 @@ Have a productive study session!
   }
 
   void _showQuickBranchSwitcher(BuildContext context) {
+    if (!_service.canSwitchBranch) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Branch switching is locked to the Library Owner.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -3337,18 +3395,43 @@ Have a productive study session!
   }
 
   // -------------------------------------------------------------
-  // 6-ITEM BOTTOM NAVIGATION BAR (Image 1 & 2)
+  // ROLE-AWARE DYNAMIC BOTTOM NAVIGATION BAR
   // -------------------------------------------------------------
+  List<_HubTabItem> get _availableTabs {
+    final tabs = <_HubTabItem>[
+      const _HubTabItem(0, Icons.grid_view_rounded, 'Home'),
+      const _HubTabItem(1, Icons.people_alt_rounded, 'Students'),
+    ];
+    if (_service.canManageSeats || _service.isAdmin) {
+      tabs.add(const _HubTabItem(2, Icons.chair_alt_rounded, 'Seats'));
+    }
+    if (_service.canViewRevenue) {
+      tabs.add(const _HubTabItem(3, Icons.credit_card_rounded, 'Payments'));
+      tabs.add(const _HubTabItem(4, Icons.bar_chart_rounded, 'Analytics'));
+    }
+    tabs.add(const _HubTabItem(5, Icons.settings_outlined, 'Settings'));
+    return tabs;
+  }
+
   Widget _buildBottomNavigationBar() {
     final isDark = AppColors.isDark(context);
+    final tabs = _availableTabs;
+    int currentNavIndex = tabs.indexWhere((t) => t.index == _currentTabIndex);
+    if (currentNavIndex == -1) {
+      currentNavIndex = 0;
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card(context),
         border: Border(top: BorderSide(color: AppColors.divider(context))),
       ),
       child: BottomNavigationBar(
-        currentIndex: _currentTabIndex,
-        onTap: (idx) => setState(() => _currentTabIndex = idx),
+        currentIndex: currentNavIndex,
+        onTap: (navIdx) {
+          final targetIndex = tabs[navIdx].index;
+          setState(() => _currentTabIndex = targetIndex);
+        },
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppColors.card(context),
         selectedItemColor: isDark ? AppColors.mintAccent : AppColors.primaryTeal,
@@ -3357,33 +3440,19 @@ Have a productive study session!
         unselectedFontSize: 11,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view_rounded),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_alt_rounded),
-            label: 'Students',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chair_alt_rounded),
-            label: 'Seats',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.credit_card_rounded),
-            label: 'Payments',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: 'Analytics',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            label: 'Settings',
-          ),
-        ],
+        items: tabs.map((t) => BottomNavigationBarItem(
+          icon: Icon(t.icon),
+          label: t.label,
+        )).toList(),
       ),
     );
   }
+}
+
+
+class _HubTabItem {
+  final int index;
+  final IconData icon;
+  final String label;
+  const _HubTabItem(this.index, this.icon, this.label);
 }

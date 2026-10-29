@@ -632,6 +632,53 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_service.canViewRevenue) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textNavy),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Reports & Analytics Hub',
+            style: TextStyle(color: AppColors.textNavy, fontWeight: FontWeight.w800, fontSize: 17),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF2F2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock_rounded, size: 48, color: Color(0xFFEF4444)),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Access Restricted',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Financial reports, payment analysis, and tenure data are restricted to the Library Owner and Accountant. Your role (${_service.currentUserRole}) is scoped to desk operations.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(

@@ -150,6 +150,7 @@ class LibraryService {
   List<StudentInfo> get allStudents => List.unmodifiable(_mockStudents);
 
   void switchBranch(String branchId) {
+    if (!canSwitchBranch) return; // Strict ownership: Only admin/owner can switch active branch
     if (branches.any((b) => b.id == branchId) || branchId == 'all') {
       activeBranchId = branchId;
       if (branchId != 'all') {
@@ -164,6 +165,7 @@ class LibraryService {
   }
 
   void addBranch(LibraryBranch branch) {
+    if (!isAdmin) return; // Only library owner can add branches
     branches.add(branch);
     _saveLocalState();
     if (isFirebaseConnected && currentUserId != null) {
@@ -175,6 +177,7 @@ class LibraryService {
   }
 
   void removeBranch(String branchId) {
+    if (!isAdmin) return; // Only library owner can remove branches
     if (branches.length > 1) {
       branches.removeWhere((b) => b.id == branchId);
       if (activeBranchId == branchId) {
@@ -195,6 +198,7 @@ class LibraryService {
   }
 
   void addStaffMember(StaffMember staff) {
+    if (!canManageStaff) return; // Only library owner can add staff members
     staffList.add(staff);
     _saveLocalState();
     if (isFirebaseConnected && currentUserId != null) {
@@ -205,6 +209,7 @@ class LibraryService {
   }
 
   void removeStaffMember(String staffId) {
+    if (!canManageStaff) return; // Only library owner can remove staff members
     staffList.removeWhere((s) => s.id == staffId);
     _saveLocalState();
     if (isFirebaseConnected && currentUserId != null) {
@@ -215,6 +220,7 @@ class LibraryService {
   }
 
   void toggleStaffActive(String staffId) {
+    if (!canManageStaff) return; // Only library owner can toggle staff active status
     final idx = staffList.indexWhere((s) => s.id == staffId);
     if (idx != -1) {
       final cur = staffList[idx];

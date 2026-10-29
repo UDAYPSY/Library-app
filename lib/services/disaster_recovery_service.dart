@@ -24,18 +24,25 @@ class DisasterRecoveryService {
   }
 
   Future<void> setAutoBackupEnabled(bool enabled) async {
+    if (!_service.isAdmin) return; // Strict ownership enforcement: Only admin can toggle auto-backup
     await LocalStorageService.saveString(keyAutoBackupEnabled, enabled ? 'true' : 'false');
   }
 
   Future<String> getBackupEmail() async {
     final val = await LocalStorageService.getString(keyBackupEmail);
     if (val != null && val.trim().isNotEmpty) return val.trim();
-    return _service.currentUserEmail.isNotEmpty
-        ? _service.currentUserEmail
-        : _service.profile.adminEmail;
+    // Google Drive backup email belongs strictly to the Owner/Admin, never a staff member
+    if (_service.profile.adminEmail.trim().isNotEmpty) {
+      return _service.profile.adminEmail.trim();
+    }
+    if (_service.isAdmin && _service.currentUserEmail.trim().isNotEmpty) {
+      return _service.currentUserEmail.trim();
+    }
+    return '';
   }
 
   Future<void> setBackupEmail(String email) async {
+    if (!_service.isAdmin) return; // Strict ownership enforcement: Only admin can change Google Drive sync email
     await LocalStorageService.saveString(keyBackupEmail, email.trim());
   }
 

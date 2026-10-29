@@ -67,6 +67,15 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
   }
 
   void _showEditEmailDialog() {
+    if (!_service.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only the library owner can configure Google Drive sync.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
     final emailCtrl = TextEditingController(text: _backupEmail);
     showDialog(
       context: context,
@@ -449,7 +458,46 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
     final students = _service.currentStudents;
     final payments = _service.currentPayments;
     final expenses = _service.currentExpenses;
-    final isConnected = _service.isFirebaseConnected;
+    if (!_service.isAdmin) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: const Text('Google Drive & Disaster Recovery', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.textNavy,
+          elevation: 0.5,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF2F2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.shield_rounded, size: 48, color: Color(0xFFEF4444)),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Owner-Only Security Access',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Google Drive auto-sync, cloud backup archives, and disaster recovery are strictly restricted to the Library Owner. Your staff role (${_service.currentUserRole}) cannot alter ownership settings or backup archives.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
