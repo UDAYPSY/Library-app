@@ -1504,6 +1504,13 @@ class LibraryService {
       );
     }
 
+    final isAdminMatch = (
+        (profile.adminEmail.isNotEmpty && cleanId.toLowerCase() == profile.adminEmail.toLowerCase()) ||
+        (profile.adminPhone.isNotEmpty && cleanId.replaceAll(RegExp(r'\D'), '') == profile.adminPhone.replaceAll(RegExp(r'\D'), '')) ||
+        cleanId.toLowerCase() == 'admin' ||
+        (currentUserId != null && cleanId == currentUserId)
+    );
+
     // 1. If Firebase is connected and valid email is provided, attempt cloud authentication
     if (isFirebaseConnected && cleanId.contains('@')) {
       try {
@@ -1560,12 +1567,6 @@ class LibraryService {
     // Check Admin Credentials
     final storedAdminHash = await LocalStorageService.getString('app_admin_password_hash');
     const defaultAdminHash = 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f';
-    final isAdminMatch = (
-        (profile.adminEmail.isNotEmpty && cleanId.toLowerCase() == profile.adminEmail.toLowerCase()) ||
-        (profile.adminPhone.isNotEmpty && cleanId.replaceAll(RegExp(r'\D'), '') == profile.adminPhone.replaceAll(RegExp(r'\D'), '')) ||
-        cleanId.toLowerCase() == 'admin' ||
-        (currentUserId != null && cleanId == currentUserId)
-    );
 
     if (isAdminMatch) {
       if (verifyPin(cleanPass, storedAdminHash ?? defaultAdminHash)) {
