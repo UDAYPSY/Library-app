@@ -426,6 +426,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 4),
               const Text('Manage and switch between your library locations & floors', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
               const SizedBox(height: 16),
+              if (_service.isAdmin) ...[
+                InkWell(
+                  onTap: () {
+                    _service.switchBranch('all');
+                    setState(() {});
+                    setModalState(() {});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Switched to All Branches view'),
+                        backgroundColor: Color(0xFF0D766E),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _service.activeBranchId == 'all' ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _service.activeBranchId == 'all' ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _service.activeBranchId == 'all' ? const Color(0xFFDCFCE7) : const Color(0xFFEDF2F7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.public_rounded, color: _service.activeBranchId == 'all' ? const Color(0xFF16A34A) : const Color(0xFF64748B), size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('All Branches (Combined)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.textNavy)),
+                              SizedBox(height: 2),
+                              Text('View aggregate seats and member rosters across all branches', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                        if (_service.activeBranchId == 'all')
+                          const Row(
+                            children: [
+                              Text('ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF16A34A))),
+                              SizedBox(width: 4),
+                              Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18),
+                            ],
+                          )
+                        else
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0D766E),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              minimumSize: Size.zero,
+                            ),
+                            onPressed: () {
+                              _service.switchBranch('all');
+                              setState(() {});
+                              setModalState(() {});
+                            },
+                            child: const Text('Switch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               ..._service.branches.map((b) {
                 final isCurrent = b.id == _service.activeBranchId;
                 return InkWell(
@@ -902,7 +975,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Icon(Icons.badge_rounded, color: staff.isActive ? const Color(0xFF16A34A) : const Color(0xFF94A3B8), size: 20),
                   ),
                   title: Text(staff.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Text('${staff.role} • ${staff.phone}', style: const TextStyle(fontSize: 11)),
+                  subtitle: Text(
+                    '${staff.role} • ${staff.phone} • ${_service.branches.any((b) => b.id == staff.branchId) ? _service.branches.firstWhere((b) => b.id == staff.branchId).name : (_service.branches.isNotEmpty ? _service.branches.first.name : "Main Campus")}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1279,6 +1355,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     email: email,
                     pinHash: LibraryService.hashPin(password),
                     addedAt: DateTime.now(),
+                    branchId: selectedBranchId,
                   );
                   _service.addStaffMember(newStaff);
                   setState(() {});

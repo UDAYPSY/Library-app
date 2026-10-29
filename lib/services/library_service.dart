@@ -139,13 +139,23 @@ class LibraryService {
     }
   }
 
+  bool get canViewRevenue => isAdmin || currentUserRole == 'Accountant & Fees';
+  bool get canManageStaff => isAdmin;
+  bool get canSwitchBranch => isAdmin;
+  bool get canEditSettings => isAdmin;
+  bool get canDeleteRecords => isAdmin;
+  bool get canManageSeats => isAdmin || currentUserRole != 'Accountant & Fees';
+
   void switchBranch(String branchId) {
-    if (branches.any((b) => b.id == branchId)) {
+    if (branches.any((b) => b.id == branchId) || branchId == 'all') {
       activeBranchId = branchId;
-      final b = currentBranch;
-      profile.libraryName = b.name;
-      profile.city = b.address;
+      if (branchId != 'all') {
+        final b = currentBranch;
+        profile.libraryName = b.name;
+        profile.city = b.address;
+      }
       _saveLocalState();
+      _syncSeatsWithStudents();
       notifyStreamControllers();
     }
   }
@@ -153,6 +163,11 @@ class LibraryService {
   void addBranch(LibraryBranch branch) {
     branches.add(branch);
     _saveLocalState();
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        _tenantCol('branches').doc(branch.id).set(branch.toMap(), SetOptions(merge: true));
+      } catch (_) {}
+    }
     notifyStreamControllers();
   }
 
@@ -166,6 +181,12 @@ class LibraryService {
         profile.city = b.address;
       }
       _saveLocalState();
+      if (isFirebaseConnected && currentUserId != null) {
+        try {
+          _tenantCol('branches').doc(branchId).delete();
+        } catch (_) {}
+      }
+      _syncSeatsWithStudents();
       notifyStreamControllers();
     }
   }
@@ -240,11 +261,35 @@ class LibraryService {
   }
 
   int get totalSeatsCount {
+    if (branches.isNotEmpty && currentBranch.totalSeats > 0) {
+      return currentBranch.totalSeats;
+    }
     int total = 0;
     for (var s in sections) {
       total += s.totalSeats;
     }
     return total > 0 ? total : 35;
+  }
+
+  List<StudentInfo> get activeBranchStudents {
+    if (activeBranchId == 'all') return List.unmodifiable(_mockStudents);
+    return List.unmodifiable(_mockStudents.where(
+      (s) => s.branchId == activeBranchId || (activeBranchId == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1')),
+    ));
+  }
+
+  List<PaymentTransaction> get activeBranchPayments {
+    if (activeBranchId == 'all') return List.unmodifiable(_mockPayments);
+    return List.unmodifiable(_mockPayments.where(
+      (p) => p.branchId == activeBranchId || (activeBranchId == 'branch_1' && (p.branchId.isEmpty || p.branchId == 'branch_1')),
+    ));
+  }
+
+  List<ExpenseItem> get activeBranchExpenses {
+    if (activeBranchId == 'all') return List.unmodifiable(_mockExpenses);
+    return List.unmodifiable(_mockExpenses.where(
+      (e) => e.branchId == activeBranchId || (activeBranchId == 'branch_1' && (e.branchId.isEmpty || e.branchId == 'branch_1')),
+    ));
   }
 
 
@@ -281,12 +326,16 @@ class LibraryService {
   }
 
   void _syncSeatsWithStudents() {
+    final seatCount = totalSeatsCount;
     _mockSeats = List.generate(
-      totalSeatsCount,
+      seatCount,
       (index) => SeatInfo(seatNumber: index + 1),
     );
-    for (int seatNum = 1; seatNum <= totalSeatsCount; seatNum++) {
-      final occupants = _mockStudents.where(
+    final branchStudents = _mockStudents.where(
+      (s) => (s.branchId == activeBranchId || (activeBranchId == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1')) || activeBranchId == 'all'),
+    ).toList();
+    for (int seatNum = 1; seatNum <= seatCount; seatNum++) {
+      final occupants = branchStudents.where(
         (s) => s.seatNumber == seatNum && s.status != 'INACTIVE',
       ).toList();
       if (occupants.isNotEmpty) {
@@ -963,11 +1012,13 @@ class LibraryService {
     return false;
   }
 
-  bool isSeatOccupied(int seatNum, {String? shift, String? excludeStudentId}) {
+  bool isSeatOccupied(int seatNum, {String? shift, String? excludeStudentId, String? branchId}) {
     ensureInitialized();
     if (seatNum <= 0) return false;
+    final targetBranch = branchId ?? activeBranchId;
     final activeOccupants = _mockStudents.where(
-      (s) => s.seatNumber == seatNum && s.status != 'INACTIVE' && (excludeStudentId == null || s.id != excludeStudentId),
+      (s) => (targetBranch == 'all' || s.branchId == targetBranch || (targetBranch == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1'))) &&
+          s.seatNumber == seatNum && s.status != 'INACTIVE' && (excludeStudentId == null || s.id != excludeStudentId),
     ).toList();
     if (activeOccupants.isEmpty) return false;
     if (shift == null || shift.trim().isEmpty) {
@@ -976,13 +1027,17 @@ class LibraryService {
     return activeOccupants.any((s) => doShiftsConflict(s.shift, shift, allShifts: shifts));
   }
 
-  bool isSeatAvailableForShift(int seatNum, String? shift, {String? excludeStudentId}) {
-    return !isSeatOccupied(seatNum, shift: shift, excludeStudentId: excludeStudentId);
+  bool isSeatAvailableForShift(int seatNum, String? shift, {String? excludeStudentId, String? branchId}) {
+    return !isSeatOccupied(seatNum, shift: shift, excludeStudentId: excludeStudentId, branchId: branchId);
   }
 
-  StudentInfo? getStudentForSeat(int seatNum, {String? shift}) {
+  StudentInfo? getStudentForSeat(int seatNum, {String? shift, String? branchId}) {
     ensureInitialized();
-    final activeOccupants = _mockStudents.where((s) => s.seatNumber == seatNum && s.status != 'INACTIVE').toList();
+    final targetBranch = branchId ?? activeBranchId;
+    final activeOccupants = _mockStudents.where(
+      (s) => (targetBranch == 'all' || s.branchId == targetBranch || (targetBranch == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1'))) &&
+          s.seatNumber == seatNum && s.status != 'INACTIVE',
+    ).toList();
     if (activeOccupants.isEmpty) return null;
     if (shift != null && shift.trim().isNotEmpty) {
       for (final s in activeOccupants) {
@@ -995,9 +1050,13 @@ class LibraryService {
     return activeOccupants.first;
   }
 
-  List<StudentInfo> getStudentsForSeat(int seatNum) {
+  List<StudentInfo> getStudentsForSeat(int seatNum, {String? branchId}) {
     ensureInitialized();
-    return _mockStudents.where((s) => s.seatNumber == seatNum && s.status != 'INACTIVE').toList();
+    final targetBranch = branchId ?? activeBranchId;
+    return _mockStudents.where(
+      (s) => (targetBranch == 'all' || s.branchId == targetBranch || (targetBranch == 'branch_1' && (s.branchId.isEmpty || s.branchId == 'branch_1'))) &&
+          s.seatNumber == seatNum && s.status != 'INACTIVE',
+    ).toList();
   }
 
   List<StudentInfo> get currentStudents => List.unmodifiable(_mockStudents);
@@ -1395,6 +1454,9 @@ class LibraryService {
         if (map['library_id'] != null && (map['library_id'] as String).isNotEmpty) {
           profile.libraryId = map['library_id'];
         }
+        if (map['branch_id'] != null && (map['branch_id'] as String).isNotEmpty) {
+          activeBranchId = map['branch_id'];
+        }
         isAuthenticated = true;
       } catch (_) {}
     }
@@ -1533,8 +1595,15 @@ class LibraryService {
         currentUserId = staff.id;
         currentUserName = staff.name;
         currentUserEmail = staff.email ?? '${staff.phone}@staff.local';
-        currentUserRole = staff.role.toLowerCase().contains('admin') ? 'Admin' : 'Receptionist';
+        currentUserRole = staff.role.toLowerCase().contains('admin') ? 'Admin' : staff.role;
         isAuthenticated = true;
+        if (staff.branchId.isNotEmpty && branches.any((b) => b.id == staff.branchId)) {
+          activeBranchId = staff.branchId;
+          final b = currentBranch;
+          profile.libraryName = b.name;
+          profile.city = b.address;
+          _syncSeatsWithStudents();
+        }
         await LocalStorageService.saveString(
           'app_active_session',
           json.encode({
@@ -1542,6 +1611,7 @@ class LibraryService {
             'email': currentUserEmail,
             'role': currentUserRole,
             'name': currentUserName,
+            'branch_id': activeBranchId,
           }),
         );
         return AuthResult(
@@ -2159,8 +2229,10 @@ class LibraryService {
     required DateTime date,
     String paymentMode = 'Cash',
     String note = '',
+    String? branchId,
   }) async {
     ensureInitialized();
+    final effectiveBranchId = branchId ?? (activeBranchId == 'all' ? 'branch_1' : activeBranchId);
     final expId = 'exp_${DateTime.now().millisecondsSinceEpoch}';
     if (isFirebaseConnected) {
       await _tenantCol('expenses').doc(expId).set({
@@ -2171,6 +2243,7 @@ class LibraryService {
         'date': Timestamp.fromDate(date),
         'payment_mode': paymentMode,
         'note': note,
+        'branch_id': effectiveBranchId,
       });
     } else {
       _mockExpenses.insert(
@@ -2183,6 +2256,7 @@ class LibraryService {
           date: date,
           paymentMode: paymentMode,
           note: note,
+          branchId: effectiveBranchId,
         ),
       );
       _mockExpensesController.add(List.unmodifiable(_mockExpenses));
@@ -2245,10 +2319,23 @@ class LibraryService {
     DateTime? validFrom,
     DateTime? validUntil,
     int? durationMonths,
+    String? branchId,
   }) async {
     ensureInitialized();
     final payDate = date ?? DateTime.now();
     final paymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
+
+    // Resolve target branch
+    String targetBranch = branchId ?? '';
+    if (targetBranch.isEmpty && studentId != null && studentId.isNotEmpty) {
+      final sMatch = _mockStudents.where((s) => s.id == studentId);
+      if (sMatch.isNotEmpty && sMatch.first.branchId.isNotEmpty) {
+        targetBranch = sMatch.first.branchId;
+      }
+    }
+    if (targetBranch.isEmpty) {
+      targetBranch = (activeBranchId == 'all' ? 'branch_1' : activeBranchId);
+    }
 
     // Format explicit period note for due collections
     String effectiveNotes = notes;
@@ -2310,6 +2397,7 @@ class LibraryService {
         'date': Timestamp.fromDate(payDate),
         'payment_mode': paymentMode,
         'notes': effectiveNotes,
+        'branch_id': targetBranch,
         if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom),
         if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil),
         if (durationMonths != null) 'duration_months': durationMonths,
@@ -2369,6 +2457,7 @@ class LibraryService {
           validFrom: validFrom,
           validUntil: validUntil,
           durationMonths: durationMonths,
+          branchId: targetBranch,
         ),
       );
       _mockPaymentsController.add(List.unmodifiable(_mockPayments));
@@ -2789,8 +2878,12 @@ class LibraryService {
     String gender = 'Male',
     String? photoBase64,
     int durationMonths = 1,
+    String? branchId,
   }) async {
     ensureInitialized();
+    final targetBranch = (branchId != null && branchId.isNotEmpty)
+        ? branchId
+        : (activeBranchId == 'all' ? 'branch_1' : activeBranchId);
 
     final now = joiningDate ?? DateTime.now();
     final effectiveJoiningDate = now;
@@ -2923,6 +3016,7 @@ class LibraryService {
           'preparation_for': preparationFor,
           'gender': gender,
           'photo_base64': photoBase64,
+          'branch_id': targetBranch,
         });
 
         // 2. Log payment if not trial and fee > 0
@@ -2942,6 +3036,7 @@ class LibraryService {
             'notes': durationMonths > 1
                 ? '$durationMonths Months Advance Fees'
                 : 'Initial registration fee',
+            'branch_id': targetBranch,
           });
         }
       });
@@ -2987,6 +3082,7 @@ class LibraryService {
           preparationFor: preparationFor,
           gender: gender,
           photoBase64: photoBase64,
+          branchId: targetBranch,
         ),
       );
 
@@ -3009,6 +3105,7 @@ class LibraryService {
             validFrom: effectiveJoiningDate,
             validUntil: effectiveValidUntil,
             durationMonths: durationMonths,
+            branchId: targetBranch,
           ),
         );
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));

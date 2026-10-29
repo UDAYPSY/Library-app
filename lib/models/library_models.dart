@@ -434,6 +434,7 @@ class StudentInfo {
   final String? email;
   final String? photoBase64;
   final DateTime? updatedAt;
+  final String branchId;
 
   const StudentInfo({
     required this.id,
@@ -458,6 +459,7 @@ class StudentInfo {
     this.email,
     this.photoBase64,
     this.updatedAt,
+    this.branchId = 'branch_1',
   });
 
   bool get hasPhoto => photoBase64 != null && photoBase64!.isNotEmpty;
@@ -501,6 +503,7 @@ class StudentInfo {
     String? email,
     String? photoBase64,
     DateTime? updatedAt,
+    String? branchId,
   }) {
     return StudentInfo(
       id: id ?? this.id,
@@ -529,6 +532,7 @@ class StudentInfo {
       email: email ?? this.email,
       photoBase64: photoBase64 ?? this.photoBase64,
       updatedAt: updatedAt ?? this.updatedAt,
+      branchId: branchId ?? this.branchId,
     );
   }
 
@@ -556,6 +560,7 @@ class StudentInfo {
       'email': email,
       'photo_base64': photoBase64,
       'updated_at': updatedAt?.toIso8601String(),
+      'branch_id': branchId,
     };
   }
 
@@ -592,6 +597,7 @@ class StudentInfo {
       email: data['email'] as String?,
       photoBase64: data['photo_base64'] as String?,
       updatedAt: parseDate(data['updated_at']),
+      branchId: (data['branch_id'] as String?)?.isNotEmpty == true ? (data['branch_id'] as String) : 'branch_1',
     );
   }
 }
@@ -604,6 +610,7 @@ class ExpenseItem {
   final DateTime date;
   final String paymentMode;
   final String note;
+  final String branchId;
 
   const ExpenseItem({
     required this.id,
@@ -613,6 +620,7 @@ class ExpenseItem {
     required this.date,
     this.paymentMode = 'Cash',
     this.note = '',
+    this.branchId = 'branch_1',
   });
 
   Map<String, dynamic> toMap() {
@@ -624,6 +632,7 @@ class ExpenseItem {
       'date': Timestamp.fromDate(date),
       'payment_mode': paymentMode,
       'note': note,
+      'branch_id': branchId,
     };
   }
 
@@ -636,6 +645,7 @@ class ExpenseItem {
       'date': date.toIso8601String(),
       'payment_mode': paymentMode,
       'note': note,
+      'branch_id': branchId,
     };
   }
 
@@ -654,6 +664,7 @@ class ExpenseItem {
       date: parseDate(data['date']),
       paymentMode: (data['payment_mode'] as String?) ?? 'Cash',
       note: (data['note'] as String?) ?? '',
+      branchId: (data['branch_id'] as String?)?.isNotEmpty == true ? (data['branch_id'] as String) : 'branch_1',
     );
   }
 }
@@ -672,6 +683,7 @@ class PaymentTransaction {
   final DateTime? validFrom;
   final DateTime? validUntil;
   final int? durationMonths;
+  final String branchId;
 
   const PaymentTransaction({
     required this.id,
@@ -687,6 +699,7 @@ class PaymentTransaction {
     this.validFrom,
     this.validUntil,
     this.durationMonths,
+    this.branchId = 'branch_1',
   });
 
   PaymentTransaction copyWith({
@@ -703,6 +716,7 @@ class PaymentTransaction {
     DateTime? validFrom,
     DateTime? validUntil,
     int? durationMonths,
+    String? branchId,
   }) {
     return PaymentTransaction(
       id: id ?? this.id,
@@ -718,6 +732,7 @@ class PaymentTransaction {
       validFrom: validFrom ?? this.validFrom,
       validUntil: validUntil ?? this.validUntil,
       durationMonths: durationMonths ?? this.durationMonths,
+      branchId: branchId ?? this.branchId,
     );
   }
 
@@ -733,6 +748,7 @@ class PaymentTransaction {
       'date': Timestamp.fromDate(date),
       'payment_mode': paymentMode,
       'notes': notes,
+      'branch_id': branchId,
       if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom!),
       if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil!),
       if (durationMonths != null) 'duration_months': durationMonths,
@@ -751,6 +767,7 @@ class PaymentTransaction {
       'date': date.toIso8601String(),
       'payment_mode': paymentMode,
       'notes': notes,
+      'branch_id': branchId,
       if (validFrom != null) 'valid_from': validFrom!.toIso8601String(),
       if (validUntil != null) 'valid_until': validUntil!.toIso8601String(),
       if (durationMonths != null) 'duration_months': durationMonths,
@@ -785,6 +802,7 @@ class PaymentTransaction {
       validFrom: parseOptionalDate(data['valid_from']),
       validUntil: parseOptionalDate(data['valid_until']),
       durationMonths: (data['duration_months'] as num?)?.toInt(),
+      branchId: (data['branch_id'] as String?)?.isNotEmpty == true ? (data['branch_id'] as String) : 'branch_1',
     );
   }
 }
@@ -798,6 +816,7 @@ class StaffMember {
   final bool isActive;
   final String? email;
   final String? pinHash;
+  final String branchId;
 
   const StaffMember({
     required this.id,
@@ -808,6 +827,7 @@ class StaffMember {
     this.isActive = true,
     this.email,
     this.pinHash,
+    this.branchId = 'branch_1',
   });
 
   StaffMember copyWith({
@@ -819,6 +839,7 @@ class StaffMember {
     bool? isActive,
     String? email,
     String? pinHash,
+    String? branchId,
   }) {
     return StaffMember(
       id: id ?? this.id,
@@ -829,6 +850,7 @@ class StaffMember {
       isActive: isActive ?? this.isActive,
       email: email ?? this.email,
       pinHash: pinHash ?? this.pinHash,
+      branchId: branchId ?? this.branchId,
     );
   }
 
@@ -842,6 +864,7 @@ class StaffMember {
       'is_active': isActive,
       'email': email,
       'pin_hash': pinHash,
+      'branch_id': branchId,
     };
   }
 
@@ -855,6 +878,7 @@ class StaffMember {
       isActive: map['is_active'] ?? true,
       email: map['email'] as String?,
       pinHash: (map['pin_hash'] ?? map['pin']) as String?,
+      branchId: (map['branch_id'] as String?)?.isNotEmpty == true ? (map['branch_id'] as String) : 'branch_1',
     );
   }
 }

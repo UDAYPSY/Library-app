@@ -160,6 +160,51 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               color: AppColors.text(context),
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          InkWell(
+                            onTap: _service.canSwitchBranch ? () => _showQuickBranchSwitcher(context) : null,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: (AppColors.isDark(context) ? AppColors.primaryTeal.withValues(alpha: 0.15) : AppColors.primaryTeal.withValues(alpha: 0.08)),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppColors.primaryTeal.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.location_on_rounded,
+                                    size: 13,
+                                    color: AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _service.activeBranchId == 'all'
+                                        ? 'All Branches (Combined)'
+                                        : _service.currentBranch.name,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal,
+                                    ),
+                                  ),
+                                  if (_service.canSwitchBranch) ...[
+                                    const SizedBox(width: 3),
+                                    Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 14,
+                                      color: AppColors.isDark(context) ? AppColors.mintAccent : AppColors.primaryTeal,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       // Avatar Card with Star (Image 1)
@@ -3081,6 +3126,201 @@ Have a productive study session!
   // -------------------------------------------------------------
   Widget _buildSettingsTab() {
     return const SettingsScreen();
+  }
+
+  void _showQuickBranchSwitcher(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.card(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) {
+          final branches = _service.branches;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Switch Active Branch',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.text(context),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, color: AppColors.textMutedColor(context)),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Select a location or floor to filter live seats and students',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMutedColor(context)),
+                ),
+                const SizedBox(height: 16),
+                if (_service.isAdmin) ...[
+                  InkWell(
+                    onTap: () {
+                      _service.switchBranch('all');
+                      setState(() {});
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Switched to All Branches view'),
+                          backgroundColor: Color(0xFF0D766E),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _service.activeBranchId == 'all'
+                            ? (AppColors.isDark(context) ? const Color(0xFF064E3B) : const Color(0xFFF0FDF4))
+                            : AppColors.surface(context),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _service.activeBranchId == 'all'
+                              ? const Color(0xFF86EFAC)
+                              : AppColors.cardBorderColor(context),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: _service.activeBranchId == 'all'
+                                  ? const Color(0xFFDCFCE7)
+                                  : (AppColors.isDark(context) ? Colors.white10 : const Color(0xFFEDF2F7)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.public_rounded,
+                              color: _service.activeBranchId == 'all' ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'All Branches (Combined)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                    color: AppColors.text(context),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'View aggregate seats and member rosters across all branches',
+                                  style: TextStyle(fontSize: 11, color: AppColors.textMutedColor(context)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_service.activeBranchId == 'all')
+                            const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                ...branches.map((b) {
+                  final isCurrent = b.id == _service.activeBranchId;
+                  return InkWell(
+                    onTap: isCurrent
+                        ? null
+                        : () {
+                            _service.switchBranch(b.id);
+                            setState(() {});
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Switched active branch to ${b.name}'),
+                                backgroundColor: const Color(0xFF0D766E),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? (AppColors.isDark(context) ? const Color(0xFF064E3B) : const Color(0xFFF0FDF4))
+                            : AppColors.surface(context),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isCurrent ? const Color(0xFF86EFAC) : AppColors.cardBorderColor(context),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isCurrent
+                                  ? const Color(0xFFDCFCE7)
+                                  : (AppColors.isDark(context) ? Colors.white10 : const Color(0xFFEDF2F7)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.apartment_rounded,
+                              color: isCurrent ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  b.name,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                    color: AppColors.text(context),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${b.address} • ${b.totalSeats} Seats Capacity',
+                                  style: TextStyle(fontSize: 11, color: AppColors.textMutedColor(context)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isCurrent)
+                            const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   // -------------------------------------------------------------
