@@ -407,6 +407,11 @@ class SeatInfo {
       sectionName: (data['section_name'] as String?) ?? 'Main Hall',
     );
   }
+
+  factory SeatInfo.fromFirestore(String id, Map<String, dynamic>? data) {
+    final seatNum = int.tryParse(id.replaceAll(RegExp(r'\D'), '')) ?? (data?['seat_number'] as num?)?.toInt() ?? 0;
+    return SeatInfo.fromMap(seatNum, data);
+  }
 }
 
 class StudentInfo {

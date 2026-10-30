@@ -1572,20 +1572,23 @@ class LibraryService {
 
       final studentSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('students').get();
       if (studentSnaps.docs.isNotEmpty) {
-        _mockStudents = studentSnaps.docs.map((d) => StudentInfo.fromFirestore(d.id, d.data())).toList();
+        _mockStudents.clear();
+        _mockStudents.addAll(studentSnaps.docs.map((d) => StudentInfo.fromFirestore(d.id, d.data())));
         _syncSeatsWithStudents();
         _mockStudentsController.add(List.unmodifiable(_mockStudents));
       }
 
       final seatSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('seats').get();
       if (seatSnaps.docs.isNotEmpty) {
-        _mockSeats = seatSnaps.docs.map((d) => SeatInfo.fromFirestore(d.id, d.data())).toList();
+        _mockSeats.clear();
+        _mockSeats.addAll(seatSnaps.docs.map((d) => SeatInfo.fromFirestore(d.id, d.data())));
         _mockSeatsController.add(List.unmodifiable(_mockSeats));
       }
 
       final paySnaps = await _db.collection('libraries').doc(targetLibraryId).collection('payments').limit(150).get();
       if (paySnaps.docs.isNotEmpty) {
-        _mockPayments = paySnaps.docs.map((d) => PaymentTransaction.fromFirestore(d.id, d.data())).toList();
+        _mockPayments.clear();
+        _mockPayments.addAll(paySnaps.docs.map((d) => PaymentTransaction.fromFirestore(d.id, d.data())));
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));
       }
 
