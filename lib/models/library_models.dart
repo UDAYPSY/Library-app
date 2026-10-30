@@ -684,6 +684,9 @@ class PaymentTransaction {
   final DateTime? validUntil;
   final int? durationMonths;
   final String branchId;
+  final String collectedBy;
+  final String staffRole;
+  final String staffId;
 
   const PaymentTransaction({
     required this.id,
@@ -700,6 +703,9 @@ class PaymentTransaction {
     this.validUntil,
     this.durationMonths,
     this.branchId = 'branch_1',
+    this.collectedBy = 'Admin',
+    this.staffRole = 'Admin',
+    this.staffId = '',
   });
 
   PaymentTransaction copyWith({
@@ -717,6 +723,9 @@ class PaymentTransaction {
     DateTime? validUntil,
     int? durationMonths,
     String? branchId,
+    String? collectedBy,
+    String? staffRole,
+    String? staffId,
   }) {
     return PaymentTransaction(
       id: id ?? this.id,
@@ -733,6 +742,9 @@ class PaymentTransaction {
       validUntil: validUntil ?? this.validUntil,
       durationMonths: durationMonths ?? this.durationMonths,
       branchId: branchId ?? this.branchId,
+      collectedBy: collectedBy ?? this.collectedBy,
+      staffRole: staffRole ?? this.staffRole,
+      staffId: staffId ?? this.staffId,
     );
   }
 
@@ -749,6 +761,9 @@ class PaymentTransaction {
       'payment_mode': paymentMode,
       'notes': notes,
       'branch_id': branchId,
+      'collected_by': collectedBy,
+      'staff_role': staffRole,
+      'staff_id': staffId,
       if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom!),
       if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil!),
       if (durationMonths != null) 'duration_months': durationMonths,
@@ -768,6 +783,9 @@ class PaymentTransaction {
       'payment_mode': paymentMode,
       'notes': notes,
       'branch_id': branchId,
+      'collected_by': collectedBy,
+      'staff_role': staffRole,
+      'staff_id': staffId,
       if (validFrom != null) 'valid_from': validFrom!.toIso8601String(),
       if (validUntil != null) 'valid_until': validUntil!.toIso8601String(),
       if (durationMonths != null) 'duration_months': durationMonths,
@@ -803,6 +821,9 @@ class PaymentTransaction {
       validUntil: parseOptionalDate(data['valid_until']),
       durationMonths: (data['duration_months'] as num?)?.toInt(),
       branchId: (data['branch_id'] as String?)?.isNotEmpty == true ? (data['branch_id'] as String) : 'branch_1',
+      collectedBy: (data['collected_by'] as String?) ?? 'Admin',
+      staffRole: (data['staff_role'] as String?) ?? 'Admin',
+      staffId: (data['staff_id'] as String?) ?? '',
     );
   }
 }

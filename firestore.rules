@@ -6,14 +6,20 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == libraryId;
     }
 
+    // Global Staff Directory for seamless multi-device staff lookup by phone or email
+    match /staff_directory/{identifier} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
     match /libraries/{libraryId} {
       // Allow public read on library profile for public QR admission portal & seat verification
       allow read: if true;
       allow write: if isLibraryOwner(libraryId);
 
       match /students/{studentId} {
-        allow read: if isLibraryOwner(libraryId);
-        allow create, update: if isLibraryOwner(libraryId)
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null
                               && request.resource.data.name is string
                               && request.resource.data.name.size() > 0
                               && request.resource.data.phone is string;
@@ -21,20 +27,22 @@ service cloud.firestore {
       }
 
       match /seats/{seatId} {
-        allow read, write: if isLibraryOwner(libraryId);
+        allow read, write: if request.auth != null;
       }
 
       match /payments/{paymentId} {
-        allow read: if isLibraryOwner(libraryId);
-        allow create: if isLibraryOwner(libraryId)
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
                       && request.resource.data.amount is number
                       && request.resource.data.amount > 0;
-        allow update: if false;
-        allow delete: if isLibraryOwner(libraryId);
+        allow update: if false; // Immutable ledger: payments cannot be altered
+        allow delete: if isLibraryOwner(libraryId); // Only library owner can wipe on permanent account deletion
       }
 
       match /expenses/{expenseId} {
-        allow read, write: if isLibraryOwner(libraryId);
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null;
+        allow delete: if isLibraryOwner(libraryId);
       }
 
       match /settings/{docId} {
@@ -43,11 +51,13 @@ service cloud.firestore {
       }
 
       match /staff/{staffId} {
-        allow read, write: if isLibraryOwner(libraryId);
+        allow read: if request.auth != null;
+        allow write: if isLibraryOwner(libraryId);
       }
 
       match /branches/{branchId} {
-        allow read, write: if isLibraryOwner(libraryId);
+        allow read: if request.auth != null;
+        allow write: if isLibraryOwner(libraryId);
       }
 
       match /backups/{backupId} {
@@ -61,8 +71,8 @@ service cloud.firestore {
                         (request.resource.data.student_name is string && request.resource.data.student_name.size() > 0) ||
                         (request.resource.data.name is string && request.resource.data.name.size() > 0)
                       );
-        // Only library owner can view, approve, update, or reject requests
-        allow read, update, delete: if isLibraryOwner(libraryId);
+        // Only authenticated library accounts can view, approve, update, or reject requests
+        allow read, update, delete: if request.auth != null;
       }
     }
 

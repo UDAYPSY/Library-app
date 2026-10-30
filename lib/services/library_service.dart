@@ -197,6 +197,65 @@ class LibraryService {
     }
   }
 
+  Future<void> _syncStaffMemberToDirectory(StaffMember staff) async {
+    if (!isFirebaseConnected) return;
+    try {
+      final effectiveLibraryId = profile.libraryId.isNotEmpty ? profile.libraryId : tenantId;
+      if (effectiveLibraryId.isEmpty || effectiveLibraryId == 'default_library') return;
+      const defaultStaffHash = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
+      final data = {
+        'library_id': effectiveLibraryId,
+        'staff_id': staff.id,
+        'name': staff.name,
+        'phone': normalizePhone(staff.phone),
+        'email': staff.email?.trim().toLowerCase() ?? '',
+        'role': staff.role,
+        'pin_hash': staff.pinHash ?? defaultStaffHash,
+        'branch_id': staff.branchId,
+        'is_active': staff.isActive,
+        'updated_at': FieldValue.serverTimestamp(),
+      };
+      final normPhone = normalizePhone(staff.phone);
+      if (normPhone.isNotEmpty) {
+        await _db.collection('staff_directory').doc(normPhone).set(data, SetOptions(merge: true));
+      }
+      if (staff.email != null && staff.email!.trim().isNotEmpty) {
+        final normEmail = staff.email!.trim().toLowerCase();
+        await _db.collection('staff_directory').doc(normEmail).set(data, SetOptions(merge: true));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _removeStaffMemberFromDirectory(StaffMember staff) async {
+    if (!isFirebaseConnected) return;
+    try {
+      final normPhone = normalizePhone(staff.phone);
+      if (normPhone.isNotEmpty) {
+        await _db.collection('staff_directory').doc(normPhone).delete();
+      }
+      if (staff.email != null && staff.email!.trim().isNotEmpty) {
+        final normEmail = staff.email!.trim().toLowerCase();
+        await _db.collection('staff_directory').doc(normEmail).delete();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> syncAllStaffToDirectory() async {
+    if (!isFirebaseConnected) return;
+    try {
+      final effectiveLibraryId = profile.libraryId.isNotEmpty ? profile.libraryId : tenantId;
+      if (effectiveLibraryId.isEmpty || effectiveLibraryId == 'default_library') return;
+      for (final s in staffList) {
+        await _syncStaffMemberToDirectory(s);
+      }
+      final snaps = await _db.collection('libraries').doc(effectiveLibraryId).collection('staff').get();
+      for (final doc in snaps.docs) {
+        final staff = StaffMember.fromMap(doc.data());
+        await _syncStaffMemberToDirectory(staff);
+      }
+    } catch (_) {}
+  }
+
   void addStaffMember(StaffMember staff) {
     if (!canManageStaff) return; // Only library owner can add staff members
     staffList.add(staff);
@@ -204,17 +263,26 @@ class LibraryService {
     if (isFirebaseConnected && currentUserId != null) {
       try {
         _tenantCol('staff').doc(staff.id).set(staff.toMap(), SetOptions(merge: true));
+        _syncStaffMemberToDirectory(staff);
       } catch (_) {}
     }
   }
 
   void removeStaffMember(String staffId) {
     if (!canManageStaff) return; // Only library owner can remove staff members
-    staffList.removeWhere((s) => s.id == staffId);
+    final idx = staffList.indexWhere((s) => s.id == staffId);
+    StaffMember? removed;
+    if (idx != -1) {
+      removed = staffList[idx];
+      staffList.removeAt(idx);
+    }
     _saveLocalState();
     if (isFirebaseConnected && currentUserId != null) {
       try {
         _tenantCol('staff').doc(staffId).delete();
+        if (removed != null) {
+          _removeStaffMemberFromDirectory(removed);
+        }
       } catch (_) {}
     }
   }
@@ -230,6 +298,7 @@ class LibraryService {
       if (isFirebaseConnected && currentUserId != null) {
         try {
           _tenantCol('staff').doc(cur.id).set(updated.toMap(), SetOptions(merge: true));
+          _syncStaffMemberToDirectory(updated);
         } catch (_) {}
       }
     }
@@ -809,16 +878,21 @@ class LibraryService {
               await batch.commit();
               if (snaps.docs.length < 200) break;
             }
-          } catch (_) {
+          } catch (e) {
+            debugPrint('[deleteAccountPermanently] Batch delete failed for $col under $tId: $e');
             try {
               final colRef = _db.collection('libraries').doc(tId).collection(col);
               final snaps = await colRef.get();
               for (final doc in snaps.docs) {
                 try {
                   await doc.reference.delete();
-                } catch (_) {}
+                } catch (singleErr) {
+                  debugPrint('[deleteAccountPermanently] Single doc delete failed for ${doc.id} in $col: $singleErr');
+                }
               }
-            } catch (_) {}
+            } catch (err) {
+              debugPrint('[deleteAccountPermanently] Col ref get failed for $col: $err');
+            }
           }
         }
 
@@ -1444,7 +1518,13 @@ class LibraryService {
 
   // Multi-Tenant Cloud Firestore Isolation
   String get tenantId {
+    if (profile.libraryId.isNotEmpty && (isStaff || currentUserRole != 'Admin')) {
+      return profile.libraryId;
+    }
     if (isFirebaseConnected && FirebaseAuth.instance.currentUser != null) {
+      if (profile.libraryId.isNotEmpty && profile.libraryId != FirebaseAuth.instance.currentUser!.uid && isStaff) {
+        return profile.libraryId;
+      }
       return FirebaseAuth.instance.currentUser!.uid;
     }
     return profile.libraryId.isNotEmpty ? profile.libraryId : 'default_library';
@@ -1471,6 +1551,48 @@ class LibraryService {
       } catch (_) {}
     }
     return null;
+  }
+
+  Future<void> _loadStaffLibraryData(String targetLibraryId) async {
+    if (!isFirebaseConnected || targetLibraryId.isEmpty) return;
+    try {
+      final libDoc = await _db.collection('libraries').doc(targetLibraryId).get();
+      if (libDoc.exists && libDoc.data() != null) {
+        profile = LibraryProfile.fromMap(libDoc.data()!);
+      }
+      final brandingDoc = await _db.collection('libraries').doc(targetLibraryId).collection('settings').doc('branding').get();
+      if (brandingDoc.exists && brandingDoc.data() != null) {
+        profile = LibraryProfile.fromMap(brandingDoc.data()!);
+      }
+
+      final branchSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('branches').get();
+      if (branchSnaps.docs.isNotEmpty) {
+        branches = branchSnaps.docs.map((d) => LibraryBranch.fromMap(d.data())).toList();
+      }
+
+      final studentSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('students').get();
+      if (studentSnaps.docs.isNotEmpty) {
+        _mockStudents = studentSnaps.docs.map((d) => StudentInfo.fromFirestore(d.id, d.data())).toList();
+        _syncSeatsWithStudents();
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+
+      final seatSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('seats').get();
+      if (seatSnaps.docs.isNotEmpty) {
+        _mockSeats = seatSnaps.docs.map((d) => SeatInfo.fromFirestore(d.id, d.data())).toList();
+        _mockSeatsController.add(List.unmodifiable(_mockSeats));
+      }
+
+      final paySnaps = await _db.collection('libraries').doc(targetLibraryId).collection('payments').limit(150).get();
+      if (paySnaps.docs.isNotEmpty) {
+        _mockPayments = paySnaps.docs.map((d) => PaymentTransaction.fromFirestore(d.id, d.data())).toList();
+        _mockPaymentsController.add(List.unmodifiable(_mockPayments));
+      }
+
+      await _saveLocalState();
+    } catch (e) {
+      debugPrint('[Staff] Failed to load library data from cloud: $e');
+    }
   }
 
   CollectionReference<Map<String, dynamic>> _tenantCol(String collectionName) {
@@ -1649,21 +1771,7 @@ class LibraryService {
           );
         }
       } on FirebaseAuthException catch (e) {
-        // If account is not in Firebase Auth, fall through if registered in local staffList or local admin
-        final normPhone = normalizePhone(cleanId);
-        final hasStaffMatch = staffList.any((s) =>
-            (s.email != null && s.email!.toLowerCase() == cleanId.toLowerCase()) ||
-            normalizePhone(s.phone) == normPhone ||
-            s.id == cleanId);
-        if (!hasStaffMatch && !isAdminMatch) {
-          String msg = 'Authentication failed: ${e.message ?? e.code}';
-          if (e.code == 'user-not-found') msg = 'No account found with this email.';
-          if (e.code == 'wrong-password' || e.code == 'invalid-credential') msg = 'Incorrect password. Please verify and retry.';
-          if (e.code == 'invalid-email') msg = 'The email address is badly formatted.';
-          if (e.code == 'user-disabled') msg = 'This user account has been disabled.';
-          if (e.code == 'operation-not-allowed') msg = 'Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
-          return AuthResult(success: false, message: msg);
-        }
+        // If account is not in Firebase Auth, fall through if registered in local staffList, local admin, or cloud staff directory
       } catch (_) {}
     }
 
@@ -1734,6 +1842,14 @@ class LibraryService {
         final rawRole = staff.role.trim();
         currentUserRole = normalizeRole(rawRole);
         isAuthenticated = true;
+
+        // Ensure cloud sync is activated for staff session!
+        if (isFirebaseConnected && FirebaseAuth.instance.currentUser == null) {
+          try {
+            await FirebaseAuth.instance.signInAnonymously();
+          } catch (_) {}
+        }
+
         if (staff.branchId.isNotEmpty) {
           activeBranchId = staff.branchId;
           if (branches.any((b) => b.id == staff.branchId)) {
@@ -1771,6 +1887,91 @@ class LibraryService {
           success: false,
           message: 'Incorrect PIN/password for staff member ${staff.name}.',
         );
+      }
+    }
+
+    // 3. Cloud Staff Directory Check (for staff logging in from a new/different mobile phone)
+    if (isFirebaseConnected) {
+      try {
+        DocumentSnapshot<Map<String, dynamic>>? dirDoc;
+        if (cleanId.contains('@')) {
+          final doc = await _db.collection('staff_directory').doc(cleanId.toLowerCase()).get();
+          if (doc.exists && doc.data() != null) dirDoc = doc;
+        }
+        if (dirDoc == null && normPhone.isNotEmpty) {
+          final doc = await _db.collection('staff_directory').doc(normPhone).get();
+          if (doc.exists && doc.data() != null) dirDoc = doc;
+        }
+
+        if (dirDoc != null && dirDoc.exists && dirDoc.data() != null) {
+          final data = dirDoc.data()!;
+          final isActive = data['is_active'] ?? true;
+          if (!isActive) {
+            return const AuthResult(
+              success: false,
+              message: 'This staff account has been deactivated by the administrator.',
+            );
+          }
+          const defaultStaffHash = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
+          final storedHash = data['pin_hash']?.toString() ?? defaultStaffHash;
+          if (verifyPin(cleanPass, storedHash)) {
+            final staffLibraryId = data['library_id']?.toString() ?? '';
+            if (staffLibraryId.isNotEmpty) {
+              profile = profile.copyWith(libraryId: staffLibraryId);
+              await LocalStorageService.saveString('app_setup_completed', 'true');
+            }
+
+            // Ensure Firebase session is active for cloud sync
+            if (FirebaseAuth.instance.currentUser == null) {
+              try {
+                await FirebaseAuth.instance.signInAnonymously();
+              } catch (_) {}
+            }
+
+            currentUserId = data['staff_id']?.toString() ?? 'staff_001';
+            currentUserName = data['name']?.toString() ?? 'Staff Member';
+            currentUserEmail = data['email']?.toString() ?? cleanId;
+            final rawRole = data['role']?.toString() ?? 'Shift Manager';
+            currentUserRole = normalizeRole(rawRole);
+            final branchId = data['branch_id']?.toString() ?? 'branch_1';
+            activeBranchId = branchId;
+            isAuthenticated = true;
+
+            // Fetch library data from cloud so staff can see students, seats, branches
+            if (staffLibraryId.isNotEmpty) {
+              await _loadStaffLibraryData(staffLibraryId);
+            }
+
+            await LocalStorageService.saveString(
+              'app_active_session',
+              json.encode({
+                'user_id': currentUserId,
+                'email': currentUserEmail,
+                'role': currentUserRole,
+                'name': currentUserName,
+                'branch_id': activeBranchId,
+                'library_id': profile.libraryId,
+              }),
+            );
+            if (cleanId.isNotEmpty) {
+              await LocalStorageService.saveString('app_last_login_identifier', cleanId);
+            }
+            notifyStreamControllers();
+            return AuthResult(
+              success: true,
+              role: currentUserRole,
+              userName: currentUserName,
+              userId: currentUserId,
+            );
+          } else {
+            return AuthResult(
+              success: false,
+              message: 'Incorrect PIN/password for staff member ${data['name'] ?? cleanId}.',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('[Login] Cloud staff directory lookup error: $e');
       }
     }
 
@@ -2539,6 +2740,11 @@ class LibraryService {
       periodStr = '${DateFormat('dd-MMM-yyyy').format(approxStart)} to ${DateFormat('dd-MMM-yyyy').format(validUntil)}';
     }
 
+    final collectorName = currentUserName.isNotEmpty && currentUserName != 'Guest' ? currentUserName : 'Admin';
+    final collectorRole = currentUserRole;
+    final collectorId = currentUserId ?? '';
+    final collectorTag = ' [Received by: $collectorName${collectorRole != 'Admin' ? ' ($collectorRole)' : ''}]';
+
     // 1. Reconcile dues & activity log in local in-memory student cache
     final matchIdx = _mockStudents.indexWhere((s) =>
         (studentId != null && studentId.isNotEmpty && s.id == studentId) ||
@@ -2564,8 +2770,8 @@ class LibraryService {
       }
       final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
       final payLog = isDuePayment
-          ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
-          : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
+          ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr$collectorTag${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
+          : 'Payment of ₹$amount collected via $paymentMode on $dateStr$collectorTag${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
       final updatedNote = appendNote(s.note, payLog);
 
       _mockStudents[matchIdx] = s.copyWith(
@@ -2594,6 +2800,9 @@ class LibraryService {
         validUntil: validUntil,
         durationMonths: durationMonths,
         branchId: targetBranch,
+        collectedBy: collectorName,
+        staffRole: collectorRole,
+        staffId: collectorId,
       ),
     );
     _mockPaymentsController.add(List.unmodifiable(_mockPayments));
@@ -2617,8 +2826,8 @@ class LibraryService {
             final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
             final curNote = (data['note'] as String?) ?? '';
             final payLog = isDuePayment
-                ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
-                : 'Payment of ₹$amount collected via $paymentMode on $dateStr${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
+                ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr$collectorTag${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
+                : 'Payment of ₹$amount collected via $paymentMode on $dateStr$collectorTag${durationMonths != null && durationMonths > 0 ? " ($durationMonths mo tenure)" : ""}${notes.isNotEmpty ? " • $notes" : ""}.';
             final updatedNote = appendNote(curNote, payLog);
 
             final updates = <String, dynamic>{
@@ -2647,6 +2856,9 @@ class LibraryService {
           'payment_mode': paymentMode,
           'notes': effectiveNotes,
           'branch_id': targetBranch,
+          'collected_by': collectorName,
+          'staff_role': collectorRole,
+          'staff_id': collectorId,
           if (validFrom != null) 'valid_from': Timestamp.fromDate(validFrom),
           if (validUntil != null) 'valid_until': Timestamp.fromDate(validUntil),
           if (durationMonths != null) 'duration_months': durationMonths,
@@ -3196,6 +3408,10 @@ class LibraryService {
     String? createdPaymentId;
     if (status != 'TRIAL' && feeAmount > 0) {
       createdPaymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
+      final collectorName = currentUserName.isNotEmpty && currentUserName != 'Guest' ? currentUserName : 'Admin';
+      final collectorRole = currentUserRole;
+      final collectorId = currentUserId ?? '';
+
       _mockPayments.insert(
         0,
         PaymentTransaction(
@@ -3215,6 +3431,9 @@ class LibraryService {
           validUntil: effectiveValidUntil,
           durationMonths: durationMonths,
           branchId: targetBranch,
+          collectedBy: collectorName,
+          staffRole: collectorRole,
+          staffId: collectorId,
         ),
       );
       _mockPaymentsController.add(List.unmodifiable(_mockPayments));
@@ -3283,7 +3502,9 @@ class LibraryService {
               'amount': feeAmount,
               'date': Timestamp.fromDate(payDate),
               'valid_until': Timestamp.fromDate(effectiveValidUntil),
-              'collected_by': deviceUserId,
+              'collected_by': currentUserName.isNotEmpty && currentUserName != 'Guest' ? currentUserName : 'Admin',
+              'staff_role': currentUserRole,
+              'staff_id': currentUserId ?? '',
               'payment_mode': paymentMode,
               'notes': durationMonths > 1
                   ? '$durationMonths Months Advance Fees'
@@ -4058,6 +4279,10 @@ class LibraryService {
       }
       batch.update(studentDocRef, updateData);
 
+      final collectorName = currentUserName.isNotEmpty && currentUserName != 'Guest' ? currentUserName : 'Admin';
+      final collectorRole = currentUserRole;
+      final collectorId = currentUserId ?? '';
+
       batch.set(paymentDocRef, {
         'payment_id': paymentDocRef.id,
         'student_id': studentId,
@@ -4070,6 +4295,9 @@ class LibraryService {
         'valid_until': Timestamp.fromDate(validUntil),
         'payment_mode': paymentMode,
         'notes': notes,
+        'collected_by': collectorName,
+        'staff_role': collectorRole,
+        'staff_id': collectorId,
       });
 
       await batch.commit();
@@ -4090,6 +4318,10 @@ class LibraryService {
           paymentMode: paymentMode,
           note: updatedNote,
         );
+        final collectorName = currentUserName.isNotEmpty && currentUserName != 'Guest' ? currentUserName : 'Admin';
+        final collectorRole = currentUserRole;
+        final collectorId = currentUserId ?? '';
+
         _mockPayments.insert(
           0,
           PaymentTransaction(
@@ -4103,6 +4335,9 @@ class LibraryService {
             date: now,
             paymentMode: paymentMode,
             notes: notes,
+            collectedBy: collectorName,
+            staffRole: collectorRole,
+            staffId: collectorId,
           ),
         );
         _mockStudentsController.add(List.unmodifiable(_mockStudents));

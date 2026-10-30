@@ -363,7 +363,8 @@ class _RevenueScreenState extends State<RevenueScreen> {
             final matchNotes = p.notes.toLowerCase().contains(query);
             final matchPhone = p.studentPhone.contains(query);
             final matchSeat = 's-${p.seatNumber}'.contains(query);
-            if (!matchName && !matchNotes && !matchPhone && !matchSeat) return false;
+            final matchCollector = p.collectedBy.toLowerCase().contains(query);
+            if (!matchName && !matchNotes && !matchPhone && !matchSeat && !matchCollector) return false;
           }
 
           // Year filter
@@ -1026,27 +1027,65 @@ class _RevenueScreenState extends State<RevenueScreen> {
                                   ),
                                   const SizedBox(height: 6),
 
-                                  // Second Row: Paid on Date & Payment Mode Pill (Image 3)
+                                  // Second Row: Paid on Date & Payment Mode Pill & Collector Info
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.access_time_rounded,
-                                            size: 14,
-                                            color: AppColors.textSubtleColor(context),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Paid on $formattedPaidDate',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: AppColors.textSubtleColor(context),
+                                      Expanded(
+                                        child: Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time_rounded,
+                                                  size: 14,
+                                                  color: AppColors.textSubtleColor(context),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  'Paid on $formattedPaidDate',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: AppColors.textSubtleColor(context),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ),
-                                        ],
+                                            if (p.collectedBy.isNotEmpty)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.isDark(context) ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: AppColors.cardBorderColor(context)),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.person_pin_rounded,
+                                                      size: 12,
+                                                      color: AppColors.textSubtleColor(context),
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      '${p.collectedBy}${p.staffRole.isNotEmpty && p.staffRole != "Admin" ? " (${p.staffRole})" : ""}',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: AppColors.textSubtleColor(context),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
