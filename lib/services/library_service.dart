@@ -150,6 +150,7 @@ class LibraryService {
   bool get canCollectFees => true;
   bool get canViewStudents => true;
   List<StudentInfo> get allStudents => List.unmodifiable(_mockStudents);
+  List<SeatInfo> get allSeats => List.unmodifiable(_mockSeats);
 
   void switchBranch(String branchId) {
     if (!canSwitchBranch) return; // Strict ownership: Only admin/owner can switch active branch

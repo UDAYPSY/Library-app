@@ -582,7 +582,7 @@ void main() {
       expect(service.totalSeatsCount, equals(10));
       expect(service.currentBranch.totalSeats, equals(10));
       expect(service.effectiveBranches.first.totalSeats, equals(10));
-      expect(service.mockSeats.length, equals(10));
+      expect(service.allSeats.length, equals(10));
     });
 
     test('Biometric login checks intended role and rejects cross-role access (Owner vs Staff)', () async {
