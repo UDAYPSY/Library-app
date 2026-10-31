@@ -76,4 +76,6 @@ class LocalStoreImpl {
       }
     } catch (_) {}
   }
+
+  static void reloadWindow() {}
 }

@@ -915,12 +915,11 @@ class LibraryService {
         }
         try {
           await authUser.delete();
-        } catch (_) {
-          try {
-            await FirebaseAuth.instance.signOut();
-          } catch (_) {}
-        }
+        } catch (_) {}
       }
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
     }
 
     // Reset all in-memory collections cleanly
@@ -2064,6 +2063,14 @@ class LibraryService {
     return false;
   }
 
+  static bool reloadAppIfWeb() {
+    if (kIsWeb) {
+      LocalStorageService.reloadWindow();
+      return true;
+    }
+    return false;
+  }
+
   Future<AuthResult> loginWithGoogle() async {
     ensureInitialized();
     if (isFirebaseConnected) {
@@ -2071,6 +2078,7 @@ class LibraryService {
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
         googleProvider.addScope('email');
         googleProvider.addScope('profile');
+        googleProvider.setCustomParameters({'prompt': 'select_account'});
         final UserCredential userCredential = kIsWeb
             ? await FirebaseAuth.instance.signInWithPopup(googleProvider)
             : await FirebaseAuth.instance.signInWithProvider(googleProvider);

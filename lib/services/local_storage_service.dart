@@ -14,4 +14,7 @@ class LocalStorageService {
 
   static Future<void> clearAll() =>
       LocalStoreImpl.clearAll();
+
+  static void reloadWindow() =>
+      LocalStoreImpl.reloadWindow();
 }

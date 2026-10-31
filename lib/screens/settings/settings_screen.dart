@@ -2318,20 +2318,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Dismiss blocking indicator
                 Navigator.of(context, rootNavigator: true).pop();
 
-                // Navigate to login screen
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (route) => false,
-                );
+                if (!LibraryService.reloadAppIfWeb()) {
+                  // Navigate to login screen on mobile platforms
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Your library account and all associated data have been permanently deleted.'),
-                    backgroundColor: Color(0xFFEF4444),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Your library account and all associated data have been permanently deleted.'),
+                      backgroundColor: Color(0xFFEF4444),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
               }
             },
             child: const Text('Delete Permanently', style: TextStyle(fontWeight: FontWeight.bold)),

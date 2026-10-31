@@ -23,7 +23,21 @@ class LocalStoreImpl {
 
   static Future<void> clearAll() async {
     try {
-      html.window.localStorage.clear();
+      final keysToRemove = <String>[];
+      for (final key in html.window.localStorage.keys) {
+        if (!key.startsWith('firebase:') && !key.startsWith('__firebase')) {
+          keysToRemove.add(key);
+        }
+      }
+      for (final key in keysToRemove) {
+        html.window.localStorage.remove(key);
+      }
+    } catch (_) {}
+  }
+
+  static void reloadWindow() {
+    try {
+      html.window.location.reload();
     } catch (_) {}
   }
 }

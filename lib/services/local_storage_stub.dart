@@ -16,4 +16,6 @@ class LocalStoreImpl {
   static Future<void> clearAll() async {
     _memoryStore.clear();
   }
+
+  static void reloadWindow() {}
 }
