@@ -241,6 +241,11 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                       const SizedBox(height: 4),
                       Text('👥 Registered Members: ${_service.currentStudents.length}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                       Text('💰 Payment Records: ${_service.currentPayments.length}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      Text('📊 Operating Expenses: ${_service.currentExpenses.length}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
