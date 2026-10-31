@@ -306,8 +306,9 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         _fromDate = now;
         _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
       } else {
-        _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(Duration(days: 30 * _selectedDurationMonths));
-        _validUntilDate = s.feeDueDate!;
+        // Active student with 0 dues: renewals must start from existing feeDueDate
+        _fromDate = s.feeDueDate!;
+        _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
       }
 
       final initialDue = _dueAmount;
@@ -602,15 +603,17 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
     if (widget.studentToEdit != null) {
       final s = widget.studentToEdit!;
       final isShiftChanged = s.shift.toLowerCase() != _selectedShift.name.toLowerCase();
-      if (_isStudentInPaidActiveTenure && !isShiftChanged && _selectedDurationMonths > 1 && _fromDate.isBefore(s.feeDueDate!)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance payments starting from ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)} are allowed.'),
-            backgroundColor: const Color(0xFFE11D48),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return;
+      if (_isStudentInPaidActiveTenure && !isShiftChanged) {
+        if (_fromDate.isBefore(s.feeDueDate!) || !_validUntilDate.isAfter(s.feeDueDate!)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance payments starting from ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)} are allowed.'),
+              backgroundColor: const Color(0xFFE11D48),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
       }
     }
 
@@ -732,16 +735,18 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         final isShiftChanged = oldShift.toLowerCase() != _selectedShift.name.toLowerCase();
         final oldMonthly = _studentCurrentShiftMonthlyFee;
 
-        // Overlap prevention: Only if student is active, shift NOT changed, and advance months selected
-        if (_isStudentInPaidActiveTenure && !isShiftChanged && _selectedDurationMonths > 1 && _fromDate.isBefore(s.feeDueDate!)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance payments are allowed.'),
-              backgroundColor: const Color(0xFFE11D48),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-          return;
+        // Overlap prevention: Only if student is active and shift NOT changed
+        if (_isStudentInPaidActiveTenure && !isShiftChanged) {
+          if (_fromDate.isBefore(s.feeDueDate!) || !_validUntilDate.isAfter(s.feeDueDate!)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance payments are allowed.'),
+                backgroundColor: const Color(0xFFE11D48),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
         }
 
         final dueAmount = _dueAmount;

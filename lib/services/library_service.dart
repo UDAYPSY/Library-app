@@ -1563,6 +1563,8 @@ class LibraryService {
       if (brandingDoc.exists && brandingDoc.data() != null) {
         profile = LibraryProfile.fromMap(brandingDoc.data()!);
       }
+      // Strictly maintain targetLibraryId as libraryId
+      profile.libraryId = targetLibraryId;
 
       final branchSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('branches').get();
       if (branchSnaps.docs.isNotEmpty) {
@@ -1627,7 +1629,10 @@ class LibraryService {
   bool get isAccountant => currentUserRole == 'Accountant & Fees';
   bool get isNightSupervisor => currentUserRole == 'Night Supervisor';
 
-  bool get isCloudSyncActive => isFirebaseConnected && FirebaseAuth.instance.currentUser != null;
+  bool get isCloudSyncActive =>
+      isFirebaseConnected &&
+      (FirebaseAuth.instance.currentUser != null ||
+          (isAuthenticated && profile.libraryId.isNotEmpty && profile.libraryId != 'default_library'));
 
   Future<void> restoreSession() async {
     final sessionStr = await LocalStorageService.getString('app_active_session');
@@ -1649,10 +1654,12 @@ class LibraryService {
     }
     if (isFirebaseConnected && FirebaseAuth.instance.currentUser != null) {
       final fbUser = FirebaseAuth.instance.currentUser!;
-      currentUserId = fbUser.uid;
-      profile.libraryId = fbUser.uid;
-      currentUserEmail = fbUser.email ?? currentUserEmail;
-      isAuthenticated = true;
+      if (!fbUser.isAnonymous && currentUserRole == 'Admin') {
+        currentUserId = fbUser.uid;
+        profile.libraryId = fbUser.uid;
+        currentUserEmail = fbUser.email ?? currentUserEmail;
+        isAuthenticated = true;
+      }
     }
   }
 
@@ -1688,41 +1695,57 @@ class LibraryService {
         if (credential.user != null) {
           final user = credential.user!;
           currentUserId = user.uid;
-          profile.libraryId = user.uid; // Strictly bound to Firebase Auth UID
           currentUserEmail = user.email ?? cleanId;
           final normEmail = currentUserEmail.toLowerCase();
           final staffMatch = staffList.where((s) => s.email != null && s.email!.toLowerCase() == normEmail);
-          if (staffMatch.isNotEmpty) {
-            currentUserRole = normalizeRole(staffMatch.first.role);
-            currentUserName = staffMatch.first.name;
+
+          DocumentSnapshot<Map<String, dynamic>>? dirStaffDoc;
+          if (staffMatch.isEmpty) {
+            try {
+              final dDoc = await _db.collection('staff_directory').doc(normEmail).get();
+              if (dDoc.exists && dDoc.data() != null) dirStaffDoc = dDoc;
+            } catch (_) {}
+          }
+
+          if (staffMatch.isNotEmpty || dirStaffDoc != null) {
+            // Staff account logged in via Firebase Auth: Bind strictly to the owner's library tenant
+            final role = staffMatch.isNotEmpty
+                ? staffMatch.first.role
+                : (dirStaffDoc!.data()?['role']?.toString() ?? 'Shift Manager');
+            currentUserRole = normalizeRole(role);
+            currentUserName = staffMatch.isNotEmpty
+                ? staffMatch.first.name
+                : (dirStaffDoc!.data()?['name']?.toString() ?? 'Staff Member');
+            final staffLibId = staffMatch.isNotEmpty
+                ? (profile.libraryId.isNotEmpty ? profile.libraryId : tenantId)
+                : (dirStaffDoc!.data()?['library_id']?.toString() ?? profile.libraryId);
+            if (staffLibId.isNotEmpty) {
+              profile = profile.copyWith(libraryId: staffLibId);
+              await _loadStaffLibraryData(staffLibId);
+            }
+            final staffBranch = staffMatch.isNotEmpty
+                ? staffMatch.first.branchId
+                : (dirStaffDoc!.data()?['branch_id']?.toString() ?? 'branch_1');
+            if (staffBranch.isNotEmpty) {
+              activeBranchId = staffBranch;
+            }
+            isAuthenticated = true;
           } else {
             currentUserRole = 'Admin';
+            profile.libraryId = user.uid; // Strictly bound to Firebase Auth UID for owner
             currentUserName = (profile.adminName.isNotEmpty && profile.adminName != 'Admin')
                 ? profile.adminName
                 : (currentUserEmail.contains('@') ? currentUserEmail.split('@')[0] : 'Administrator');
             profile.adminName = currentUserName;
             profile.adminEmail = currentUserEmail;
-          }
-          isAuthenticated = true;
+            isAuthenticated = true;
 
-          // Attempt to restore existing cloud library profile if user has previously configured one
-          bool restoredCloudProfile = false;
-          try {
-            final libDoc = await _db.collection('libraries').doc(user.uid).get();
-            if (libDoc.exists && libDoc.data() != null) {
-              final data = libDoc.data()!;
-              final name = data['library_name']?.toString().trim() ?? '';
-              if (name.isNotEmpty) {
-                profile = LibraryProfile.fromMap(data);
-                await LocalStorageService.saveString('app_setup_completed', 'true');
-                await _saveLocalState();
-                restoredCloudProfile = true;
-              }
-            }
-            if (!restoredCloudProfile) {
-              final brandingDoc = await _db.collection('libraries').doc(user.uid).collection('settings').doc('branding').get();
-              if (brandingDoc.exists && brandingDoc.data() != null) {
-                final data = brandingDoc.data()!;
+            // Attempt to restore existing cloud library profile if user has previously configured one
+            bool restoredCloudProfile = false;
+            try {
+              final libDoc = await _db.collection('libraries').doc(user.uid).get();
+              if (libDoc.exists && libDoc.data() != null) {
+                final data = libDoc.data()!;
                 final name = data['library_name']?.toString().trim() ?? '';
                 if (name.isNotEmpty) {
                   profile = LibraryProfile.fromMap(data);
@@ -1731,25 +1754,38 @@ class LibraryService {
                   restoredCloudProfile = true;
                 }
               }
-            }
-          } catch (_) {}
+              if (!restoredCloudProfile) {
+                final brandingDoc = await _db.collection('libraries').doc(user.uid).collection('settings').doc('branding').get();
+                if (brandingDoc.exists && brandingDoc.data() != null) {
+                  final data = brandingDoc.data()!;
+                  final name = data['library_name']?.toString().trim() ?? '';
+                  if (name.isNotEmpty) {
+                    profile = LibraryProfile.fromMap(data);
+                    await LocalStorageService.saveString('app_setup_completed', 'true');
+                    await _saveLocalState();
+                    restoredCloudProfile = true;
+                  }
+                }
+              }
+            } catch (_) {}
 
-          if (!restoredCloudProfile) {
-            // First time user or account was permanently deleted:
-            // Ensure local state is clean so they are routed to library creation wizard
-            profile.libraryName = '';
-            profile.city = '';
-            _mockStudents.clear();
-            _mockPayments.clear();
-            _mockExpenses.clear();
-            _mockRegistrationRequests.clear();
-            staffList.clear();
-            branches.clear();
-            await LocalStorageService.remove('app_setup_completed');
-            await LocalStorageService.remove('app_library_profile');
-            await LocalStorageService.remove('app_library_payments');
-            await LocalStorageService.remove('app_library_students');
-            await LocalStorageService.remove('app_library_expenses');
+            if (!restoredCloudProfile) {
+              // First time user or account was permanently deleted:
+              // Ensure local state is clean so they are routed to library creation wizard
+              profile.libraryName = '';
+              profile.city = '';
+              _mockStudents.clear();
+              _mockPayments.clear();
+              _mockExpenses.clear();
+              _mockRegistrationRequests.clear();
+              staffList.clear();
+              branches.clear();
+              await LocalStorageService.remove('app_setup_completed');
+              await LocalStorageService.remove('app_library_profile');
+              await LocalStorageService.remove('app_library_payments');
+              await LocalStorageService.remove('app_library_students');
+              await LocalStorageService.remove('app_library_expenses');
+            }
           }
 
           await LocalStorageService.saveString(
@@ -1759,6 +1795,7 @@ class LibraryService {
               'email': currentUserEmail,
               'role': currentUserRole,
               'name': currentUserName,
+              'branch_id': activeBranchId,
               'library_id': profile.libraryId,
             }),
           );
@@ -2777,6 +2814,17 @@ class LibraryService {
     final payDate = date ?? DateTime.now();
     final paymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
 
+    // Deduplication check: Prevent rapid duplicate payment submissions within 5s window
+    final isRapidDuplicate = _mockPayments.any((p) =>
+        (studentId != null && studentId.isNotEmpty && p.studentId == studentId) &&
+        p.amount == amount &&
+        p.date.isAfter(payDate.subtract(const Duration(seconds: 5))) &&
+        p.date.isBefore(payDate.add(const Duration(seconds: 5))));
+    if (isRapidDuplicate) {
+      debugPrint('[Payment] Ignored rapid duplicate payment transaction submission.');
+      return;
+    }
+
     // Resolve target branch
     String targetBranch = branchId ?? '';
     if (targetBranch.isEmpty && studentId != null && studentId.isNotEmpty) {
@@ -2812,9 +2860,26 @@ class LibraryService {
             phone.isNotEmpty &&
             normalizePhone(s.phone) == normalizePhone(phone)));
 
+    DateTime? updatedDueDate;
     if (matchIdx != -1) {
       final s = _mockStudents[matchIdx];
       final currentDues = s.effectiveDues;
+      final today = DateTime(payDate.year, payDate.month, payDate.day);
+      final isAlreadyPaidActive = currentDues == 0 &&
+          s.feeDueDate != null &&
+          !s.feeDueDate!.isBefore(today);
+
+      // Overlap & Duplicate check: Reject duplicate payments for already-paid active tenure
+      if (isAlreadyPaidActive && validUntil != null) {
+        final targetUntil = DateTime(validUntil.year, validUntil.month, validUntil.day);
+        final currentDue = DateTime(s.feeDueDate!.year, s.feeDueDate!.month, s.feeDueDate!.day);
+        if (!targetUntil.isAfter(currentDue)) {
+          throw Exception(
+            'Duplicate payment rejected: Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(s.feeDueDate!)}. Only advance renewals beyond this date can be accepted.',
+          );
+        }
+      }
+
       final isDuePayment = currentDues > 0 || notes.toLowerCase().contains('due');
       if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
         effectiveNotes = notes.isNotEmpty
@@ -2823,10 +2888,16 @@ class LibraryService {
       }
 
       final newDues = currentDues > 0 ? (currentDues - amount).clamp(0, 999999) : 0;
-      DateTime? updatedDueDate = s.feeDueDate;
-      if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
-        updatedDueDate = DateTime(payDate.year, payDate.month + 1, payDate.day);
+      updatedDueDate = s.feeDueDate;
+      if (validUntil != null) {
+        if (updatedDueDate == null || validUntil.isAfter(updatedDueDate)) {
+          updatedDueDate = validUntil;
+        }
+      } else if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
+        final monthsToAdd = durationMonths != null && durationMonths > 0 ? durationMonths : 1;
+        updatedDueDate = DateTime(payDate.year, payDate.month + monthsToAdd, payDate.day);
       }
+
       final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
       final payLog = isDuePayment
           ? 'Due payment of ₹$amount collected via $paymentMode on $dateStr$collectorTag${periodStr.isNotEmpty ? " (Period: $periodStr)" : ""}${notes.isNotEmpty && !notes.contains(periodStr) ? " • $notes" : ""}.'
@@ -2876,10 +2947,6 @@ class LibraryService {
           if (studentDoc.exists) {
             final data = studentDoc.data() ?? {};
             final curDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
-            final dueDateRaw = data['fee_due_date'];
-            DateTime? currentDueDate;
-            if (dueDateRaw is Timestamp) currentDueDate = dueDateRaw.toDate();
-
             final isDuePayment = curDues > 0 || notes.toLowerCase().contains('due');
             final newDues = curDues > 0 ? (curDues - amount).clamp(0, 999999) : 0;
             final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
@@ -2894,8 +2961,8 @@ class LibraryService {
               'status': newDues == 0 ? 'ACTIVE' : 'DUES',
               'note': updatedNote,
             };
-            if (currentDueDate != null && currentDueDate.isBefore(payDate) && newDues == 0) {
-              updates['fee_due_date'] = Timestamp.fromDate(DateTime(payDate.year, payDate.month + 1, payDate.day));
+            if (updatedDueDate != null) {
+              updates['fee_due_date'] = Timestamp.fromDate(updatedDueDate);
             }
             await _tenantCol('students').doc(studentId).update(updates);
           }
@@ -3373,6 +3440,18 @@ class LibraryService {
           deviceUserId: deviceUserId,
         );
       }
+      final nowToday = DateTime(now.year, now.month, now.day);
+      final isExistingPaid = existingStudent.duesAmount == 0 &&
+          existingStudent.feeDueDate != null &&
+          !existingStudent.feeDueDate!.isBefore(nowToday);
+
+      DateTime targetValidFrom = effectiveJoiningDate;
+      DateTime targetValidUntil = effectiveValidUntil;
+      if (isExistingPaid) {
+        targetValidFrom = existingStudent.feeDueDate!;
+        targetValidUntil = DateTime(targetValidFrom.year, targetValidFrom.month + effectiveMonths, targetValidFrom.day);
+      }
+
       await updateStudent(
         studentId: existingStudent.id,
         name: studentName,
@@ -3384,7 +3463,7 @@ class LibraryService {
         duesAmount: duesAmount,
         advanceAmount: advanceAmount,
         status: status,
-        feeDueDate: effectiveValidUntil,
+        feeDueDate: targetValidUntil,
         fatherName: fatherName,
         address: address,
         aadhaarNumber: aadhaarNumber,
@@ -3392,6 +3471,7 @@ class LibraryService {
         gender: gender,
         photoBase64: photoBase64,
       );
+
       if (status != 'TRIAL' && feeAmount > 0) {
         await recordPayment(
           studentId: existingStudent.id,
@@ -3404,7 +3484,10 @@ class LibraryService {
           paymentMode: paymentMode,
           notes: durationMonths > 1
               ? '$durationMonths Months Advance Fees'
-              : 'Initial registration fee',
+              : (isExistingPaid ? '1 Month Advance Renewal Fee' : 'Initial registration fee'),
+          validFrom: targetValidFrom,
+          validUntil: targetValidUntil,
+          durationMonths: effectiveMonths,
         );
       }
       return;
@@ -4294,116 +4377,30 @@ class LibraryService {
   }) async {
     ensureInitialized();
     final now = DateTime.now();
-    final validUntil = now.add(const Duration(days: 30));
-    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
-    final payLog = 'Payment of ₹$amount collected via $paymentMode on $dateStr${notes.isNotEmpty ? " • $notes" : ""}.';
+    final sIdx = _mockStudents.indexWhere((s) => s.id == studentId);
+    final s = sIdx != -1 ? _mockStudents[sIdx] : null;
 
-    if (isFirebaseConnected) {
-      final studentDocRef = _tenantCol('students').doc(studentId);
-      final paymentDocRef = _tenantCol('payments').doc();
-      final batch = _db.batch();
-
-      String studentName = '';
-      String studentPhone = '';
-      int? seatNumber;
-      String shift = 'Full Day';
-      int currentDues = 0;
-      String curNote = '';
-
-      try {
-        final snap = await studentDocRef.get();
-        if (snap.exists) {
-          final data = snap.data() ?? {};
-          studentName = (data['name'] as String?) ?? '';
-          studentPhone = (data['phone'] as String?) ?? '';
-          seatNumber = (data['seat_number'] as num?)?.toInt();
-          shift = (data['shift'] as String?) ?? 'Full Day';
-          currentDues = (data['dues_amount'] as num?)?.toInt() ?? 0;
-          curNote = (data['note'] as String?) ?? '';
-        }
-      } catch (_) {}
-
-      final newDues = (currentDues - amount).clamp(0, 999999);
-      final newStatus = newDues == 0 ? 'ACTIVE' : 'DUES';
-      final updatedNote = appendNote(curNote, payLog);
-
-      final updateData = <String, dynamic>{
-        'status': newStatus,
-        'dues_amount': newDues,
-        'payment_mode': paymentMode,
-        'note': updatedNote,
-      };
-      if (newDues == 0) {
-        updateData['fee_due_date'] = Timestamp.fromDate(validUntil);
-      }
-      batch.update(studentDocRef, updateData);
-
-      final collectorName = currentUserName.isNotEmpty && currentUserName != 'Guest' ? currentUserName : 'Admin';
-      final collectorRole = currentUserRole;
-      final collectorId = currentUserId ?? '';
-
-      batch.set(paymentDocRef, {
-        'payment_id': paymentDocRef.id,
-        'student_id': studentId,
-        'student_name': studentName,
-        'student_phone': studentPhone,
-        'seat_number': seatNumber,
-        'shift': shift,
-        'amount': amount,
-        'date': Timestamp.fromDate(now),
-        'valid_until': Timestamp.fromDate(validUntil),
-        'payment_mode': paymentMode,
-        'notes': notes,
-        'collected_by': collectorName,
-        'staff_role': collectorRole,
-        'staff_id': collectorId,
-      });
-
-      await batch.commit();
+    DateTime? targetUntil;
+    if (s != null && s.duesAmount > 0 && s.feeDueDate != null && s.feeDueDate!.isAfter(now)) {
+      targetUntil = s.feeDueDate;
     } else {
-      final idx = _mockStudents.indexWhere((s) => s.id == studentId);
-      if (idx != -1) {
-        final s = _mockStudents[idx];
-        final currentDues = s.effectiveDues;
-        final newDues = (currentDues - amount).clamp(0, 999999);
-        final newStatus = newDues == 0 ? 'ACTIVE' : 'DUES';
-        final newDueDate = newDues == 0 ? validUntil : s.feeDueDate;
-        final updatedNote = appendNote(s.note, payLog);
-
-        _mockStudents[idx] = s.copyWith(
-          status: newStatus,
-          duesAmount: newDues,
-          feeDueDate: newDueDate,
-          paymentMode: paymentMode,
-          note: updatedNote,
-        );
-        final collectorName = currentUserName.isNotEmpty && currentUserName != 'Guest' ? currentUserName : 'Admin';
-        final collectorRole = currentUserRole;
-        final collectorId = currentUserId ?? '';
-
-        _mockPayments.insert(
-          0,
-          PaymentTransaction(
-            id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
-            studentId: studentId,
-            studentName: s.name,
-            studentPhone: s.phone,
-            seatNumber: s.seatNumber ?? 1,
-            shift: s.shift,
-            amount: amount,
-            date: now,
-            paymentMode: paymentMode,
-            notes: notes,
-            collectedBy: collectorName,
-            staffRole: collectorRole,
-            staffId: collectorId,
-          ),
-        );
-        _mockStudentsController.add(List.unmodifiable(_mockStudents));
-        _mockPaymentsController.add(List.unmodifiable(_mockPayments));
-        await _saveLocalState();
-      }
+      targetUntil = now.add(const Duration(days: 30));
     }
+
+    await recordPayment(
+      studentId: studentId,
+      studentName: s?.name ?? 'Student',
+      phone: s?.phone,
+      seatNumber: s?.seatNumber,
+      shift: s?.shift ?? 'Full Day',
+      amount: amount,
+      date: now,
+      paymentMode: paymentMode,
+      notes: notes,
+      validFrom: now,
+      validUntil: targetUntil,
+    );
+  }
   }
 
   // --- Tools & More Helpers ---

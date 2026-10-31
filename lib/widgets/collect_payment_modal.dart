@@ -61,6 +61,7 @@ Future<void> showCollectPaymentModal(
   );
   DateTime paymentDate = DateTime.now();
   String selectedMethod = 'UPI';
+  bool isSubmitting = false;
 
   await showModalBottomSheet(
     context: context,
@@ -1015,19 +1016,35 @@ Future<void> showCollectPaymentModal(
                           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         onPressed: () async {
+                          if (isSubmitting) return;
+
                           // Prevent duplicate/overlapping payments for an already paid active period
                           final isPaidActive = !isExpired && !hasUnexpiredDue && student.feeDueDate != null;
-                          if (isPaidActive && fromDate.isBefore(student.feeDueDate!)) {
-                            ScaffoldMessenger.of(sheetContext).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(student.feeDueDate!)}. Only advance payments are allowed.',
+                          if (isPaidActive) {
+                            if (fromDate.isBefore(student.feeDueDate!)) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Overlapping period not allowed! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(student.feeDueDate!)}. Only advance payments are allowed.',
+                                  ),
+                                  backgroundColor: const Color(0xFFE11D48),
+                                  behavior: SnackBarBehavior.floating,
                                 ),
-                                backgroundColor: const Color(0xFFE11D48),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            return;
+                              );
+                              return;
+                            }
+                            if (!untilDate.isAfter(student.feeDueDate!)) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Duplicate tenure payment rejected! Student membership is already paid until ${DateFormat('dd-MMM-yyyy').format(student.feeDueDate!)}. Please select an advance renewal duration.',
+                                  ),
+                                  backgroundColor: const Color(0xFFE11D48),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              return;
+                            }
                           }
 
                           final totalPeriodFee = hasUnexpiredDue
@@ -1040,6 +1057,19 @@ Future<void> showCollectPaymentModal(
                           final netPayable = (grossDue - advanceToApply).clamp(0, grossDue);
                           final rawPaid = int.tryParse(dueAmountCtrl.text.trim()) ?? netPayable;
                           final paid = rawPaid.clamp(0, netPayable);
+
+                          if (paid <= 0 && advanceToApply <= 0) {
+                            ScaffoldMessenger.of(sheetContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter an amount to collect.'),
+                                backgroundColor: Color(0xFFE11D48),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+
+                          isSubmitting = true;
                           final remainingAdvance = student.advanceAmount - advanceToApply;
                           final remainingDues = (grossDue - (paid + advanceToApply)).clamp(0, 999999);
                           Navigator.pop(ctx);

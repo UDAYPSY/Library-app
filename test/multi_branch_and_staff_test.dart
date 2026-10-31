@@ -355,5 +355,121 @@ void main() {
       service.addStaffMember(rogueStaff);
       expect(service.staffList.any((s) => s.id == 'staff_rogue'), isFalse); // Blocked!
     });
+
+    test('Staff operational workflow: Staff adds student, collects fee, tags collector info, and handles advance renewal', () async {
+      // 1. Setup library and add Receptionist staff
+      service.profile = service.profile.copyWith(libraryId: 'lib_owner_100');
+      final receptionist = StaffMember(
+        id: 'staff_rec_01',
+        name: 'Aarti Desk',
+        phone: '9888877777',
+        role: 'Receptionist & Desk',
+        pinHash: LibraryService.hashPin('desk1234'),
+        branchId: 'branch_1',
+        isActive: true,
+        addedAt: DateTime.now(),
+      );
+      service.currentUserRole = 'Admin';
+      service.addStaffMember(receptionist);
+
+      // 2. Staff logs in
+      await service.signOut();
+      final loginRes = await service.login(identifier: '9888877777', password: 'desk1234');
+      expect(loginRes.success, isTrue);
+      expect(service.currentUserRole, equals('Receptionist'));
+      expect(service.currentUserName, equals('Aarti Desk'));
+      expect(service.canCollectFees, isTrue);
+      expect(service.canManageSeats, isTrue);
+
+      // 3. Staff adds a student with initial 1 month fee
+      final now = DateTime.now();
+      final expiry1 = DateTime(now.year, now.month + 1, now.day);
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 15,
+        studentName: 'Amit Kumar',
+        phone: '9777766666',
+        shift: 'Morning Shift',
+        feeAmount: 600,
+        monthlyFee: 600,
+        branchId: 'branch_1',
+        joiningDate: now,
+        validUntil: expiry1,
+      );
+
+      expect(service.allStudents.length, equals(1));
+      final student = service.allStudents.first;
+      expect(student.name, equals('Amit Kumar'));
+      expect(student.duesAmount, equals(0));
+      expect(student.status, equals('ACTIVE'));
+      expect(service.isSeatOccupied(15), isTrue);
+
+      // Verify payment was recorded and tagged with Aarti Desk (Receptionist)
+      expect(service.currentPayments.length, equals(1));
+      final firstPayment = service.currentPayments.first;
+      expect(firstPayment.amount, equals(600));
+      expect(firstPayment.collectedBy, equals('Aarti Desk'));
+      expect(firstPayment.staffRole, equals('Receptionist'));
+
+      // 4. DUPLICATE TENURE CHECK: Staff attempts to record a second payment for the SAME tenure
+      // Since Amit Kumar is active with 0 dues and paid until expiry1, a payment for the same tenure MUST be rejected!
+      expect(
+        () async => await service.recordPayment(
+          studentId: student.id,
+          studentName: student.name,
+          phone: student.phone,
+          amount: 600,
+          validFrom: now,
+          validUntil: expiry1, // Same tenure, already paid!
+          paymentMode: 'Cash',
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      // 5. ADVANCE RENEWAL: Staff collects an advance renewal extending beyond expiry1
+      final expiry2 = DateTime(expiry1.year, expiry1.month + 1, expiry1.day);
+      await service.recordPayment(
+        studentId: student.id,
+        studentName: student.name,
+        phone: student.phone,
+        amount: 600,
+        validFrom: expiry1,
+        validUntil: expiry2, // Advance renewal!
+        paymentMode: 'UPI',
+        notes: '1 Month Advance Renewal Fee',
+      );
+
+      // Verify advance renewal succeeded
+      expect(service.currentPayments.length, equals(2));
+      final updatedStudent = service.findStudentByPhone('9777766666');
+      expect(updatedStudent, isNotNull);
+      expect(updatedStudent!.feeDueDate, equals(expiry2));
+      expect(updatedStudent.duesAmount, equals(0));
+    });
+
+    test('Staff session restore preserves owner libraryId and does not overwrite with anonymous UID', () async {
+      service.profile = service.profile.copyWith(libraryId: 'owner_firebase_uid_99');
+      final staff = StaffMember(
+        id: 'staff_sm_01',
+        name: 'Sunil Shift Manager',
+        phone: '9333322222',
+        role: 'Shift Manager',
+        pinHash: LibraryService.hashPin('shiftPass'),
+        branchId: 'branch_1',
+        isActive: true,
+        addedAt: DateTime.now(),
+      );
+      service.currentUserRole = 'Admin';
+      service.addStaffMember(staff);
+
+      await service.signOut();
+      await service.login(identifier: '9333322222', password: 'shiftPass');
+      expect(service.currentUserRole, equals('Shift Manager'));
+      expect(service.profile.libraryId, equals('owner_firebase_uid_99'));
+
+      // Simulate session restore
+      await service.restoreSession();
+      expect(service.currentUserRole, equals('Shift Manager'));
+      expect(service.profile.libraryId, equals('owner_firebase_uid_99'));
+    });
   });
 }
