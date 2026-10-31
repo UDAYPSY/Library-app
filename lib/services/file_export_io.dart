@@ -8,6 +8,7 @@ Future<bool> saveAndDownloadFile({
   required String fileName,
   required String content,
   required String mimeType,
+  String? targetGoogleAccount,
 }) async {
   try {
     Directory? targetDir;
@@ -40,11 +41,18 @@ Future<bool> saveAndDownloadFile({
     final file = File('${targetDir.path}/$fileName');
     await file.writeAsBytes(bytes);
 
+    final shareSubject = targetGoogleAccount != null && targetGoogleAccount.isNotEmpty
+        ? 'TrackMyLibrary Master Backup -> $targetGoogleAccount'
+        : fileName;
+    final shareText = targetGoogleAccount != null && targetGoogleAccount.isNotEmpty
+        ? 'Master Disaster Recovery Backup strictly bound to Google Drive: $targetGoogleAccount. Upload only to this designated drive.'
+        : 'Exported file: $fileName';
+
     // Invoke system Share / Export dialog to allow user to Save to Device, Open in Excel, or Share
     await Share.shareXFiles(
       [XFile(file.path, name: fileName, mimeType: mimeType)],
-      subject: fileName,
-      text: 'Exported file: $fileName',
+      subject: shareSubject,
+      text: shareText,
       sharePositionOrigin: const Rect.fromLTWH(0, 0, 100, 100),
     );
     return true;

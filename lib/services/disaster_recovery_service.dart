@@ -42,7 +42,12 @@ class DisasterRecoveryService {
   }
 
   Future<void> setBackupEmail(String email) async {
-    if (!_service.isAdmin) return; // Strict ownership enforcement: Only admin can change Google Drive sync email
+    if (!_service.isAdmin) {
+      throw UnsupportedError('Strict ownership enforcement: Only admin can change Google Drive sync email');
+    }
+    if (!LibraryService.isValidEmail(email)) {
+      throw ArgumentError('Invalid Google Drive email format.');
+    }
     await LocalStorageService.saveString(keyBackupEmail, email.trim());
   }
 
@@ -255,7 +260,7 @@ class DisasterRecoveryService {
   }
 
   /// Generates a real multi-worksheet XML Spreadsheet 2003 (.xls) natively supported by Excel & Google Drive / Google Sheets
-  String generateMasterExcelWorkbookXml() {
+  String generateMasterExcelWorkbookXml({String? targetDriveEmail}) {
     _service.ensureInitialized();
     final buffer = StringBuffer();
     final now = DateTime.now();
@@ -397,6 +402,9 @@ class DisasterRecoveryService {
     buffer.writeln('   <Row><Cell ss:StyleID="MetaLabel"><Data ss:Type="String">Tenant ID</Data></Cell><Cell><Data ss:Type="String">${_escapeXml(_service.tenantId)}</Data></Cell></Row>');
     buffer.writeln('   <Row><Cell ss:StyleID="MetaLabel"><Data ss:Type="String">Total Seats</Data></Cell><Cell ss:StyleID="NumberCell"><Data ss:Type="Number">${_service.totalSeatsCount}</Data></Cell></Row>');
     buffer.writeln('   <Row><Cell ss:StyleID="MetaLabel"><Data ss:Type="String">Registered Members</Data></Cell><Cell ss:StyleID="NumberCell"><Data ss:Type="Number">${students.length}</Data></Cell></Row>');
+    buffer.writeln('   <Row><Cell ss:StyleID="MetaLabel"><Data ss:Type="String">Designated Google Drive Destination</Data></Cell><Cell><Data ss:Type="String">${_escapeXml(targetDriveEmail ?? _service.profile.adminEmail)}</Data></Cell></Row>');
+    buffer.writeln('   <Row><Cell ss:StyleID="MetaLabel"><Data ss:Type="String">Payment UPI VPA</Data></Cell><Cell><Data ss:Type="String">${_escapeXml(_service.profile.effectiveUpiId)}</Data></Cell></Row>');
+    buffer.writeln('   <Row><Cell ss:StyleID="MetaLabel"><Data ss:Type="String">Configuration Lock Status</Data></Cell><Cell><Data ss:Type="String">STATIC_SETUP_LOCKED</Data></Cell></Row>');
     buffer.writeln('   <Row><Cell ss:StyleID="MetaLabel"><Data ss:Type="String">SYSTEM_RESTORE_PAYLOAD</Data></Cell><Cell><Data ss:Type="String">$base64Payload</Data></Cell></Row>');
     buffer.writeln('  </Table>');
     buffer.writeln(' </Worksheet>');
@@ -408,7 +416,8 @@ class DisasterRecoveryService {
   /// Triggers backup creation and opens system save/share to Google Drive
   Future<bool> backupToGoogleDriveNow() async {
     try {
-      final excelXml = generateMasterExcelWorkbookXml();
+      final targetEmail = await getBackupEmail();
+      final excelXml = generateMasterExcelWorkbookXml(targetDriveEmail: targetEmail);
       final now = DateTime.now();
       final stamp = DateFormat('yyyyMMdd_HHmmss').format(now);
       final fileName = 'TrackMyLibrary_Master_Backup_$stamp.xls';
@@ -419,6 +428,7 @@ class DisasterRecoveryService {
         fileName: fileName,
         content: excelXml,
         mimeType: 'application/vnd.ms-excel;charset=utf-8',
+        targetGoogleAccount: targetEmail,
       );
 
       if (ok) {

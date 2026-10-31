@@ -5,6 +5,7 @@ Future<bool> saveAndDownloadFile({
   required String fileName,
   required String content,
   required String mimeType,
+  String? targetGoogleAccount,
 }) async {
   try {
     // Prefix UTF-8 BOM so Microsoft Excel recognizes encoding immediately

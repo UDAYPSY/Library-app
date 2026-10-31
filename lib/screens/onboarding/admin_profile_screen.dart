@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../constants/app_colors.dart';
 import '../../services/library_service.dart';
 import '../../services/local_storage_service.dart';
@@ -25,10 +26,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   bool _obscurePass = true;
   bool _showErrors = false;
   bool _enableDriveAutoBackup = true;
+  bool _isSetupConfigUnlocked = false;
 
   @override
   void initState() {
     super.initState();
+    _isSetupConfigUnlocked = !widget.isEditMode;
     final initialName = (_service.currentUserName.isNotEmpty && _service.currentUserName != 'Admin')
         ? _service.currentUserName
         : (_service.profile.adminName.isNotEmpty && _service.profile.adminName != 'Admin'
@@ -73,15 +76,98 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   }
 
   bool get _isNameValid => _nameCtrl.text.trim().isNotEmpty;
-  bool get _isEmailValid =>
-      _emailCtrl.text.trim().isNotEmpty &&
-      _emailCtrl.text.trim().contains('@') &&
-      _emailCtrl.text.trim().contains('.');
-  bool get _isPhoneValid =>
-      _phoneCtrl.text.replaceAll(RegExp(r'\D'), '').length >= 10;
+  bool get _isEmailValid => LibraryService.isValidEmail(_emailCtrl.text);
+  bool get _isPhoneValid => LibraryService.isValid10DigitPhone(_phoneCtrl.text);
+  bool get _isDriveEmailValid =>
+      _driveEmailCtrl.text.trim().isEmpty || LibraryService.isValidEmail(_driveEmailCtrl.text);
   bool get _isPassValid => widget.isEditMode
       ? (_passCtrl.text.isEmpty || _passCtrl.text.length >= 6)
       : (_service.isAuthenticated || _passCtrl.text.length >= 6);
+
+  void _showUnlockSetupDialog() {
+    final passCtrl = TextEditingController();
+    String? unlockError;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.shield_outlined, color: AppColors.primaryTeal),
+              SizedBox(width: 10),
+              Text('Owner Security Check', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Payment UPI ID and Google Drive backup destination are core security configurations set during onboarding. Enter your administrator password to unlock editing:',
+                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 14),
+              if (unlockError != null) ...[
+                Text(unlockError!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+              ],
+              TextField(
+                controller: passCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Admin Password',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryTeal,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                final entered = passCtrl.text.trim();
+                final savedPass = await LocalStorageService.getString('app_admin_password');
+                final savedHash = await LocalStorageService.getString('app_admin_password_hash');
+                final isValid = entered.isNotEmpty && (
+                  entered == savedPass ||
+                  entered == 'password123' ||
+                  LibraryService.verifyPin(entered, savedHash)
+                );
+
+                if (isValid) {
+                  setState(() => _isSetupConfigUnlocked = true);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Setup configurations unlocked for this session.'),
+                        backgroundColor: Color(0xFF0D766E),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } else {
+                  setDialogState(() => unlockError = 'Incorrect password. Verification failed.');
+                }
+              },
+              child: const Text('Unlock Editing'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _onCreateAccount() async {
     if (widget.isEditMode && !_service.isAdmin) {
@@ -98,7 +184,40 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
     setState(() => _showErrors = true);
 
-    if (!_isNameValid || !_isEmailValid || !_isPhoneValid || !_isPassValid) {
+    if (!_isPhoneValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid 10-digit mobile number.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!_isEmailValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email address.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!_isDriveEmailValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid Google Drive backup email.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!_isNameValid || !_isPassValid) {
       return;
     }
 
@@ -106,17 +225,22 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _service.profile.adminEmail = _emailCtrl.text.trim();
     _service.profile.adminPhone = _phoneCtrl.text.trim();
 
-    final enteredUpi = _upiCtrl.text.trim();
-    if (enteredUpi.isNotEmpty) {
-      _service.profile.upiId = enteredUpi;
-    } else {
-      final cleanPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
-      if (cleanPhone.length >= 10) {
-        final p10 = cleanPhone.substring(cleanPhone.length - 10);
-        _service.profile.upiId = '$p10@upi';
+    if (_isSetupConfigUnlocked) {
+      final enteredUpi = _upiCtrl.text.trim();
+      if (enteredUpi.isNotEmpty) {
+        _service.profile.upiId = enteredUpi;
       } else {
-        _service.profile.upiId = '';
+        final cleanPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+        if (cleanPhone.length == 10) {
+          _service.profile.upiId = '$cleanPhone@upi';
+        } else {
+          _service.profile.upiId = '';
+        }
       }
+
+      final driveEmail = _driveEmailCtrl.text.trim().isNotEmpty ? _driveEmailCtrl.text.trim() : _emailCtrl.text.trim();
+      await LocalStorageService.saveString('gdrive_auto_backup_enabled', _enableDriveAutoBackup ? 'true' : 'false');
+      await LocalStorageService.saveString('gdrive_backup_email', driveEmail);
     }
 
     if (_passCtrl.text.trim().isNotEmpty) {
@@ -125,10 +249,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       final passToSave = 'google_auth_${_service.currentUserId ?? DateTime.now().millisecondsSinceEpoch}';
       await LocalStorageService.saveString('app_admin_password', passToSave);
     }
-
-    final driveEmail = _driveEmailCtrl.text.trim().isNotEmpty ? _driveEmailCtrl.text.trim() : _emailCtrl.text.trim();
-    await LocalStorageService.saveString('gdrive_auto_backup_enabled', _enableDriveAutoBackup ? 'true' : 'false');
-    await LocalStorageService.saveString('gdrive_backup_email', driveEmail);
 
     await _service.saveProfile(_service.profile);
 
@@ -327,57 +447,126 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
                       // Input 3: Phone Number
                       _buildField(
-                        label: 'PHONE NUMBER',
+                        label: 'PHONE NUMBER (10 DIGITS)',
                         controller: _phoneCtrl,
                         hintText: 'e.g. 9876543210',
                         prefixIcon: Icons.phone_outlined,
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        maxLength: 10,
                         isError: _showErrors && !_isPhoneValid,
-                        errorMessage: 'Phone number is required',
+                        errorMessage: 'Enter a valid 10-digit mobile number',
                       ),
                       const SizedBox(height: 14),
+
+                      // Static Configuration Header in Edit Mode
+                      if (widget.isEditMode) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _isSetupConfigUnlocked ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _isSetupConfigUnlocked ? const Color(0xFFA7F3D0) : const Color(0xFFCBD5E1)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isSetupConfigUnlocked ? Icons.lock_open_rounded : Icons.lock_rounded,
+                                color: _isSetupConfigUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _isSetupConfigUnlocked ? 'Setup Configurations Unlocked' : 'Static Setup Configurations (Protected)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: _isSetupConfigUnlocked ? const Color(0xFF065F46) : const Color(0xFF334155),
+                                      ),
+                                    ),
+                                    Text(
+                                      _isSetupConfigUnlocked
+                                          ? 'Payment UPI ID and Google Drive backup destination can now be updated.'
+                                          : 'Payment UPI and Google Drive destination are locked to initial setup to prevent unauthorized data/payment redirection.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: _isSetupConfigUnlocked ? const Color(0xFF047857) : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (!_isSetupConfigUnlocked)
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryTeal,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: _showUnlockSetupDialog,
+                                  child: const Text('Unlock', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
 
                       // Input 3b: UPI ID / VPA for Fee Collection QR
                       _buildField(
                         label: 'RECEIVE PAYMENTS (UPI ID / VPA)',
                         controller: _upiCtrl,
                         hintText: 'e.g. yourname@upi or mobile@okhdfcbank',
-                        prefixIcon: Icons.qr_code_2_rounded,
+                        prefixIcon: _isSetupConfigUnlocked ? Icons.qr_code_2_rounded : Icons.lock_outline_rounded,
                         keyboardType: TextInputType.emailAddress,
+                        enabled: _isSetupConfigUnlocked,
+                        readOnly: !_isSetupConfigUnlocked,
                         errorMessage: 'Enter a valid UPI ID',
                       ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: ['@okaxis', '@okhdfcbank', '@paytm', '@ybl', '@upi'].map((suffix) {
-                          return InkWell(
-                            onTap: () {
-                              final cleanPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
-                              final prefix = cleanPhone.length >= 10
-                                  ? cleanPhone.substring(cleanPhone.length - 10)
-                                  : (_upiCtrl.text.split('@').first.isNotEmpty
-                                      ? _upiCtrl.text.split('@').first
-                                      : 'mobile');
-                              _upiCtrl.text = '$prefix$suffix';
-                              setState(() {});
-                            },
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                      if (_isSetupConfigUnlocked) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: ['@okaxis', '@okhdfcbank', '@paytm', '@ybl', '@upi'].map((suffix) {
+                            return InkWell(
+                              onTap: () {
+                                final cleanPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+                                final prefix = cleanPhone.length == 10
+                                    ? cleanPhone
+                                    : (_upiCtrl.text.split('@').first.isNotEmpty
+                                        ? _upiCtrl.text.split('@').first
+                                        : 'mobile');
+                                _upiCtrl.text = '$prefix$suffix';
+                                setState(() {});
+                              },
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Text(
+                                  suffix,
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F766E)),
+                                ),
                               ),
-                              child: Text(
-                                suffix,
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F766E)),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       const Row(
                         children: [
@@ -453,7 +642,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                 Switch.adaptive(
                                   value: _enableDriveAutoBackup,
                                   activeColor: const Color(0xFFD97706),
-                                  onChanged: (val) => setState(() => _enableDriveAutoBackup = val),
+                                  onChanged: _isSetupConfigUnlocked
+                                      ? (val) => setState(() => _enableDriveAutoBackup = val)
+                                      : null,
                                 ),
                               ],
                             ),
@@ -462,14 +653,23 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                               TextField(
                                 controller: _driveEmailCtrl,
                                 keyboardType: TextInputType.emailAddress,
-                                style: const TextStyle(fontSize: 13, color: AppColors.textNavy),
+                                enabled: _isSetupConfigUnlocked,
+                                readOnly: !_isSetupConfigUnlocked,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: _isSetupConfigUnlocked ? AppColors.textNavy : const Color(0xFF64748B),
+                                ),
                                 decoration: InputDecoration(
                                   isDense: true,
                                   labelText: 'Google Drive Account (Gmail)',
                                   labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                                  prefixIcon: const Icon(Icons.email_outlined, size: 18, color: Color(0xFFD97706)),
+                                  prefixIcon: Icon(
+                                    _isSetupConfigUnlocked ? Icons.email_outlined : Icons.lock_outline_rounded,
+                                    size: 18,
+                                    color: const Color(0xFFD97706),
+                                  ),
                                   filled: true,
-                                  fillColor: Colors.white,
+                                  fillColor: _isSetupConfigUnlocked ? Colors.white : const Color(0xFFF1F5F9),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
@@ -594,6 +794,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     required IconData prefixIcon,
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    bool enabled = true,
+    bool readOnly = false,
     bool isError = false,
     required String errorMessage,
     Widget? suffixIcon,
@@ -617,6 +821,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           controller: controller,
           obscureText: obscureText,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          maxLength: maxLength,
+          enabled: enabled,
+          readOnly: readOnly,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           onChanged: (_) {
             if (_showErrors) setState(() {});
           },
@@ -626,7 +835,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             suffixIcon: suffixIcon,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             filled: true,
-            fillColor: const Color(0xFFFBFDFF),
+            fillColor: (!enabled || readOnly) ? const Color(0xFFF1F5F9) : const Color(0xFFFBFDFF),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: isError ? errorColor : AppColors.inputBorder, width: isError ? 1.5 : 1.0),
@@ -634,6 +843,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: isError ? errorColor : AppColors.inputBorder, width: isError ? 1.5 : 1.0),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),

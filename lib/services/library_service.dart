@@ -42,6 +42,20 @@ class LibraryService {
     return hashPin(inputPin) == storedHash;
   }
 
+  /// Strictly checks if a mobile number contains exactly 10 digits
+  static bool isValid10DigitPhone(String phone) {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    return digits.length == 10;
+  }
+
+  /// Validates standard RFC-5322 compliant email format
+  static bool isValidEmail(String email) {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) return false;
+    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    return emailRegex.hasMatch(trimmed);
+  }
+
   // Singleton pattern for centralized app state
   static final LibraryService _instance = LibraryService._internal();
   factory LibraryService() => _instance;
@@ -604,6 +618,12 @@ class LibraryService {
   Future<void> saveProfile(LibraryProfile newProfile) async {
     if (!isAdmin) {
       throw UnsupportedError('Access Denied: Only Library Owner can modify library profile.');
+    }
+    if (newProfile.adminPhone.isNotEmpty && !isValid10DigitPhone(newProfile.adminPhone)) {
+      throw ArgumentError('Administrator phone number must be a valid 10-digit number.');
+    }
+    if (newProfile.adminEmail.isNotEmpty && !isValidEmail(newProfile.adminEmail)) {
+      throw ArgumentError('Administrator email must be a valid email address.');
     }
     profile = newProfile;
     await _saveLocalState();
@@ -2676,6 +2696,20 @@ class LibraryService {
       return const AuthResult(
         success: false,
         message: 'Password must be at least 6 characters long.',
+      );
+    }
+
+    if (!isValidEmail(cleanEmail)) {
+      return const AuthResult(
+        success: false,
+        message: 'Please enter a valid email address.',
+      );
+    }
+
+    if (phone != null && phone.trim().isNotEmpty && !isValid10DigitPhone(phone)) {
+      return const AuthResult(
+        success: false,
+        message: 'Please enter a valid 10-digit mobile number.',
       );
     }
 

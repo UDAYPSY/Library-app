@@ -643,6 +643,108 @@ void main() {
         throwsA(isA<UnsupportedError>()),
       );
     });
+
+    test('Strict 10-digit mobile number and RFC email validation utilities', () {
+      // 1. Phone validation: exactly 10 digits
+      expect(LibraryService.isValid10DigitPhone('9876543210'), isTrue);
+      expect(LibraryService.isValid10DigitPhone('+91 98765 43210'), isTrue);
+      expect(LibraryService.isValid10DigitPhone('987654321012345678'), isFalse); // 18 digits blocked!
+      expect(LibraryService.isValid10DigitPhone('98765'), isFalse); // < 10 digits blocked
+      expect(LibraryService.isValid10DigitPhone(''), isFalse);
+      expect(LibraryService.isValid10DigitPhone('abcdefghij'), isFalse);
+
+      // 2. Email validation: standard RFC format
+      expect(LibraryService.isValidEmail('owner@library.com'), isTrue);
+      expect(LibraryService.isValidEmail('admin.desk@branch.co.in'), isTrue);
+      expect(LibraryService.isValidEmail('invalid'), isFalse);
+      expect(LibraryService.isValidEmail('user@'), isFalse);
+      expect(LibraryService.isValidEmail('user@domain'), isFalse);
+      expect(LibraryService.isValidEmail('user@.com'), isFalse);
+      expect(LibraryService.isValidEmail(''), isFalse);
+    });
+
+    test('Library setup and registration strictly rejects 18-digit phone numbers and invalid emails', () async {
+      // 1. Reject invalid email
+      final invalidEmailRes = await service.registerAdminAccount(
+        email: 'not-an-email',
+        password: 'password123',
+        adminName: 'Owner',
+        libraryName: 'Test Lib',
+        phone: '9876543210',
+      );
+      expect(invalidEmailRes.success, isFalse);
+      expect(invalidEmailRes.message, contains('valid email'));
+
+      // 2. Reject 18-digit phone number
+      final invalidPhoneRes = await service.registerAdminAccount(
+        email: 'owner@library.com',
+        password: 'password123',
+        adminName: 'Owner',
+        libraryName: 'Test Lib',
+        phone: '987654321012345678', // 18 digits
+      );
+      expect(invalidPhoneRes.success, isFalse);
+      expect(invalidPhoneRes.message, contains('10-digit mobile'));
+
+      // 3. Valid setup succeeds
+      final validRes = await service.registerAdminAccount(
+        email: 'owner@library.com',
+        password: 'password123',
+        adminName: 'Owner',
+        libraryName: 'Test Lib',
+        phone: '9876543210',
+      );
+      expect(validRes.success, isTrue);
+      expect(service.profile.adminPhone, equals('9876543210'));
+      expect(service.profile.adminEmail, equals('owner@library.com'));
+    });
+
+    test('saveProfile strictly blocks invalid phone and email formats', () async {
+      await service.login(identifier: 'admin', password: 'password123');
+      expect(service.isAdmin, isTrue);
+
+      // 18-digit phone in profile update throws ArgumentError
+      expect(
+        () async => await service.saveProfile(service.profile.copyWith(adminPhone: '123456789012345678')),
+        throwsA(isA<ArgumentError>()),
+      );
+
+      // Invalid email in profile update throws ArgumentError
+      expect(
+        () async => await service.saveProfile(service.profile.copyWith(adminEmail: 'bad-email')),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('Disaster Recovery service enforces setup Google Drive binding and static lock', () async {
+      await service.login(identifier: 'admin', password: 'password123');
+      service.profile.adminEmail = 'owner_setup@library.com';
+      service.profile.upiId = 'owner_settlement@upi';
+
+      final drService = DisasterRecoveryService(service: service);
+
+      // Default backup email binds strictly to setup owner email
+      final initialEmail = await drService.getBackupEmail();
+      expect(initialEmail, equals('owner_setup@library.com'));
+
+      // Setting invalid email throws ArgumentError
+      expect(
+        () async => await drService.setBackupEmail('not-an-email'),
+        throwsA(isA<ArgumentError>()),
+      );
+
+      // Valid email updates successfully
+      await drService.setBackupEmail('backup_drive@gmail.com');
+      expect(await drService.getBackupEmail(), equals('backup_drive@gmail.com'));
+
+      // Generated Excel contains locked Google Drive destination and STATIC_SETUP_LOCKED status
+      final xml = drService.generateMasterExcelWorkbookXml(targetDriveEmail: 'backup_drive@gmail.com');
+      expect(xml, contains('Designated Google Drive Destination'));
+      expect(xml, contains('backup_drive@gmail.com'));
+      expect(xml, contains('STATIC_SETUP_LOCKED'));
+      expect(xml, contains('Payment UPI VPA'));
+      expect(xml, contains('owner_settlement@upi'));
+    });
   });
 }
 

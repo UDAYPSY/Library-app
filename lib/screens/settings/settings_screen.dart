@@ -1412,6 +1412,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     TextField(
                       controller: phoneCtrl,
                       keyboardType: TextInputType.phone,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
+                      maxLength: 10,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       decoration: const InputDecoration(
                         labelText: '10-Digit Mobile Number (Login ID) *',
                         hintText: 'e.g. 9876543210',
@@ -1591,11 +1597,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     setDialogState(() => validationError = 'Please enter staff full name.');
                     return;
                   }
-                  if (phone.length < 10) {
-                    setDialogState(() => validationError = 'Please enter a valid 10-digit mobile number.');
+                  if (!LibraryService.isValid10DigitPhone(phone)) {
+                    setDialogState(() => validationError = 'Mobile number must be exactly 10 digits.');
                     return;
                   }
-                  if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+                  if (!LibraryService.isValidEmail(email)) {
                     setDialogState(() => validationError = 'Please enter a valid email address.');
                     return;
                   }

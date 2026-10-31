@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../services/library_service.dart';
@@ -602,6 +603,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  maxLength: 10,
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                   decoration: const InputDecoration(
                     labelText: 'Mobile Number (10 Digits)',
                     prefixIcon: Icon(Icons.phone_outlined, size: 20),
@@ -635,9 +642,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             final lib = libCtrl.text.trim();
                             final email = emailCtrl.text.trim();
                             final pass = passCtrl.text.trim();
+                            final phone = phoneCtrl.text.trim();
 
                             if (name.isEmpty || lib.isEmpty || email.isEmpty) {
                               setModalState(() => modalError = 'Please fill all required fields.');
+                              return;
+                            }
+                            if (!LibraryService.isValidEmail(email)) {
+                              setModalState(() => modalError = 'Please enter a valid email address.');
+                              return;
+                            }
+                            if (phone.isNotEmpty && !LibraryService.isValid10DigitPhone(phone)) {
+                              setModalState(() => modalError = 'Mobile number must be exactly 10 digits.');
                               return;
                             }
                             if (pass.length < 6) {

@@ -10,11 +10,13 @@ class FileExportService {
     required String fileName,
     required String content,
     String mimeType = 'text/csv;charset=utf-8',
+    String? targetGoogleAccount,
   }) async {
     return await saveAndDownloadFile(
       fileName: fileName,
       content: content,
       mimeType: mimeType,
+      targetGoogleAccount: targetGoogleAccount,
     );
   }
 }
