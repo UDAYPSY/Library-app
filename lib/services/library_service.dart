@@ -139,7 +139,9 @@ class LibraryService {
     }
   }
 
-  bool get canViewRevenue => isAdmin || currentUserRole == 'Accountant & Fees';
+  bool get canViewRevenue => isAdmin;
+  bool get canExportReports => isAdmin;
+  bool get canEditAdminProfile => isAdmin;
   bool get canManageStaff => isAdmin;
   bool get canSwitchBranch => isAdmin;
   bool get canEditSettings => isAdmin;
@@ -339,14 +341,17 @@ class LibraryService {
   }
 
   int get totalSeatsCount {
+    int totalFromSections = 0;
+    for (var s in sections) {
+      totalFromSections += s.totalSeats;
+    }
+    if (totalFromSections > 0) {
+      return totalFromSections;
+    }
     if (branches.isNotEmpty && currentBranch.totalSeats > 0) {
       return currentBranch.totalSeats;
     }
-    int total = 0;
-    for (var s in sections) {
-      total += s.totalSeats;
-    }
-    return total > 0 ? total : 35;
+    return 35;
   }
 
   List<StudentInfo> get activeBranchStudents {
@@ -571,24 +576,42 @@ class LibraryService {
     } catch (_) {}
   }
 
-  /// Public persistence helper ensuring all changes to profile, seats, shifts & staff are stored locally
+  /// Public persistence helper ensuring all changes to profile, seats, shifts & staff are stored locally and synced to cloud
   Future<void> persistAll() async {
     await _saveLocalState();
     if (isFirebaseConnected && currentUserId != null) {
       try {
-        await _db.collection('libraries').doc(tenantId).set(profile.toMap(), SetOptions(merge: true));
+        await _db.collection('libraries').doc(tenantId).set({
+          ...profile.toMap(),
+          'total_seats': totalSeatsCount,
+        }, SetOptions(merge: true));
         await _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true));
+        await _tenantCol('settings').doc('sections').set({
+          'sections': sections.map((s) => s.toMap()).toList(),
+          'total_seats': totalSeatsCount,
+        }, SetOptions(merge: true));
+        if (branches.isNotEmpty) {
+          for (final b in branches) {
+            await _tenantCol('branches').doc(b.id).set(b.toMap(), SetOptions(merge: true));
+          }
+        }
       } catch (_) {}
     }
   }
 
-  /// Update and persist library profile metadata
+  /// Update and persist library profile metadata (Owner only)
   Future<void> saveProfile(LibraryProfile newProfile) async {
+    if (!isAdmin) {
+      throw UnsupportedError('Access Denied: Only Library Owner can modify library profile.');
+    }
     profile = newProfile;
     await _saveLocalState();
     if (isFirebaseConnected && currentUserId != null) {
       try {
-        await _db.collection('libraries').doc(tenantId).set(profile.toMap(), SetOptions(merge: true));
+        await _db.collection('libraries').doc(tenantId).set({
+          ...profile.toMap(),
+          'total_seats': totalSeatsCount,
+        }, SetOptions(merge: true));
         await _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true));
       } catch (_) {}
     }
@@ -619,6 +642,9 @@ class LibraryService {
   }
 
   String exportFullBackupJson() {
+    if (!isAdmin) {
+      throw UnsupportedError('Access Denied: Only Library Owner can export full library data.');
+    }
     ensureInitialized();
     final backupData = {
       'app': 'TrackMyLibrary',
@@ -1030,8 +1056,43 @@ class LibraryService {
 
   void updateSectionsAndRebuildSeats(List<SectionConfig> newSections) {
     sections = newSections;
+    int calculatedSeats = 0;
+    for (var s in newSections) {
+      calculatedSeats += s.totalSeats;
+    }
+    if (calculatedSeats <= 0) {
+      calculatedSeats = 10;
+    }
+    if (branches.isNotEmpty) {
+      branches[0] = branches[0].copyWith(totalSeats: calculatedSeats);
+    } else {
+      branches = [
+        LibraryBranch(
+          id: 'branch_1',
+          name: profile.libraryName.isNotEmpty ? profile.libraryName : 'Main Campus',
+          address: profile.city.isNotEmpty ? profile.city : 'Main Branch',
+          totalSeats: calculatedSeats,
+          isDefault: true,
+        ),
+      ];
+    }
     _syncSeatsWithStudents();
     _saveLocalState();
+    if (!_mockSeatsController.isClosed) {
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    }
+    if (isFirebaseConnected && currentUserId != null) {
+      try {
+        _db.collection('libraries').doc(tenantId).set({
+          'total_seats': calculatedSeats,
+        }, SetOptions(merge: true));
+        _tenantCol('settings').doc('sections').set({
+          'sections': newSections.map((s) => s.toMap()).toList(),
+          'total_seats': calculatedSeats,
+        }, SetOptions(merge: true));
+        _tenantCol('branches').doc(currentBranch.id).set(currentBranch.toMap(), SetOptions(merge: true));
+      } catch (_) {}
+    }
   }
 
   static String normalizePhone(String phone) {
@@ -1571,9 +1632,15 @@ class LibraryService {
   Future<void> _loadStaffLibraryData(String targetLibraryId) async {
     if (!isFirebaseConnected || targetLibraryId.isEmpty) return;
     try {
+      int cloudTotalSeats = 0;
       final libDoc = await _db.collection('libraries').doc(targetLibraryId).get();
       if (libDoc.exists && libDoc.data() != null) {
-        profile = LibraryProfile.fromMap(libDoc.data()!);
+        final d = libDoc.data()!;
+        profile = LibraryProfile.fromMap(d);
+        if (d['total_seats'] != null) {
+          final sVal = (d['total_seats'] as num).toInt();
+          if (sVal > 0) cloudTotalSeats = sVal;
+        }
       }
       final brandingDoc = await _db.collection('libraries').doc(targetLibraryId).collection('settings').doc('branding').get();
       if (brandingDoc.exists && brandingDoc.data() != null) {
@@ -1582,25 +1649,63 @@ class LibraryService {
       // Strictly maintain targetLibraryId as libraryId
       profile.libraryId = targetLibraryId;
 
+      try {
+        final secDoc = await _db.collection('libraries').doc(targetLibraryId).collection('settings').doc('sections').get();
+        if (secDoc.exists && secDoc.data() != null) {
+          final sData = secDoc.data()!;
+          if (sData['sections'] is List) {
+            sections = (sData['sections'] as List)
+                .map((x) => SectionConfig.fromMap(Map<String, dynamic>.from(x)))
+                .toList();
+          }
+          if (sData['total_seats'] != null) {
+            final sVal = (sData['total_seats'] as num).toInt();
+            if (sVal > 0) cloudTotalSeats = sVal;
+          }
+        }
+      } catch (_) {}
+
       final branchSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('branches').get();
       if (branchSnaps.docs.isNotEmpty) {
         branches = branchSnaps.docs.map((d) => LibraryBranch.fromMap(d.data())).toList();
+      } else if (cloudTotalSeats > 0) {
+        branches = [
+          LibraryBranch(
+            id: 'branch_1',
+            name: profile.libraryName.isNotEmpty ? profile.libraryName : 'Main Campus',
+            address: profile.city.isNotEmpty ? profile.city : 'Main Branch',
+            totalSeats: cloudTotalSeats,
+            isDefault: true,
+          ),
+        ];
+      }
+
+      if (cloudTotalSeats > 0 && branches.isNotEmpty) {
+        branches[0] = branches[0].copyWith(totalSeats: cloudTotalSeats);
       }
 
       final studentSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('students').get();
       if (studentSnaps.docs.isNotEmpty) {
         _mockStudents.clear();
         _mockStudents.addAll(studentSnaps.docs.map((d) => StudentInfo.fromFirestore(d.id, d.data())));
-        _syncSeatsWithStudents();
-        _mockStudentsController.add(List.unmodifiable(_mockStudents));
       }
+
+      _syncSeatsWithStudents();
+      _mockStudentsController.add(List.unmodifiable(_mockStudents));
 
       final seatSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('seats').get();
       if (seatSnaps.docs.isNotEmpty) {
-        _mockSeats.clear();
-        _mockSeats.addAll(seatSnaps.docs.map((d) => SeatInfo.fromFirestore(d.id, d.data())));
-        _mockSeatsController.add(List.unmodifiable(_mockSeats));
+        for (final doc in seatSnaps.docs) {
+          final s = SeatInfo.fromFirestore(doc.id, doc.data());
+          final idx = _mockSeats.indexWhere((seat) => seat.seatNumber == s.seatNumber);
+          if (idx != -1) {
+            _mockSeats[idx] = s;
+          } else if (s.seatNumber <= totalSeatsCount) {
+            _mockSeats.add(s);
+          }
+        }
       }
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
 
       final paySnaps = await _db.collection('libraries').doc(targetLibraryId).collection('payments').limit(150).get();
       if (paySnaps.docs.isNotEmpty) {
@@ -2401,7 +2506,10 @@ class LibraryService {
     }
   }
 
-  Future<AuthResult> loginWithBiometrics() async {
+  Future<AuthResult> loginWithBiometrics({
+    String? intendedRole,
+    String? enteredIdentifier,
+  }) async {
     ensureInitialized();
 
     // 1. Check if hardware biometric sensor is available
@@ -2425,9 +2533,50 @@ class LibraryService {
       );
     }
 
-    // 3. Prompt native phone OS biometric hardware sensor (BiometricPrompt)
+    // 3. Strict Tab and Identifier context validation
+    final boundRole = binding != null ? normalizeRole(binding['user_role']?.toString() ?? 'Receptionist') : 'Admin';
+    final boundIsOwner = binding != null ? (binding['is_owner'] == true || boundRole == 'Admin') : true;
+    final boundName = binding?['user_name']?.toString() ?? 'User';
+    final boundEmail = binding?['user_email']?.toString() ?? '';
+
+    // Check entered identifier if user typed something
+    if (enteredIdentifier != null && enteredIdentifier.trim().isNotEmpty) {
+      final cleanEntered = enteredIdentifier.trim().toLowerCase();
+      final normEnteredPhone = normalizePhone(cleanEntered);
+      final normBoundPhone = normalizePhone(boundEmail);
+      final isMatchingIdentifier = (cleanEntered == boundEmail.toLowerCase()) ||
+          (normEnteredPhone.isNotEmpty && normEnteredPhone == normBoundPhone);
+
+      if (!isMatchingIdentifier) {
+        return AuthResult(
+          success: false,
+          message: 'This fingerprint is bound to $boundName ($boundRole). It does not match the entered identifier "$enteredIdentifier". Please enter your PIN/password to log in.',
+        );
+      }
+    }
+
+    // Check intended role if user selected a tab (Owner/Admin vs Staff)
+    if (intendedRole != null && intendedRole.trim().isNotEmpty) {
+      final cleanIntended = intendedRole.trim().toLowerCase();
+      final isIntendedOwner = cleanIntended.contains('admin') || cleanIntended.contains('owner');
+      final isIntendedStaff = cleanIntended.contains('staff') || cleanIntended.contains('reception') || cleanIntended.contains('desk');
+
+      if (isIntendedStaff && boundIsOwner) {
+        return AuthResult(
+          success: false,
+          message: 'This fingerprint is registered to Library Owner ($boundName). You are on the Staff tab. Please switch to the Owner tab, or enter Staff phone & PIN.',
+        );
+      } else if (isIntendedOwner && !boundIsOwner) {
+        return AuthResult(
+          success: false,
+          message: 'This fingerprint is registered to Staff ($boundName). You are on the Owner tab. Please switch to the Staff tab, or enter Owner credentials.',
+        );
+      }
+    }
+
+    // 4. Prompt native phone OS biometric hardware sensor (BiometricPrompt)
     final biometricPassed = await BiometricAuthService.authenticate(
-      reason: 'Scan your fingerprint to log in to TrackMyLibrary',
+      reason: 'Scan your fingerprint to log in as ${boundIsOwner ? "Owner" : "Staff"}',
     );
 
     if (!biometricPassed) {
@@ -2437,7 +2586,7 @@ class LibraryService {
       );
     }
 
-    // 4. Restore EXACT bound user identity (Owner or Staff) without role confusion!
+    // 5. Restore EXACT bound user identity (Owner or Staff) without role confusion!
     if (binding != null) {
       currentUserId = binding['user_id']?.toString() ?? 'user_001';
       currentUserName = binding['user_name']?.toString() ?? 'User';

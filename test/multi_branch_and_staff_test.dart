@@ -573,6 +573,73 @@ void main() {
       expect(service.currentUserRole, equals('Guest'));
       expect(await service.getBiometricBinding(), isNull);
     });
+
+    test('Owner-configured seat capacity synchronizes to branches and totalSeatsCount', () async {
+      service.updateSectionsAndRebuildSeats([
+        SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 10),
+      ]);
+
+      expect(service.totalSeatsCount, equals(10));
+      expect(service.currentBranch.totalSeats, equals(10));
+      expect(service.effectiveBranches.first.totalSeats, equals(10));
+      expect(service.mockSeats.length, equals(10));
+    });
+
+    test('Biometric login checks intended role and rejects cross-role access (Owner vs Staff)', () async {
+      await service.login(identifier: 'admin', password: 'password123');
+      expect(await service.getBiometricBinding(), isNotNull);
+      await service.signOut();
+
+      // Attempt biometric login on Staff tab when device is bound to Owner
+      final staffTabRes = await service.loginWithBiometrics(intendedRole: 'Staff');
+      expect(staffTabRes.success, isFalse);
+      expect(staffTabRes.message, contains('registered to Library Owner'));
+      expect(staffTabRes.message, contains('Staff tab'));
+
+      // Attempt biometric login with mismatched identifier
+      final mismatchRes = await service.loginWithBiometrics(
+        intendedRole: 'Admin',
+        enteredIdentifier: '9999988888',
+      );
+      expect(mismatchRes.success, isFalse);
+      expect(mismatchRes.message, contains('does not match the entered identifier'));
+
+      // Valid Owner login on Admin tab
+      final adminTabRes = await service.loginWithBiometrics(intendedRole: 'Admin');
+      expect(adminTabRes.success, isTrue);
+      expect(service.isAdmin, isTrue);
+    });
+
+    test('Least-privilege RBAC strictly blocks staff from viewing revenue, editing admin profile, and exporting data', () async {
+      final staff = StaffMember(
+        id: 'staff_strict_01',
+        name: 'Kavita Desk',
+        phone: '9888877777',
+        role: 'Receptionist',
+        pinHash: LibraryService.hashPin('1234'),
+        branchId: 'branch_1',
+        isActive: true,
+        addedAt: DateTime.now(),
+      );
+      service.addStaffMember(staff);
+
+      await service.login(identifier: '9888877777', password: '1234');
+      expect(service.isStaff, isTrue);
+      expect(service.isAdmin, isFalse);
+      expect(service.canViewRevenue, isFalse);
+      expect(service.canExportReports, isFalse);
+      expect(service.canEditAdminProfile, isFalse);
+
+      expect(
+        () async => await service.saveProfile(service.profile.copyWith(adminName: 'Hacked Name')),
+        throwsA(isA<UnsupportedError>()),
+      );
+
+      expect(
+        () => service.exportFullBackupJson(),
+        throwsA(isA<UnsupportedError>()),
+      );
+    });
   });
 }
 

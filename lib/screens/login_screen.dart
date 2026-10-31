@@ -24,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _canUseBiometrics = false;
+  bool _isStaffTab = false;
   String? _errorMessage;
 
   @override
@@ -307,7 +308,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final result = await _service.loginWithBiometrics();
+      final result = await _service.loginWithBiometrics(
+        intendedRole: _isStaffTab ? 'Staff' : 'Admin',
+        enteredIdentifier: _emailCtrl.text.trim(),
+      );
       if (!mounted) return;
 
       if (result.success) {
@@ -829,6 +833,148 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 14),
 
+                      // Role Selector Tabs: Owner/Admin vs Staff/Desk
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _isStaffTab = false;
+                                    _errorMessage = null;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: !_isStaffTab ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: !_isStaffTab
+                                        ? [
+                                            const BoxShadow(
+                                              color: Colors.black12,
+                                              blurRadius: 4,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.admin_panel_settings_rounded,
+                                        size: 16,
+                                        color: !_isStaffTab ? const Color(0xFF0F766E) : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Owner / Admin',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: !_isStaffTab ? const Color(0xFF0F766E) : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _isStaffTab = true;
+                                    _errorMessage = null;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _isStaffTab ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: _isStaffTab
+                                        ? [
+                                            const BoxShadow(
+                                              color: Colors.black12,
+                                              blurRadius: 4,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.badge_rounded,
+                                        size: 16,
+                                        color: _isStaffTab ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Staff / Desk',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: _isStaffTab ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Role Context Description Banner
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _isStaffTab ? const Color(0xFFEEF2FF) : const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _isStaffTab ? const Color(0xFFC7D2FE) : const Color(0xFFA7F3D0)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _isStaffTab ? Icons.badge_outlined : Icons.verified_user_outlined,
+                              color: _isStaffTab ? const Color(0xFF4F46E5) : const Color(0xFF059669),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _isStaffTab
+                                    ? 'Staff Desk Mode: Enter staff mobile number & 4-digit PIN for daily desk operations.'
+                                    : 'Owner Admin Mode: Full access to seat setups, revenue reports, and settings.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _isStaffTab ? const Color(0xFF3730A3) : const Color(0xFF065F46),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
                       // Quick Demo Role Switcher
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -850,7 +996,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: InkWell(
-                                onTap: _fillAdminDemo,
+                                onTap: () {
+                                  setState(() => _isStaffTab = false);
+                                  _fillAdminDemo();
+                                },
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 6),
@@ -873,7 +1022,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: InkWell(
-                                onTap: _fillStaffDemo,
+                                onTap: () {
+                                  setState(() => _isStaffTab = true);
+                                  _fillStaffDemo();
+                                },
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 6),
@@ -928,9 +1080,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
 
                       // Input 1: Mobile or Email
-                      const Text(
-                        'MOBILE OR EMAIL',
-                        style: TextStyle(
+                      Text(
+                        _isStaffTab ? 'STAFF REGISTERED MOBILE OR EMAIL' : 'OWNER EMAIL OR MOBILE',
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.8,
@@ -940,10 +1092,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 8),
                       TextField(
                         controller: _emailCtrl,
+                        keyboardType: _isStaffTab ? TextInputType.phone : TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          hintText: 'Enter mobile no. or email',
+                          hintText: _isStaffTab ? 'Enter staff mobile number' : 'Enter owner email or mobile',
                           hintStyle: const TextStyle(color: AppColors.textSubtle, fontSize: 14),
-                          prefixIcon: const Icon(Icons.mail_outline_rounded, color: AppColors.textMuted, size: 20),
+                          prefixIcon: Icon(
+                            _isStaffTab ? Icons.phone_android_rounded : Icons.mail_outline_rounded,
+                            color: AppColors.textMuted,
+                            size: 20,
+                          ),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           filled: true,
                           fillColor: const Color(0xFFFBFDFF),
@@ -957,7 +1114,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.primaryTeal, width: 1.5),
+                            borderSide: BorderSide(
+                              color: _isStaffTab ? const Color(0xFF4F46E5) : AppColors.primaryTeal,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                       ),
@@ -967,9 +1127,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'PASSWORD OR PIN',
-                            style: TextStyle(
+                          Text(
+                            _isStaffTab ? 'STAFF 4-DIGIT PIN' : 'PASSWORD OR PIN',
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.8,
@@ -993,8 +1153,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextField(
                         controller: _passCtrl,
                         obscureText: _obscurePassword,
+                        keyboardType: _isStaffTab ? TextInputType.number : TextInputType.text,
                         decoration: InputDecoration(
-                          hintText: 'Enter your password or 4-digit PIN',
+                          hintText: _isStaffTab ? 'Enter 4-digit staff PIN' : 'Enter your password or PIN',
                           hintStyle: const TextStyle(color: AppColors.textSubtle, fontSize: 14),
                           prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted, size: 20),
                           suffixIcon: IconButton(
@@ -1018,7 +1179,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: AppColors.primaryTeal, width: 1.5),
+                            borderSide: BorderSide(
+                              color: _isStaffTab ? const Color(0xFF4F46E5) : AppColors.primaryTeal,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                       ),

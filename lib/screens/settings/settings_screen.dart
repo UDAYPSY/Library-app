@@ -393,12 +393,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showEditProfileModal() {
+    if (!_service.isAdmin) {
+      _showStaffInfoModal();
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const AdminProfileScreen(isEditMode: true)),
     ).then((_) {
       if (mounted) setState(() {});
     });
+  }
+
+  void _showStaffInfoModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Staff Member Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy)),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('Role assignment and desk access details', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.shield_outlined, color: Color(0xFF2563EB), size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Least-Privilege Desk Access: You are signed in as a staff member. Admin profile editing and financials are restricted to the Library Owner.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFEEF2FF),
+                child: Icon(Icons.person_rounded, color: Color(0xFF4F46E5)),
+              ),
+              title: Text(_service.currentUserName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: Text('Role: ${_service.currentUserRole}'),
+            ),
+            const Divider(),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFF0FDF4),
+                child: Icon(Icons.apartment_rounded, color: Color(0xFF16A34A)),
+              ),
+              title: Text(_service.currentBranch.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: Text('Assigned Branch (${_service.currentBranch.totalSeats} Seats Capacity)'),
+            ),
+            const Divider(),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFFEF3C7),
+                child: Icon(Icons.local_library_rounded, color: Color(0xFFD97706)),
+              ),
+              title: Text(_service.profile.libraryName.isNotEmpty ? _service.profile.libraryName : 'TrackMyLibrary', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: Text('Library ID: ${_service.profile.libraryId.isNotEmpty ? _service.profile.libraryId : _service.tenantId}'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showBranchSwitcherModal() {
@@ -2809,14 +2893,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _sectionHeader('ACCOUNT'),
               const SizedBox(height: 10),
               _cardGroup([
-                _settingsTile(
-                  icon: Icons.person_outline_rounded,
-                  iconBg: const Color(0xFFE0F2FE),
-                  iconColor: const Color(0xFF0284C7),
-                  title: 'Edit Profile',
-                  subtitle: 'Name, email, and contact details',
-                  onTap: _showEditProfileModal,
-                ),
+                if (_service.isAdmin)
+                  _settingsTile(
+                    icon: Icons.person_outline_rounded,
+                    iconBg: const Color(0xFFE0F2FE),
+                    iconColor: const Color(0xFF0284C7),
+                    title: 'Edit Profile',
+                    subtitle: 'Name, email, and contact details',
+                    onTap: _showEditProfileModal,
+                  )
+                else
+                  _settingsTile(
+                    icon: Icons.badge_outlined,
+                    iconBg: const Color(0xFFEEF2FF),
+                    iconColor: const Color(0xFF4F46E5),
+                    title: 'My Staff Profile',
+                    subtitle: 'Role & assigned branch (Read Only)',
+                    onTap: _showStaffInfoModal,
+                  ),
                 if (_service.canSwitchBranch)
                   _settingsTile(
                     icon: Icons.apartment_rounded,
@@ -2911,7 +3005,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Import multiple students via CSV',
                     onTap: _showBulkImportModal,
                   ),
-                if (_service.canViewRevenue)
+                if (_service.isAdmin)
                   _settingsTile(
                     icon: Icons.insert_chart_outlined_rounded,
                     iconBg: const Color(0xFFCCFBF1),
@@ -2923,14 +3017,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       MaterialPageRoute(builder: (_) => const ReportsExportsScreen()),
                     ),
                   ),
-                _settingsTile(
-                  icon: Icons.group_add_outlined,
-                  iconBg: const Color(0xFFDCFCE7),
-                  iconColor: const Color(0xFF16A34A),
-                  title: 'Save Students to Contacts',
-                  subtitle: 'See names on calls, find them in WhatsApp',
-                  onTap: _showContactsSyncModal,
-                ),
+                if (_service.isAdmin)
+                  _settingsTile(
+                    icon: Icons.group_add_outlined,
+                    iconBg: const Color(0xFFDCFCE7),
+                    iconColor: const Color(0xFF16A34A),
+                    title: 'Save Students to Contacts',
+                    subtitle: 'See names on calls, find them in WhatsApp',
+                    onTap: _showContactsSyncModal,
+                  ),
                 _settingsTile(
                   icon: Icons.logout_rounded,
                   iconBg: const Color(0xFFFEE2E2),
@@ -2995,43 +3090,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ]),
               const SizedBox(height: 24),
 
-              // SECTION: AUTOMATION (Image 3)
-              _sectionHeader('AUTOMATION'),
-              const SizedBox(height: 10),
-              _cardGroup([
-                _settingsTile(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  iconBg: const Color(0xFFECFDF5),
-                  iconColor: const Color(0xFF10B981),
-                  title: 'WhatsApp Notifications',
-                  subtitle: 'Manage alerts and connection',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const WhatsAppAutomationScreen()),
+              // SECTION: AUTOMATION (Image 3) - Admin only
+              if (_service.isAdmin) ...[
+                _sectionHeader('AUTOMATION'),
+                const SizedBox(height: 10),
+                _cardGroup([
+                  _settingsTile(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    iconBg: const Color(0xFFECFDF5),
+                    iconColor: const Color(0xFF10B981),
+                    title: 'WhatsApp Notifications',
+                    subtitle: 'Manage alerts and connection',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const WhatsAppAutomationScreen()),
+                    ),
                   ),
-                ),
-                _settingsTile(
-                  icon: Icons.article_outlined,
-                  iconBg: const Color(0xFFCCFBF1),
-                  iconColor: const Color(0xFF0F766E),
-                  title: 'Message Templates',
-                  subtitle: 'Edit welcome and reminder texts',
-                  onTap: _showMessageTemplatesModal,
-                ),
-                _settingsTile(
-                  icon: Icons.access_time_rounded,
-                  iconBg: const Color(0xFFF3E8FF),
-                  iconColor: const Color(0xFF8B5CF6),
-                  title: 'Shift Management',
-                  subtitle: 'Configure timings and slot fees',
-                  showDivider: false,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ShiftSystemScreen()),
+                  _settingsTile(
+                    icon: Icons.article_outlined,
+                    iconBg: const Color(0xFFCCFBF1),
+                    iconColor: const Color(0xFF0F766E),
+                    title: 'Message Templates',
+                    subtitle: 'Edit welcome and reminder texts',
+                    onTap: _showMessageTemplatesModal,
                   ),
-                ),
-              ]),
-              const SizedBox(height: 24),
+                  _settingsTile(
+                    icon: Icons.access_time_rounded,
+                    iconBg: const Color(0xFFF3E8FF),
+                    iconColor: const Color(0xFF8B5CF6),
+                    title: 'Shift Management',
+                    subtitle: 'Configure timings and slot fees',
+                    showDivider: false,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ShiftSystemScreen()),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 24),
+              ],
 
               // SECTION: SUPPORT & FEEDBACK (Image 3 & 4)
               _sectionHeader('SUPPORT & FEEDBACK'),

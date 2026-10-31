@@ -84,6 +84,18 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       : (_service.isAuthenticated || _passCtrl.text.length >= 6);
 
   void _onCreateAccount() async {
+    if (widget.isEditMode && !_service.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Access Denied: Only Library Owner can modify administrator credentials.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pop(context);
+      return;
+    }
+
     setState(() => _showErrors = true);
 
     if (!_isNameValid || !_isEmailValid || !_isPhoneValid || !_isPassValid) {
@@ -142,6 +154,21 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isEditMode && !_service.isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Access Denied'), backgroundColor: AppColors.primaryTeal, foregroundColor: Colors.white),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Text(
+              'Access Denied: Only Library Owner can view or edit administrator profile details.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textNavy),
+            ),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.primaryTeal,
       body: SafeArea(
