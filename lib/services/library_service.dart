@@ -2069,7 +2069,11 @@ class LibraryService {
     if (isFirebaseConnected) {
       try {
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        final UserCredential userCredential = await FirebaseAuth.instance.signInWithProvider(googleProvider);
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        final UserCredential userCredential = kIsWeb
+            ? await FirebaseAuth.instance.signInWithPopup(googleProvider)
+            : await FirebaseAuth.instance.signInWithProvider(googleProvider);
         if (userCredential.user != null) {
           final user = userCredential.user!;
           currentUserId = user.uid;
@@ -2151,7 +2155,39 @@ class LibraryService {
             );
           }
         } on FirebaseAuthException catch (e) {
+        final code = e.code.toLowerCase();
         final errText = '${e.code} ${e.message ?? ''}'.toLowerCase();
+
+        if (code == 'popup-blocked' || errText.contains('popup-blocked')) {
+          return const AuthResult(
+            success: false,
+            message: 'Popup was blocked by your browser. Please allow popups for this site and try again.',
+          );
+        }
+        if (code == 'popup-closed-by-user' || errText.contains('popup-closed-by-user')) {
+          return const AuthResult(
+            success: false,
+            message: 'Google Sign-In was cancelled (popup was closed before completing sign-in).',
+          );
+        }
+        if (code == 'unauthorized-domain' || errText.contains('unauthorized-domain') || errText.contains('auth/unauthorized-domain')) {
+          return const AuthResult(
+            success: false,
+            message: 'Domain not authorized: Please add this website domain to Firebase Console > Authentication > Settings > Authorized domains.',
+          );
+        }
+        if (code == 'operation-not-allowed' || errText.contains('operation-not-allowed')) {
+          return const AuthResult(
+            success: false,
+            message: 'Google Sign-In is disabled in Firebase. Please enable "Google" under Firebase Console > Authentication > Sign-in method.',
+          );
+        }
+        if (errText.contains('initial state') || errText.contains('storage-partitioned')) {
+          return const AuthResult(
+            success: false,
+            message: 'Browser storage blocked: Please ensure third-party cookies/storage are allowed or try opening in a standard browser tab.',
+          );
+        }
         if (errText.contains('certificate hash') ||
             errText.contains('invalid-cert-hash') ||
             errText.contains('17093')) {
@@ -2172,6 +2208,18 @@ class LibraryService {
         return AuthResult(success: false, message: 'Google Sign-In failed: ${e.message ?? e.code}');
       } catch (e) {
         final errStr = e.toString().toLowerCase();
+        if (errStr.contains('popup-blocked')) {
+          return const AuthResult(
+            success: false,
+            message: 'Popup was blocked by your browser. Please allow popups for this site and try again.',
+          );
+        }
+        if (errStr.contains('initial state') || errStr.contains('storage-partitioned')) {
+          return const AuthResult(
+            success: false,
+            message: 'Browser storage blocked: Please ensure third-party cookies/storage are allowed or try opening in a standard browser tab.',
+          );
+        }
         if (errStr.contains('certificate hash') || errStr.contains('invalid-cert-hash') || errStr.contains('17093')) {
           return const AuthResult(
             success: false,
