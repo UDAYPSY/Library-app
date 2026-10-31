@@ -42,10 +42,13 @@ class LibraryService {
     return hashPin(inputPin) == storedHash;
   }
 
-  /// Strictly checks if a mobile number contains exactly 10 digits
+  /// Strictly checks if a mobile number is a valid 10-digit mobile number (allows standard +91 or 0 prefix)
   static bool isValid10DigitPhone(String phone) {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
-    return digits.length == 10;
+    if (digits.length == 10) return true;
+    if (digits.length == 11 && digits.startsWith('0')) return true;
+    if (digits.length == 12 && digits.startsWith('91')) return true;
+    return false;
   }
 
   /// Validates standard RFC-5322 compliant email format

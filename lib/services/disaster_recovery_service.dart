@@ -42,9 +42,7 @@ class DisasterRecoveryService {
   }
 
   Future<void> setBackupEmail(String email) async {
-    if (!_service.isAdmin) {
-      throw UnsupportedError('Strict ownership enforcement: Only admin can change Google Drive sync email');
-    }
+    if (!_service.isAdmin) return; // Strict ownership enforcement: Only admin can change Google Drive sync email
     if (!LibraryService.isValidEmail(email)) {
       throw ArgumentError('Invalid Google Drive email format.');
     }
