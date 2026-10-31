@@ -1593,6 +1593,24 @@ class LibraryService {
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));
       }
 
+      try {
+        final regSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('registration_requests').orderBy('created_at', descending: true).limit(50).get();
+        if (regSnaps.docs.isNotEmpty) {
+          _mockRegistrationRequests.clear();
+          _mockRegistrationRequests.addAll(regSnaps.docs.map((d) => RegistrationRequest.fromMap({'id': d.id, ...d.data()})));
+          notifyRegistrationRequestsChanged();
+        }
+      } catch (_) {}
+
+      try {
+        final expSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('expenses').limit(100).get();
+        if (expSnaps.docs.isNotEmpty) {
+          _mockExpenses.clear();
+          _mockExpenses.addAll(expSnaps.docs.map((d) => ExpenseItem.fromFirestore(d.id, d.data())));
+          _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+        }
+      } catch (_) {}
+
       await _saveLocalState();
     } catch (e) {
       debugPrint('[Staff] Failed to load library data from cloud: $e');
@@ -1670,6 +1688,7 @@ class LibraryService {
     ensureInitialized();
     final cleanId = identifier.trim();
     final cleanPass = password.trim();
+    final normPhone = normalizePhone(cleanId);
 
     if (cleanId.isEmpty || cleanPass.isEmpty) {
       return const AuthResult(
@@ -1848,15 +1867,22 @@ class LibraryService {
           userId: currentUserId,
         );
       } else {
-        return const AuthResult(
-          success: false,
-          message: 'Incorrect password for administrator account.',
-        );
+        // If the identifier also matches a staff member (e.g. staff created with owner's phone or email),
+        // do not reject immediately; allow falling through to staff credentials check!
+        final isStaffCandidate = staffList.any((s) =>
+            normalizePhone(s.phone) == normPhone ||
+            (s.email != null && s.email!.toLowerCase() == cleanId.toLowerCase()) ||
+            s.id == cleanId);
+        if (!isStaffCandidate && !isFirebaseConnected) {
+          return const AuthResult(
+            success: false,
+            message: 'Incorrect password for administrator account.',
+          );
+        }
       }
     }
 
     // Check Staff Credentials (Receptionist / Desk Staff)
-    final normPhone = normalizePhone(cleanId);
     final staffMatches = staffList.where((s) =>
         normalizePhone(s.phone) == normPhone ||
         (s.email != null && s.email!.toLowerCase() == cleanId.toLowerCase()) ||
@@ -1887,6 +1913,12 @@ class LibraryService {
           try {
             await FirebaseAuth.instance.signInAnonymously();
           } catch (_) {}
+        }
+
+        // Pull full library data (students, seats, payments, QR requests) so staff sees everything in sync!
+        final staffLibId = profile.libraryId.isNotEmpty ? profile.libraryId : tenantId;
+        if (staffLibId.isNotEmpty && staffLibId != 'default_library') {
+          await _loadStaffLibraryData(staffLibId);
         }
 
         if (staff.branchId.isNotEmpty) {
