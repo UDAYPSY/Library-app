@@ -943,6 +943,22 @@ class LibraryBranch {
       isDefault: map['is_default'] ?? false,
     );
   }
+
+  LibraryBranch copyWith({
+    String? id,
+    String? name,
+    String? address,
+    int? totalSeats,
+    bool? isDefault,
+  }) {
+    return LibraryBranch(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      address: address ?? this.address,
+      totalSeats: totalSeats ?? this.totalSeats,
+      isDefault: isDefault ?? this.isDefault,
+    );
+  }
 }
 
 class RegistrationRequest {
