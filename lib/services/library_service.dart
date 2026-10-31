@@ -902,6 +902,14 @@ class LibraryService {
             await _removeStaffMemberFromDirectory(s);
           } catch (_) {}
         }
+        try {
+          final dirSnaps = await _db.collection('staff_directory').where('library_id', isEqualTo: tId).get();
+          for (final doc in dirSnaps.docs) {
+            try {
+              await doc.reference.delete();
+            } catch (_) {}
+          }
+        } catch (_) {}
 
         // Delete parent library root document
         try {
