@@ -171,7 +171,10 @@ void main() {
       expect(service.isAdmin, isTrue);
     });
 
-    test('Biometric login authenticates administrator session', () async {
+    test('Biometric login authenticates administrator session after enrollment', () async {
+      await service.login(identifier: 'admin', password: 'password123');
+      await service.signOut();
+
       final res = await service.loginWithBiometrics();
       expect(res.success, isTrue);
       expect(service.isAuthenticated, isTrue);
@@ -179,6 +182,9 @@ void main() {
     });
 
     test('Biometric login rejects when fingerprint hardware verification fails', () async {
+      await service.login(identifier: 'admin', password: 'password123');
+      await service.signOut();
+
       BiometricAuthService.testAuthResult = false;
       final res = await service.loginWithBiometrics();
       expect(res.success, isFalse);
@@ -244,7 +250,7 @@ void main() {
       // Biometrics must fail when no credentials exist
       final bioRes = await service.loginWithBiometrics();
       expect(bioRes.success, isFalse);
-      expect(bioRes.message, contains('No registered credentials found'));
+      expect(bioRes.message, contains('No account is currently tagged to fingerprint login'));
     });
 
     test('Financial ledger immutability blocks manual payment deletion', () async {
