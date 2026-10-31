@@ -2814,17 +2814,6 @@ class LibraryService {
     final payDate = date ?? DateTime.now();
     final paymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
 
-    // Deduplication check: Prevent rapid duplicate payment submissions within 5s window
-    final isRapidDuplicate = _mockPayments.any((p) =>
-        (studentId != null && studentId.isNotEmpty && p.studentId == studentId) &&
-        p.amount == amount &&
-        p.date.isAfter(payDate.subtract(const Duration(seconds: 5))) &&
-        p.date.isBefore(payDate.add(const Duration(seconds: 5))));
-    if (isRapidDuplicate) {
-      debugPrint('[Payment] Ignored rapid duplicate payment transaction submission.');
-      return;
-    }
-
     // Resolve target branch
     String targetBranch = branchId ?? '';
     if (targetBranch.isEmpty && studentId != null && studentId.isNotEmpty) {
@@ -2879,6 +2868,23 @@ class LibraryService {
           );
         }
       }
+    }
+
+    // Deduplication check: Prevent rapid identical double-click payment submissions within 3s window
+    final isRapidDuplicate = _mockPayments.any((p) =>
+        (studentId != null && studentId.isNotEmpty && p.studentId == studentId) &&
+        p.amount == amount &&
+        (periodStr.isEmpty || p.notes.contains(periodStr)) &&
+        p.date.isAfter(payDate.subtract(const Duration(seconds: 3))) &&
+        p.date.isBefore(payDate.add(const Duration(seconds: 3))));
+    if (isRapidDuplicate) {
+      debugPrint('[Payment] Ignored rapid duplicate payment transaction submission.');
+      return;
+    }
+
+    if (matchIdx != -1) {
+      final s = _mockStudents[matchIdx];
+      final currentDues = s.effectiveDues;
 
       final isDuePayment = currentDues > 0 || notes.toLowerCase().contains('due');
       if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
@@ -4400,7 +4406,6 @@ class LibraryService {
       validFrom: now,
       validUntil: targetUntil,
     );
-  }
   }
 
   // --- Tools & More Helpers ---
