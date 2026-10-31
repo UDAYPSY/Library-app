@@ -1,0 +1,1605 @@
+
+lib/services/library_service.dart:4595:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendWhatsAppDirect({
+  ^^^^^^
+lib/services/library_service.dart:4628:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendSmsDirect({
+  ^^^^^^
+lib/services/library_service.dart:4649:1: Error: Expected a declaration, but got '}'.
+}
+^
+lib/services/library_service.dart:4409:5: Error: Method not found: 'ensureInitialized'.
+    ensureInitialized();
+    ^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4410:12: Error: Undefined name '_mockStudents'.
+    return _mockStudents.where((s) =>
+           ^^^^^^^^^^^^^
+lib/services/library_service.dart:4430:29: Error: Undefined name 'profile'.
+    if (logoEmblem != null) profile.logoEmblem = logoEmblem;
+                            ^^^^^^^
+lib/services/library_service.dart:4431:26: Error: Undefined name 'profile'.
+    if (tagline != null) profile.tagline = tagline;
+                         ^^^^^^^
+lib/services/library_service.dart:4432:33: Error: Undefined name 'profile'.
+    if (accentColorHex != null) profile.accentColorHex = accentColorHex;
+                                ^^^^^^^
+lib/services/library_service.dart:4433:33: Error: Undefined name 'profile'.
+    if (cardThemeStyle != null) profile.cardThemeStyle = cardThemeStyle;
+                                ^^^^^^^
+lib/services/library_service.dart:4434:37: Error: Undefined name 'profile'.
+    if (noticeAnnouncement != null) profile.noticeAnnouncement = noticeAnnouncement;
+                                    ^^^^^^^
+lib/services/library_service.dart:4435:36: Error: Undefined name 'profile'.
+    if (receiptFooterNote != null) profile.receiptFooterNote = receiptFooterNote;
+                                   ^^^^^^^
+lib/services/library_service.dart:4436:40: Error: Undefined name 'profile'.
+    if (showBrandingWatermark != null) profile.showBrandingWatermark = showBrandingWatermark;
+                                       ^^^^^^^
+lib/services/library_service.dart:4438:7: Error: Undefined name 'profile'.
+      profile.logoBase64 = null;
+      ^^^^^^^
+lib/services/library_service.dart:4439:7: Error: Undefined name 'profile'.
+      profile.logoUrl = null;
+      ^^^^^^^
+lib/services/library_service.dart:4441:31: Error: Undefined name 'profile'.
+      if (logoBase64 != null) profile.logoBase64 = logoBase64;
+                              ^^^^^^^
+lib/services/library_service.dart:4442:28: Error: Undefined name 'profile'.
+      if (logoUrl != null) profile.logoUrl = logoUrl;
+                           ^^^^^^^
+lib/services/library_service.dart:4445:7: Error: Undefined name 'profile'.
+      profile.libraryName = libraryName.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4448:7: Error: Undefined name 'profile'.
+      profile.city = city.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4450:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4451:5: Error: Method not found: 'notifyStreamControllers'.
+    notifyStreamControllers();
+    ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4452:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4453:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4453:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4473:32: Error: Undefined name 'profile'.
+    if (notifications != null) profile.whatsappNotifications = notifications;
+                               ^^^^^^^
+lib/services/library_service.dart:4474:32: Error: Undefined name 'profile'.
+    if (autoReminders != null) profile.autoFeeReminders = autoReminders;
+                               ^^^^^^^
+lib/services/library_service.dart:4475:30: Error: Undefined name 'profile'.
+    if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;
+                             ^^^^^^^
+lib/services/library_service.dart:4476:30: Error: Undefined name 'profile'.
+    if (autoReceipt != null) profile.autoPaymentReceipt = autoReceipt;
+                             ^^^^^^^
+lib/services/library_service.dart:4477:36: Error: Undefined name 'profile'.
+    if (remind3DaysBefore != null) profile.remind3DaysBefore = remind3DaysBefore;
+                                   ^^^^^^^
+lib/services/library_service.dart:4478:33: Error: Undefined name 'profile'.
+    if (remindOnExpiry != null) profile.remindOnExpiry = remindOnExpiry;
+                                ^^^^^^^
+lib/services/library_service.dart:4479:36: Error: Undefined name 'profile'.
+    if (remindAfterExpiry != null) profile.remindAfterExpiry = remindAfterExpiry;
+                                   ^^^^^^^
+lib/services/library_service.dart:4480:29: Error: Undefined name 'profile'.
+    if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4481:30: Error: Undefined name 'profile'.
+    if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4482:29: Error: Undefined name 'profile'.
+    if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4483:30: Error: Undefined name 'profile'.
+    if (followupTpl != null) profile.followupTemplate = followupTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4484:32: Error: Undefined name 'profile'.
+    if (seatChangeTpl != null) profile.seatChangeTemplate = seatChangeTpl;
+                               ^^^^^^^
+lib/services/library_service.dart:4485:33: Error: Undefined name 'profile'.
+    if (shiftChangeTpl != null) profile.shiftChangeTemplate = shiftChangeTpl;
+                                ^^^^^^^
+lib/services/library_service.dart:4486:35: Error: Undefined name 'profile'.
+    if (seatAllotmentTpl != null) profile.seatAllotmentTemplate = seatAllotmentTpl;
+                                  ^^^^^^^
+lib/services/library_service.dart:4487:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4489:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4490:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4490:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4495:5: Error: Undefined name 'profile'.
+    profile.whatsappCredits += amount;
+    ^^^^^^^
+lib/services/library_service.dart:4496:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4497:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4498:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4498:71: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+                                                                      ^^^^^^^
+lib/services/library_service.dart:4503:9: Error: Undefined name 'profile'.
+    if (profile.whatsappCredits >= count) {
+        ^^^^^^^
+lib/services/library_service.dart:4504:7: Error: Undefined name 'profile'.
+      profile.whatsappCredits -= count;
+      ^^^^^^^
+lib/services/library_service.dart:4505:7: Error: Undefined name 'profile'.
+      profile.messagesSentCount += count;
+      ^^^^^^^
+lib/services/library_service.dart:4506:7: Error: Method not found: '_saveLocalState'.
+      _saveLocalState();
+      ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4533:39: Error: Undefined name 'profile'.
+        .replaceAll('{library_name}', profile.libraryName)
+                                      ^^^^^^^
+lib/services/library_service.dart:4556:15: Error: Undefined name 'profile'.
+        tpl = profile.seatChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4559:15: Error: Undefined name 'profile'.
+        tpl = profile.shiftChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4562:15: Error: Undefined name 'profile'.
+        tpl = profile.seatAllotmentTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4565:15: Error: Undefined name 'profile'.
+        tpl = profile.reminderTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4568:15: Error: Undefined name 'profile'.
+        tpl = profile.welcomeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4571:15: Error: Undefined name 'profile'.
+        tpl = profile.receiptTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4575:15: Error: Undefined name 'profile'.
+        tpl = profile.followupTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4599:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+lib/services/library_service.dart:4632:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/excel_import_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/excel_import_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/zone.dart 1308:19                     _CustomZone.runUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:4595:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendWhatsAppDirect({
+  ^^^^^^
+lib/services/library_service.dart:4628:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendSmsDirect({
+  ^^^^^^
+lib/services/library_service.dart:4649:1: Error: Expected a declaration, but got '}'.
+}
+^
+lib/services/library_service.dart:4409:5: Error: Method not found: 'ensureInitialized'.
+    ensureInitialized();
+    ^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4410:12: Error: Undefined name '_mockStudents'.
+    return _mockStudents.where((s) =>
+           ^^^^^^^^^^^^^
+lib/services/library_service.dart:4430:29: Error: Undefined name 'profile'.
+    if (logoEmblem != null) profile.logoEmblem = logoEmblem;
+                            ^^^^^^^
+lib/services/library_service.dart:4431:26: Error: Undefined name 'profile'.
+    if (tagline != null) profile.tagline = tagline;
+                         ^^^^^^^
+lib/services/library_service.dart:4432:33: Error: Undefined name 'profile'.
+    if (accentColorHex != null) profile.accentColorHex = accentColorHex;
+                                ^^^^^^^
+lib/services/library_service.dart:4433:33: Error: Undefined name 'profile'.
+    if (cardThemeStyle != null) profile.cardThemeStyle = cardThemeStyle;
+                                ^^^^^^^
+lib/services/library_service.dart:4434:37: Error: Undefined name 'profile'.
+    if (noticeAnnouncement != null) profile.noticeAnnouncement = noticeAnnouncement;
+                                    ^^^^^^^
+lib/services/library_service.dart:4435:36: Error: Undefined name 'profile'.
+    if (receiptFooterNote != null) profile.receiptFooterNote = receiptFooterNote;
+                                   ^^^^^^^
+lib/services/library_service.dart:4436:40: Error: Undefined name 'profile'.
+    if (showBrandingWatermark != null) profile.showBrandingWatermark = showBrandingWatermark;
+                                       ^^^^^^^
+lib/services/library_service.dart:4438:7: Error: Undefined name 'profile'.
+      profile.logoBase64 = null;
+      ^^^^^^^
+lib/services/library_service.dart:4439:7: Error: Undefined name 'profile'.
+      profile.logoUrl = null;
+      ^^^^^^^
+lib/services/library_service.dart:4441:31: Error: Undefined name 'profile'.
+      if (logoBase64 != null) profile.logoBase64 = logoBase64;
+                              ^^^^^^^
+lib/services/library_service.dart:4442:28: Error: Undefined name 'profile'.
+      if (logoUrl != null) profile.logoUrl = logoUrl;
+                           ^^^^^^^
+lib/services/library_service.dart:4445:7: Error: Undefined name 'profile'.
+      profile.libraryName = libraryName.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4448:7: Error: Undefined name 'profile'.
+      profile.city = city.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4450:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4451:5: Error: Method not found: 'notifyStreamControllers'.
+    notifyStreamControllers();
+    ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4452:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4453:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4453:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4473:32: Error: Undefined name 'profile'.
+    if (notifications != null) profile.whatsappNotifications = notifications;
+                               ^^^^^^^
+lib/services/library_service.dart:4474:32: Error: Undefined name 'profile'.
+    if (autoReminders != null) profile.autoFeeReminders = autoReminders;
+                               ^^^^^^^
+lib/services/library_service.dart:4475:30: Error: Undefined name 'profile'.
+    if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;
+                             ^^^^^^^
+lib/services/library_service.dart:4476:30: Error: Undefined name 'profile'.
+    if (autoReceipt != null) profile.autoPaymentReceipt = autoReceipt;
+                             ^^^^^^^
+lib/services/library_service.dart:4477:36: Error: Undefined name 'profile'.
+    if (remind3DaysBefore != null) profile.remind3DaysBefore = remind3DaysBefore;
+                                   ^^^^^^^
+lib/services/library_service.dart:4478:33: Error: Undefined name 'profile'.
+    if (remindOnExpiry != null) profile.remindOnExpiry = remindOnExpiry;
+                                ^^^^^^^
+lib/services/library_service.dart:4479:36: Error: Undefined name 'profile'.
+    if (remindAfterExpiry != null) profile.remindAfterExpiry = remindAfterExpiry;
+                                   ^^^^^^^
+lib/services/library_service.dart:4480:29: Error: Undefined name 'profile'.
+    if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4481:30: Error: Undefined name 'profile'.
+    if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4482:29: Error: Undefined name 'profile'.
+    if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4483:30: Error: Undefined name 'profile'.
+    if (followupTpl != null) profile.followupTemplate = followupTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4484:32: Error: Undefined name 'profile'.
+    if (seatChangeTpl != null) profile.seatChangeTemplate = seatChangeTpl;
+                               ^^^^^^^
+lib/services/library_service.dart:4485:33: Error: Undefined name 'profile'.
+    if (shiftChangeTpl != null) profile.shiftChangeTemplate = shiftChangeTpl;
+                                ^^^^^^^
+lib/services/library_service.dart:4486:35: Error: Undefined name 'profile'.
+    if (seatAllotmentTpl != null) profile.seatAllotmentTemplate = seatAllotmentTpl;
+                                  ^^^^^^^
+lib/services/library_service.dart:4487:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4489:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4490:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4490:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4495:5: Error: Undefined name 'profile'.
+    profile.whatsappCredits += amount;
+    ^^^^^^^
+lib/services/library_service.dart:4496:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4497:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4498:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4498:71: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+                                                                      ^^^^^^^
+lib/services/library_service.dart:4503:9: Error: Undefined name 'profile'.
+    if (profile.whatsappCredits >= count) {
+        ^^^^^^^
+lib/services/library_service.dart:4504:7: Error: Undefined name 'profile'.
+      profile.whatsappCredits -= count;
+      ^^^^^^^
+lib/services/library_service.dart:4505:7: Error: Undefined name 'profile'.
+      profile.messagesSentCount += count;
+      ^^^^^^^
+lib/services/library_service.dart:4506:7: Error: Method not found: '_saveLocalState'.
+      _saveLocalState();
+      ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4533:39: Error: Undefined name 'profile'.
+        .replaceAll('{library_name}', profile.libraryName)
+                                      ^^^^^^^
+lib/services/library_service.dart:4556:15: Error: Undefined name 'profile'.
+        tpl = profile.seatChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4559:15: Error: Undefined name 'profile'.
+        tpl = profile.shiftChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4562:15: Error: Undefined name 'profile'.
+        tpl = profile.seatAllotmentTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4565:15: Error: Undefined name 'profile'.
+        tpl = profile.reminderTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4568:15: Error: Undefined name 'profile'.
+        tpl = profile.welcomeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4571:15: Error: Undefined name 'profile'.
+        tpl = profile.receiptTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4575:15: Error: Undefined name 'profile'.
+        tpl = profile.followupTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4599:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+lib/services/library_service.dart:4632:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/zone.dart 1308:19                     _CustomZone.runUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:4595:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendWhatsAppDirect({
+  ^^^^^^
+lib/services/library_service.dart:4628:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendSmsDirect({
+  ^^^^^^
+lib/services/library_service.dart:4649:1: Error: Expected a declaration, but got '}'.
+}
+^
+lib/services/library_service.dart:4409:5: Error: Method not found: 'ensureInitialized'.
+    ensureInitialized();
+    ^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4410:12: Error: Undefined name '_mockStudents'.
+    return _mockStudents.where((s) =>
+           ^^^^^^^^^^^^^
+lib/services/library_service.dart:4430:29: Error: Undefined name 'profile'.
+    if (logoEmblem != null) profile.logoEmblem = logoEmblem;
+                            ^^^^^^^
+lib/services/library_service.dart:4431:26: Error: Undefined name 'profile'.
+    if (tagline != null) profile.tagline = tagline;
+                         ^^^^^^^
+lib/services/library_service.dart:4432:33: Error: Undefined name 'profile'.
+    if (accentColorHex != null) profile.accentColorHex = accentColorHex;
+                                ^^^^^^^
+lib/services/library_service.dart:4433:33: Error: Undefined name 'profile'.
+    if (cardThemeStyle != null) profile.cardThemeStyle = cardThemeStyle;
+                                ^^^^^^^
+lib/services/library_service.dart:4434:37: Error: Undefined name 'profile'.
+    if (noticeAnnouncement != null) profile.noticeAnnouncement = noticeAnnouncement;
+                                    ^^^^^^^
+lib/services/library_service.dart:4435:36: Error: Undefined name 'profile'.
+    if (receiptFooterNote != null) profile.receiptFooterNote = receiptFooterNote;
+                                   ^^^^^^^
+lib/services/library_service.dart:4436:40: Error: Undefined name 'profile'.
+    if (showBrandingWatermark != null) profile.showBrandingWatermark = showBrandingWatermark;
+                                       ^^^^^^^
+lib/services/library_service.dart:4438:7: Error: Undefined name 'profile'.
+      profile.logoBase64 = null;
+      ^^^^^^^
+lib/services/library_service.dart:4439:7: Error: Undefined name 'profile'.
+      profile.logoUrl = null;
+      ^^^^^^^
+lib/services/library_service.dart:4441:31: Error: Undefined name 'profile'.
+      if (logoBase64 != null) profile.logoBase64 = logoBase64;
+                              ^^^^^^^
+lib/services/library_service.dart:4442:28: Error: Undefined name 'profile'.
+      if (logoUrl != null) profile.logoUrl = logoUrl;
+                           ^^^^^^^
+lib/services/library_service.dart:4445:7: Error: Undefined name 'profile'.
+      profile.libraryName = libraryName.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4448:7: Error: Undefined name 'profile'.
+      profile.city = city.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4450:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4451:5: Error: Method not found: 'notifyStreamControllers'.
+    notifyStreamControllers();
+    ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4452:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4453:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4453:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4473:32: Error: Undefined name 'profile'.
+    if (notifications != null) profile.whatsappNotifications = notifications;
+                               ^^^^^^^
+lib/services/library_service.dart:4474:32: Error: Undefined name 'profile'.
+    if (autoReminders != null) profile.autoFeeReminders = autoReminders;
+                               ^^^^^^^
+lib/services/library_service.dart:4475:30: Error: Undefined name 'profile'.
+    if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;
+                             ^^^^^^^
+lib/services/library_service.dart:4476:30: Error: Undefined name 'profile'.
+    if (autoReceipt != null) profile.autoPaymentReceipt = autoReceipt;
+                             ^^^^^^^
+lib/services/library_service.dart:4477:36: Error: Undefined name 'profile'.
+    if (remind3DaysBefore != null) profile.remind3DaysBefore = remind3DaysBefore;
+                                   ^^^^^^^
+lib/services/library_service.dart:4478:33: Error: Undefined name 'profile'.
+    if (remindOnExpiry != null) profile.remindOnExpiry = remindOnExpiry;
+                                ^^^^^^^
+lib/services/library_service.dart:4479:36: Error: Undefined name 'profile'.
+    if (remindAfterExpiry != null) profile.remindAfterExpiry = remindAfterExpiry;
+                                   ^^^^^^^
+lib/services/library_service.dart:4480:29: Error: Undefined name 'profile'.
+    if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4481:30: Error: Undefined name 'profile'.
+    if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4482:29: Error: Undefined name 'profile'.
+    if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4483:30: Error: Undefined name 'profile'.
+    if (followupTpl != null) profile.followupTemplate = followupTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4484:32: Error: Undefined name 'profile'.
+    if (seatChangeTpl != null) profile.seatChangeTemplate = seatChangeTpl;
+                               ^^^^^^^
+lib/services/library_service.dart:4485:33: Error: Undefined name 'profile'.
+    if (shiftChangeTpl != null) profile.shiftChangeTemplate = shiftChangeTpl;
+                                ^^^^^^^
+lib/services/library_service.dart:4486:35: Error: Undefined name 'profile'.
+    if (seatAllotmentTpl != null) profile.seatAllotmentTemplate = seatAllotmentTpl;
+                                  ^^^^^^^
+lib/services/library_service.dart:4487:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4489:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4490:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4490:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4495:5: Error: Undefined name 'profile'.
+    profile.whatsappCredits += amount;
+    ^^^^^^^
+lib/services/library_service.dart:4496:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4497:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4498:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4498:71: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+                                                                      ^^^^^^^
+lib/services/library_service.dart:4503:9: Error: Undefined name 'profile'.
+    if (profile.whatsappCredits >= count) {
+        ^^^^^^^
+lib/services/library_service.dart:4504:7: Error: Undefined name 'profile'.
+      profile.whatsappCredits -= count;
+      ^^^^^^^
+lib/services/library_service.dart:4505:7: Error: Undefined name 'profile'.
+      profile.messagesSentCount += count;
+      ^^^^^^^
+lib/services/library_service.dart:4506:7: Error: Method not found: '_saveLocalState'.
+      _saveLocalState();
+      ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4533:39: Error: Undefined name 'profile'.
+        .replaceAll('{library_name}', profile.libraryName)
+                                      ^^^^^^^
+lib/services/library_service.dart:4556:15: Error: Undefined name 'profile'.
+        tpl = profile.seatChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4559:15: Error: Undefined name 'profile'.
+        tpl = profile.shiftChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4562:15: Error: Undefined name 'profile'.
+        tpl = profile.seatAllotmentTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4565:15: Error: Undefined name 'profile'.
+        tpl = profile.reminderTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4568:15: Error: Undefined name 'profile'.
+        tpl = profile.welcomeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4571:15: Error: Undefined name 'profile'.
+        tpl = profile.receiptTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4575:15: Error: Undefined name 'profile'.
+        tpl = profile.followupTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4599:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+lib/services/library_service.dart:4632:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/backup_restore_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/backup_restore_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:4595:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendWhatsAppDirect({
+  ^^^^^^
+lib/services/library_service.dart:4628:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendSmsDirect({
+  ^^^^^^
+lib/services/library_service.dart:4649:1: Error: Expected a declaration, but got '}'.
+}
+^
+lib/services/library_service.dart:4409:5: Error: Method not found: 'ensureInitialized'.
+    ensureInitialized();
+    ^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4410:12: Error: Undefined name '_mockStudents'.
+    return _mockStudents.where((s) =>
+           ^^^^^^^^^^^^^
+lib/services/library_service.dart:4430:29: Error: Undefined name 'profile'.
+    if (logoEmblem != null) profile.logoEmblem = logoEmblem;
+                            ^^^^^^^
+lib/services/library_service.dart:4431:26: Error: Undefined name 'profile'.
+    if (tagline != null) profile.tagline = tagline;
+                         ^^^^^^^
+lib/services/library_service.dart:4432:33: Error: Undefined name 'profile'.
+    if (accentColorHex != null) profile.accentColorHex = accentColorHex;
+                                ^^^^^^^
+lib/services/library_service.dart:4433:33: Error: Undefined name 'profile'.
+    if (cardThemeStyle != null) profile.cardThemeStyle = cardThemeStyle;
+                                ^^^^^^^
+lib/services/library_service.dart:4434:37: Error: Undefined name 'profile'.
+    if (noticeAnnouncement != null) profile.noticeAnnouncement = noticeAnnouncement;
+                                    ^^^^^^^
+lib/services/library_service.dart:4435:36: Error: Undefined name 'profile'.
+    if (receiptFooterNote != null) profile.receiptFooterNote = receiptFooterNote;
+                                   ^^^^^^^
+lib/services/library_service.dart:4436:40: Error: Undefined name 'profile'.
+    if (showBrandingWatermark != null) profile.showBrandingWatermark = showBrandingWatermark;
+                                       ^^^^^^^
+lib/services/library_service.dart:4438:7: Error: Undefined name 'profile'.
+      profile.logoBase64 = null;
+      ^^^^^^^
+lib/services/library_service.dart:4439:7: Error: Undefined name 'profile'.
+      profile.logoUrl = null;
+      ^^^^^^^
+lib/services/library_service.dart:4441:31: Error: Undefined name 'profile'.
+      if (logoBase64 != null) profile.logoBase64 = logoBase64;
+                              ^^^^^^^
+lib/services/library_service.dart:4442:28: Error: Undefined name 'profile'.
+      if (logoUrl != null) profile.logoUrl = logoUrl;
+                           ^^^^^^^
+lib/services/library_service.dart:4445:7: Error: Undefined name 'profile'.
+      profile.libraryName = libraryName.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4448:7: Error: Undefined name 'profile'.
+      profile.city = city.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4450:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4451:5: Error: Method not found: 'notifyStreamControllers'.
+    notifyStreamControllers();
+    ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4452:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4453:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4453:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4473:32: Error: Undefined name 'profile'.
+    if (notifications != null) profile.whatsappNotifications = notifications;
+                               ^^^^^^^
+lib/services/library_service.dart:4474:32: Error: Undefined name 'profile'.
+    if (autoReminders != null) profile.autoFeeReminders = autoReminders;
+                               ^^^^^^^
+lib/services/library_service.dart:4475:30: Error: Undefined name 'profile'.
+    if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;
+                             ^^^^^^^
+lib/services/library_service.dart:4476:30: Error: Undefined name 'profile'.
+    if (autoReceipt != null) profile.autoPaymentReceipt = autoReceipt;
+                             ^^^^^^^
+lib/services/library_service.dart:4477:36: Error: Undefined name 'profile'.
+    if (remind3DaysBefore != null) profile.remind3DaysBefore = remind3DaysBefore;
+                                   ^^^^^^^
+lib/services/library_service.dart:4478:33: Error: Undefined name 'profile'.
+    if (remindOnExpiry != null) profile.remindOnExpiry = remindOnExpiry;
+                                ^^^^^^^
+lib/services/library_service.dart:4479:36: Error: Undefined name 'profile'.
+    if (remindAfterExpiry != null) profile.remindAfterExpiry = remindAfterExpiry;
+                                   ^^^^^^^
+lib/services/library_service.dart:4480:29: Error: Undefined name 'profile'.
+    if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4481:30: Error: Undefined name 'profile'.
+    if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4482:29: Error: Undefined name 'profile'.
+    if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4483:30: Error: Undefined name 'profile'.
+    if (followupTpl != null) profile.followupTemplate = followupTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4484:32: Error: Undefined name 'profile'.
+    if (seatChangeTpl != null) profile.seatChangeTemplate = seatChangeTpl;
+                               ^^^^^^^
+lib/services/library_service.dart:4485:33: Error: Undefined name 'profile'.
+    if (shiftChangeTpl != null) profile.shiftChangeTemplate = shiftChangeTpl;
+                                ^^^^^^^
+lib/services/library_service.dart:4486:35: Error: Undefined name 'profile'.
+    if (seatAllotmentTpl != null) profile.seatAllotmentTemplate = seatAllotmentTpl;
+                                  ^^^^^^^
+lib/services/library_service.dart:4487:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4489:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4490:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4490:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4495:5: Error: Undefined name 'profile'.
+    profile.whatsappCredits += amount;
+    ^^^^^^^
+lib/services/library_service.dart:4496:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4497:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4498:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4498:71: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+                                                                      ^^^^^^^
+lib/services/library_service.dart:4503:9: Error: Undefined name 'profile'.
+    if (profile.whatsappCredits >= count) {
+        ^^^^^^^
+lib/services/library_service.dart:4504:7: Error: Undefined name 'profile'.
+      profile.whatsappCredits -= count;
+      ^^^^^^^
+lib/services/library_service.dart:4505:7: Error: Undefined name 'profile'.
+      profile.messagesSentCount += count;
+      ^^^^^^^
+lib/services/library_service.dart:4506:7: Error: Method not found: '_saveLocalState'.
+      _saveLocalState();
+      ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4533:39: Error: Undefined name 'profile'.
+        .replaceAll('{library_name}', profile.libraryName)
+                                      ^^^^^^^
+lib/services/library_service.dart:4556:15: Error: Undefined name 'profile'.
+        tpl = profile.seatChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4559:15: Error: Undefined name 'profile'.
+        tpl = profile.shiftChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4562:15: Error: Undefined name 'profile'.
+        tpl = profile.seatAllotmentTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4565:15: Error: Undefined name 'profile'.
+        tpl = profile.reminderTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4568:15: Error: Undefined name 'profile'.
+        tpl = profile.welcomeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4571:15: Error: Undefined name 'profile'.
+        tpl = profile.receiptTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4575:15: Error: Undefined name 'profile'.
+        tpl = profile.followupTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4599:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+lib/services/library_service.dart:4632:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:4595:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendWhatsAppDirect({
+  ^^^^^^
+lib/services/library_service.dart:4628:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendSmsDirect({
+  ^^^^^^
+lib/services/library_service.dart:4649:1: Error: Expected a declaration, but got '}'.
+}
+^
+lib/services/library_service.dart:4409:5: Error: Method not found: 'ensureInitialized'.
+    ensureInitialized();
+    ^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4410:12: Error: Undefined name '_mockStudents'.
+    return _mockStudents.where((s) =>
+           ^^^^^^^^^^^^^
+lib/services/library_service.dart:4430:29: Error: Undefined name 'profile'.
+    if (logoEmblem != null) profile.logoEmblem = logoEmblem;
+                            ^^^^^^^
+lib/services/library_service.dart:4431:26: Error: Undefined name 'profile'.
+    if (tagline != null) profile.tagline = tagline;
+                         ^^^^^^^
+lib/services/library_service.dart:4432:33: Error: Undefined name 'profile'.
+    if (accentColorHex != null) profile.accentColorHex = accentColorHex;
+                                ^^^^^^^
+lib/services/library_service.dart:4433:33: Error: Undefined name 'profile'.
+    if (cardThemeStyle != null) profile.cardThemeStyle = cardThemeStyle;
+                                ^^^^^^^
+lib/services/library_service.dart:4434:37: Error: Undefined name 'profile'.
+    if (noticeAnnouncement != null) profile.noticeAnnouncement = noticeAnnouncement;
+                                    ^^^^^^^
+lib/services/library_service.dart:4435:36: Error: Undefined name 'profile'.
+    if (receiptFooterNote != null) profile.receiptFooterNote = receiptFooterNote;
+                                   ^^^^^^^
+lib/services/library_service.dart:4436:40: Error: Undefined name 'profile'.
+    if (showBrandingWatermark != null) profile.showBrandingWatermark = showBrandingWatermark;
+                                       ^^^^^^^
+lib/services/library_service.dart:4438:7: Error: Undefined name 'profile'.
+      profile.logoBase64 = null;
+      ^^^^^^^
+lib/services/library_service.dart:4439:7: Error: Undefined name 'profile'.
+      profile.logoUrl = null;
+      ^^^^^^^
+lib/services/library_service.dart:4441:31: Error: Undefined name 'profile'.
+      if (logoBase64 != null) profile.logoBase64 = logoBase64;
+                              ^^^^^^^
+lib/services/library_service.dart:4442:28: Error: Undefined name 'profile'.
+      if (logoUrl != null) profile.logoUrl = logoUrl;
+                           ^^^^^^^
+lib/services/library_service.dart:4445:7: Error: Undefined name 'profile'.
+      profile.libraryName = libraryName.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4448:7: Error: Undefined name 'profile'.
+      profile.city = city.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4450:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4451:5: Error: Method not found: 'notifyStreamControllers'.
+    notifyStreamControllers();
+    ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4452:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4453:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4453:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4473:32: Error: Undefined name 'profile'.
+    if (notifications != null) profile.whatsappNotifications = notifications;
+                               ^^^^^^^
+lib/services/library_service.dart:4474:32: Error: Undefined name 'profile'.
+    if (autoReminders != null) profile.autoFeeReminders = autoReminders;
+                               ^^^^^^^
+lib/services/library_service.dart:4475:30: Error: Undefined name 'profile'.
+    if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;
+                             ^^^^^^^
+lib/services/library_service.dart:4476:30: Error: Undefined name 'profile'.
+    if (autoReceipt != null) profile.autoPaymentReceipt = autoReceipt;
+                             ^^^^^^^
+lib/services/library_service.dart:4477:36: Error: Undefined name 'profile'.
+    if (remind3DaysBefore != null) profile.remind3DaysBefore = remind3DaysBefore;
+                                   ^^^^^^^
+lib/services/library_service.dart:4478:33: Error: Undefined name 'profile'.
+    if (remindOnExpiry != null) profile.remindOnExpiry = remindOnExpiry;
+                                ^^^^^^^
+lib/services/library_service.dart:4479:36: Error: Undefined name 'profile'.
+    if (remindAfterExpiry != null) profile.remindAfterExpiry = remindAfterExpiry;
+                                   ^^^^^^^
+lib/services/library_service.dart:4480:29: Error: Undefined name 'profile'.
+    if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4481:30: Error: Undefined name 'profile'.
+    if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4482:29: Error: Undefined name 'profile'.
+    if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4483:30: Error: Undefined name 'profile'.
+    if (followupTpl != null) profile.followupTemplate = followupTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4484:32: Error: Undefined name 'profile'.
+    if (seatChangeTpl != null) profile.seatChangeTemplate = seatChangeTpl;
+                               ^^^^^^^
+lib/services/library_service.dart:4485:33: Error: Undefined name 'profile'.
+    if (shiftChangeTpl != null) profile.shiftChangeTemplate = shiftChangeTpl;
+                                ^^^^^^^
+lib/services/library_service.dart:4486:35: Error: Undefined name 'profile'.
+    if (seatAllotmentTpl != null) profile.seatAllotmentTemplate = seatAllotmentTpl;
+                                  ^^^^^^^
+lib/services/library_service.dart:4487:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4489:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4490:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4490:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4495:5: Error: Undefined name 'profile'.
+    profile.whatsappCredits += amount;
+    ^^^^^^^
+lib/services/library_service.dart:4496:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4497:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4498:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4498:71: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+                                                                      ^^^^^^^
+lib/services/library_service.dart:4503:9: Error: Undefined name 'profile'.
+    if (profile.whatsappCredits >= count) {
+        ^^^^^^^
+lib/services/library_service.dart:4504:7: Error: Undefined name 'profile'.
+      profile.whatsappCredits -= count;
+      ^^^^^^^
+lib/services/library_service.dart:4505:7: Error: Undefined name 'profile'.
+      profile.messagesSentCount += count;
+      ^^^^^^^
+lib/services/library_service.dart:4506:7: Error: Method not found: '_saveLocalState'.
+      _saveLocalState();
+      ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4533:39: Error: Undefined name 'profile'.
+        .replaceAll('{library_name}', profile.libraryName)
+                                      ^^^^^^^
+lib/services/library_service.dart:4556:15: Error: Undefined name 'profile'.
+        tpl = profile.seatChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4559:15: Error: Undefined name 'profile'.
+        tpl = profile.shiftChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4562:15: Error: Undefined name 'profile'.
+        tpl = profile.seatAllotmentTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4565:15: Error: Undefined name 'profile'.
+        tpl = profile.reminderTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4568:15: Error: Undefined name 'profile'.
+        tpl = profile.welcomeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4571:15: Error: Undefined name 'profile'.
+        tpl = profile.receiptTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4575:15: Error: Undefined name 'profile'.
+        tpl = profile.followupTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4599:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+lib/services/library_service.dart:4632:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:4595:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendWhatsAppDirect({
+  ^^^^^^
+lib/services/library_service.dart:4628:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendSmsDirect({
+  ^^^^^^
+lib/services/library_service.dart:4649:1: Error: Expected a declaration, but got '}'.
+}
+^
+test/seat_and_student_test.dart:1176:39: Error: The method 'formatActionDraft' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatActionDraft'.
+      final defaultFollowup = service.formatActionDraft(
+                                      ^^^^^^^^^^^^^^^^^
+test/seat_and_student_test.dart:1186:39: Error: The method 'formatActionDraft' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatActionDraft'.
+      final seatChangeDraft = service.formatActionDraft(
+                                      ^^^^^^^^^^^^^^^^^
+test/seat_and_student_test.dart:1195:40: Error: The method 'formatActionDraft' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatActionDraft'.
+      final shiftChangeDraft = service.formatActionDraft(
+                                       ^^^^^^^^^^^^^^^^^
+test/seat_and_student_test.dart:1203:38: Error: The method 'formatActionDraft' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatActionDraft'.
+      final allotmentDraft = service.formatActionDraft(
+                                     ^^^^^^^^^^^^^^^^^
+test/seat_and_student_test.dart:1211:34: Error: The method 'formatActionDraft' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatActionDraft'.
+      final withRemark = service.formatActionDraft(
+                                 ^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4409:5: Error: Method not found: 'ensureInitialized'.
+    ensureInitialized();
+    ^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4410:12: Error: Undefined name '_mockStudents'.
+    return _mockStudents.where((s) =>
+           ^^^^^^^^^^^^^
+lib/services/library_service.dart:4430:29: Error: Undefined name 'profile'.
+    if (logoEmblem != null) profile.logoEmblem = logoEmblem;
+                            ^^^^^^^
+lib/services/library_service.dart:4431:26: Error: Undefined name 'profile'.
+    if (tagline != null) profile.tagline = tagline;
+                         ^^^^^^^
+lib/services/library_service.dart:4432:33: Error: Undefined name 'profile'.
+    if (accentColorHex != null) profile.accentColorHex = accentColorHex;
+                                ^^^^^^^
+lib/services/library_service.dart:4433:33: Error: Undefined name 'profile'.
+    if (cardThemeStyle != null) profile.cardThemeStyle = cardThemeStyle;
+                                ^^^^^^^
+lib/services/library_service.dart:4434:37: Error: Undefined name 'profile'.
+    if (noticeAnnouncement != null) profile.noticeAnnouncement = noticeAnnouncement;
+                                    ^^^^^^^
+lib/services/library_service.dart:4435:36: Error: Undefined name 'profile'.
+    if (receiptFooterNote != null) profile.receiptFooterNote = receiptFooterNote;
+                                   ^^^^^^^
+lib/services/library_service.dart:4436:40: Error: Undefined name 'profile'.
+    if (showBrandingWatermark != null) profile.showBrandingWatermark = showBrandingWatermark;
+                                       ^^^^^^^
+lib/services/library_service.dart:4438:7: Error: Undefined name 'profile'.
+      profile.logoBase64 = null;
+      ^^^^^^^
+lib/services/library_service.dart:4439:7: Error: Undefined name 'profile'.
+      profile.logoUrl = null;
+      ^^^^^^^
+lib/services/library_service.dart:4441:31: Error: Undefined name 'profile'.
+      if (logoBase64 != null) profile.logoBase64 = logoBase64;
+                              ^^^^^^^
+lib/services/library_service.dart:4442:28: Error: Undefined name 'profile'.
+      if (logoUrl != null) profile.logoUrl = logoUrl;
+                           ^^^^^^^
+lib/services/library_service.dart:4445:7: Error: Undefined name 'profile'.
+      profile.libraryName = libraryName.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4448:7: Error: Undefined name 'profile'.
+      profile.city = city.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4450:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4451:5: Error: Method not found: 'notifyStreamControllers'.
+    notifyStreamControllers();
+    ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4452:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4453:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4453:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4473:32: Error: Undefined name 'profile'.
+    if (notifications != null) profile.whatsappNotifications = notifications;
+                               ^^^^^^^
+lib/services/library_service.dart:4474:32: Error: Undefined name 'profile'.
+    if (autoReminders != null) profile.autoFeeReminders = autoReminders;
+                               ^^^^^^^
+lib/services/library_service.dart:4475:30: Error: Undefined name 'profile'.
+    if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;
+                             ^^^^^^^
+lib/services/library_service.dart:4476:30: Error: Undefined name 'profile'.
+    if (autoReceipt != null) profile.autoPaymentReceipt = autoReceipt;
+                             ^^^^^^^
+lib/services/library_service.dart:4477:36: Error: Undefined name 'profile'.
+    if (remind3DaysBefore != null) profile.remind3DaysBefore = remind3DaysBefore;
+                                   ^^^^^^^
+lib/services/library_service.dart:4478:33: Error: Undefined name 'profile'.
+    if (remindOnExpiry != null) profile.remindOnExpiry = remindOnExpiry;
+                                ^^^^^^^
+lib/services/library_service.dart:4479:36: Error: Undefined name 'profile'.
+    if (remindAfterExpiry != null) profile.remindAfterExpiry = remindAfterExpiry;
+                                   ^^^^^^^
+lib/services/library_service.dart:4480:29: Error: Undefined name 'profile'.
+    if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4481:30: Error: Undefined name 'profile'.
+    if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4482:29: Error: Undefined name 'profile'.
+    if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4483:30: Error: Undefined name 'profile'.
+    if (followupTpl != null) profile.followupTemplate = followupTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4484:32: Error: Undefined name 'profile'.
+    if (seatChangeTpl != null) profile.seatChangeTemplate = seatChangeTpl;
+                               ^^^^^^^
+lib/services/library_service.dart:4485:33: Error: Undefined name 'profile'.
+    if (shiftChangeTpl != null) profile.shiftChangeTemplate = shiftChangeTpl;
+                                ^^^^^^^
+lib/services/library_service.dart:4486:35: Error: Undefined name 'profile'.
+    if (seatAllotmentTpl != null) profile.seatAllotmentTemplate = seatAllotmentTpl;
+                                  ^^^^^^^
+lib/services/library_service.dart:4487:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4489:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4490:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4490:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4495:5: Error: Undefined name 'profile'.
+    profile.whatsappCredits += amount;
+    ^^^^^^^
+lib/services/library_service.dart:4496:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4497:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4498:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4498:71: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+                                                                      ^^^^^^^
+lib/services/library_service.dart:4503:9: Error: Undefined name 'profile'.
+    if (profile.whatsappCredits >= count) {
+        ^^^^^^^
+lib/services/library_service.dart:4504:7: Error: Undefined name 'profile'.
+      profile.whatsappCredits -= count;
+      ^^^^^^^
+lib/services/library_service.dart:4505:7: Error: Undefined name 'profile'.
+      profile.messagesSentCount += count;
+      ^^^^^^^
+lib/services/library_service.dart:4506:7: Error: Method not found: '_saveLocalState'.
+      _saveLocalState();
+      ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4533:39: Error: Undefined name 'profile'.
+        .replaceAll('{library_name}', profile.libraryName)
+                                      ^^^^^^^
+lib/services/library_service.dart:4556:15: Error: Undefined name 'profile'.
+        tpl = profile.seatChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4559:15: Error: Undefined name 'profile'.
+        tpl = profile.shiftChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4562:15: Error: Undefined name 'profile'.
+        tpl = profile.seatAllotmentTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4565:15: Error: Undefined name 'profile'.
+        tpl = profile.reminderTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4568:15: Error: Undefined name 'profile'.
+        tpl = profile.welcomeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4571:15: Error: Undefined name 'profile'.
+        tpl = profile.receiptTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4575:15: Error: Undefined name 'profile'.
+        tpl = profile.followupTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4599:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+lib/services/library_service.dart:4632:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:4595:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendWhatsAppDirect({
+  ^^^^^^
+lib/services/library_service.dart:4628:3: Error: Can't have modifier 'static' here.
+Try removing 'static'.
+  static Future<bool> sendSmsDirect({
+  ^^^^^^
+lib/services/library_service.dart:4649:1: Error: Expected a declaration, but got '}'.
+}
+^
+lib/screens/main_hub_screen.dart:2740:34: Error: The method 'saveBranding' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'saveBranding'.
+                        _service.saveBranding(
+                                 ^^^^^^^^^^^^
+lib/screens/students/member_profile_screen.dart:377:67: Error: Member not found: 'LibraryService.sendWhatsAppDirect'.
+                                final sent = await LibraryService.sendWhatsAppDirect(
+                                                                  ^^^^^^^^^^^^^^^^^^
+lib/screens/students/member_profile_screen.dart:390:67: Error: Member not found: 'LibraryService.sendSmsDirect'.
+                                final sent = await LibraryService.sendSmsDirect(
+                                                                  ^^^^^^^^^^^^^
+lib/screens/students/member_profile_screen.dart:113:26: Error: The method 'formatTemplate' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatTemplate'.
+      var msg = _service.formatTemplate(
+                         ^^^^^^^^^^^^^^
+lib/screens/students/member_profile_screen.dart:376:42: Error: The method 'useWhatsAppCredit' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'useWhatsAppCredit'.
+                                _service.useWhatsAppCredit(1);
+                                         ^^^^^^^^^^^^^^^^^
+lib/screens/students/student_directory_screen.dart:520:37: Error: Member not found: 'LibraryService.sendWhatsAppDirect'.
+    final ok = await LibraryService.sendWhatsAppDirect(phone: s.phone, message: msg);
+                                    ^^^^^^^^^^^^^^^^^^
+lib/screens/students/student_directory_screen.dart:518:20: Error: The method 'formatTemplate' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatTemplate'.
+        ? _service.formatTemplate(_service.profile.followupTemplate, student: s)
+                   ^^^^^^^^^^^^^^
+lib/screens/students/student_directory_screen.dart:519:20: Error: The method 'formatTemplate' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatTemplate'.
+        : _service.formatTemplate(_service.profile.reminderTemplate, student: s);
+                   ^^^^^^^^^^^^^^
+lib/screens/students/student_directory_screen.dart:535:37: Error: Member not found: 'LibraryService.sendSmsDirect'.
+    final ok = await LibraryService.sendSmsDirect(phone: s.phone, message: msg);
+                                    ^^^^^^^^^^^^^
+lib/screens/students/student_directory_screen.dart:533:20: Error: The method 'formatTemplate' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatTemplate'.
+        ? _service.formatTemplate(_service.profile.followupTemplate, student: s)
+                   ^^^^^^^^^^^^^^
+lib/screens/students/student_directory_screen.dart:534:20: Error: The method 'formatTemplate' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatTemplate'.
+        : _service.formatTemplate(_service.profile.reminderTemplate, student: s);
+                   ^^^^^^^^^^^^^^
+lib/screens/students/student_directory_screen.dart:2413:40: Error: Member not found: 'LibraryService.sendWhatsAppDirect'.
+                        LibraryService.sendWhatsAppDirect(phone: req.phone, message: text);
+                                       ^^^^^^^^^^^^^^^^^^
+lib/screens/tools/reports_exports_screen.dart:38:39: Error: Member not found: 'LibraryService.sendWhatsAppDirect'.
+      final ok = await LibraryService.sendWhatsAppDirect(phone: phoneClean, message: text);
+                                      ^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4409:5: Error: Method not found: 'ensureInitialized'.
+    ensureInitialized();
+    ^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4410:12: Error: Undefined name '_mockStudents'.
+    return _mockStudents.where((s) =>
+           ^^^^^^^^^^^^^
+lib/services/library_service.dart:4430:29: Error: Undefined name 'profile'.
+    if (logoEmblem != null) profile.logoEmblem = logoEmblem;
+                            ^^^^^^^
+lib/services/library_service.dart:4431:26: Error: Undefined name 'profile'.
+    if (tagline != null) profile.tagline = tagline;
+                         ^^^^^^^
+lib/services/library_service.dart:4432:33: Error: Undefined name 'profile'.
+    if (accentColorHex != null) profile.accentColorHex = accentColorHex;
+                                ^^^^^^^
+lib/services/library_service.dart:4433:33: Error: Undefined name 'profile'.
+    if (cardThemeStyle != null) profile.cardThemeStyle = cardThemeStyle;
+                                ^^^^^^^
+lib/services/library_service.dart:4434:37: Error: Undefined name 'profile'.
+    if (noticeAnnouncement != null) profile.noticeAnnouncement = noticeAnnouncement;
+                                    ^^^^^^^
+lib/services/library_service.dart:4435:36: Error: Undefined name 'profile'.
+    if (receiptFooterNote != null) profile.receiptFooterNote = receiptFooterNote;
+                                   ^^^^^^^
+lib/services/library_service.dart:4436:40: Error: Undefined name 'profile'.
+    if (showBrandingWatermark != null) profile.showBrandingWatermark = showBrandingWatermark;
+                                       ^^^^^^^
+lib/services/library_service.dart:4438:7: Error: Undefined name 'profile'.
+      profile.logoBase64 = null;
+      ^^^^^^^
+lib/services/library_service.dart:4439:7: Error: Undefined name 'profile'.
+      profile.logoUrl = null;
+      ^^^^^^^
+lib/services/library_service.dart:4441:31: Error: Undefined name 'profile'.
+      if (logoBase64 != null) profile.logoBase64 = logoBase64;
+                              ^^^^^^^
+lib/services/library_service.dart:4442:28: Error: Undefined name 'profile'.
+      if (logoUrl != null) profile.logoUrl = logoUrl;
+                           ^^^^^^^
+lib/services/library_service.dart:4445:7: Error: Undefined name 'profile'.
+      profile.libraryName = libraryName.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4448:7: Error: Undefined name 'profile'.
+      profile.city = city.trim();
+      ^^^^^^^
+lib/services/library_service.dart:4450:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4451:5: Error: Method not found: 'notifyStreamControllers'.
+    notifyStreamControllers();
+    ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4452:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4453:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4453:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4473:32: Error: Undefined name 'profile'.
+    if (notifications != null) profile.whatsappNotifications = notifications;
+                               ^^^^^^^
+lib/services/library_service.dart:4474:32: Error: Undefined name 'profile'.
+    if (autoReminders != null) profile.autoFeeReminders = autoReminders;
+                               ^^^^^^^
+lib/services/library_service.dart:4475:30: Error: Undefined name 'profile'.
+    if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;
+                             ^^^^^^^
+lib/services/library_service.dart:4476:30: Error: Undefined name 'profile'.
+    if (autoReceipt != null) profile.autoPaymentReceipt = autoReceipt;
+                             ^^^^^^^
+lib/services/library_service.dart:4477:36: Error: Undefined name 'profile'.
+    if (remind3DaysBefore != null) profile.remind3DaysBefore = remind3DaysBefore;
+                                   ^^^^^^^
+lib/services/library_service.dart:4478:33: Error: Undefined name 'profile'.
+    if (remindOnExpiry != null) profile.remindOnExpiry = remindOnExpiry;
+                                ^^^^^^^
+lib/services/library_service.dart:4479:36: Error: Undefined name 'profile'.
+    if (remindAfterExpiry != null) profile.remindAfterExpiry = remindAfterExpiry;
+                                   ^^^^^^^
+lib/services/library_service.dart:4480:29: Error: Undefined name 'profile'.
+    if (welcomeTpl != null) profile.welcomeTemplate = welcomeTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4481:30: Error: Undefined name 'profile'.
+    if (reminderTpl != null) profile.reminderTemplate = reminderTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4482:29: Error: Undefined name 'profile'.
+    if (receiptTpl != null) profile.receiptTemplate = receiptTpl;
+                            ^^^^^^^
+lib/services/library_service.dart:4483:30: Error: Undefined name 'profile'.
+    if (followupTpl != null) profile.followupTemplate = followupTpl;
+                             ^^^^^^^
+lib/services/library_service.dart:4484:32: Error: Undefined name 'profile'.
+    if (seatChangeTpl != null) profile.seatChangeTemplate = seatChangeTpl;
+                               ^^^^^^^
+lib/services/library_service.dart:4485:33: Error: Undefined name 'profile'.
+    if (shiftChangeTpl != null) profile.shiftChangeTemplate = shiftChangeTpl;
+                                ^^^^^^^
+lib/services/library_service.dart:4486:35: Error: Undefined name 'profile'.
+    if (seatAllotmentTpl != null) profile.seatAllotmentTemplate = seatAllotmentTpl;
+                                  ^^^^^^^
+lib/services/library_service.dart:4487:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4489:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4490:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4490:50: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set(profile.toMap(), SetOptions(merge: true)).catchError((_) {});
+                                                 ^^^^^^^
+lib/services/library_service.dart:4495:5: Error: Undefined name 'profile'.
+    profile.whatsappCredits += amount;
+    ^^^^^^^
+lib/services/library_service.dart:4496:5: Error: Method not found: '_saveLocalState'.
+    _saveLocalState();
+    ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4497:9: Error: Undefined name 'isFirebaseConnected'.
+    if (isFirebaseConnected) {
+        ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4498:7: Error: Method not found: '_tenantCol'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+      ^^^^^^^^^^
+lib/services/library_service.dart:4498:71: Error: Undefined name 'profile'.
+      _tenantCol('settings').doc('whatsapp').set({'whatsapp_credits': profile.whatsappCredits}, SetOptions(merge: true)).catchError((_) {});
+                                                                      ^^^^^^^
+lib/services/library_service.dart:4503:9: Error: Undefined name 'profile'.
+    if (profile.whatsappCredits >= count) {
+        ^^^^^^^
+lib/services/library_service.dart:4504:7: Error: Undefined name 'profile'.
+      profile.whatsappCredits -= count;
+      ^^^^^^^
+lib/services/library_service.dart:4505:7: Error: Undefined name 'profile'.
+      profile.messagesSentCount += count;
+      ^^^^^^^
+lib/services/library_service.dart:4506:7: Error: Method not found: '_saveLocalState'.
+      _saveLocalState();
+      ^^^^^^^^^^^^^^^
+lib/services/library_service.dart:4533:39: Error: Undefined name 'profile'.
+        .replaceAll('{library_name}', profile.libraryName)
+                                      ^^^^^^^
+lib/services/library_service.dart:4556:15: Error: Undefined name 'profile'.
+        tpl = profile.seatChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4559:15: Error: Undefined name 'profile'.
+        tpl = profile.shiftChangeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4562:15: Error: Undefined name 'profile'.
+        tpl = profile.seatAllotmentTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4565:15: Error: Undefined name 'profile'.
+        tpl = profile.reminderTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4568:15: Error: Undefined name 'profile'.
+        tpl = profile.welcomeTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4571:15: Error: Undefined name 'profile'.
+        tpl = profile.receiptTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4575:15: Error: Undefined name 'profile'.
+        tpl = profile.followupTemplate;
+              ^^^^^^^
+lib/services/library_service.dart:4599:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+lib/services/library_service.dart:4632:24: Error: Method not found: 'normalizePhone'.
+    final cleanPhone = normalizePhone(phone);
+                       ^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:48:14: Error: The method 'saveWhatsAppSettings' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'saveWhatsAppSettings'.
+    _service.saveWhatsAppSettings(
+             ^^^^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:60:37: Error: Member not found: 'LibraryService.sendWhatsAppDirect'.
+    final ok = await LibraryService.sendWhatsAppDirect(phone: studentPhone, message: message);
+                                    ^^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:83:37: Error: Member not found: 'LibraryService.sendWhatsAppDirect'.
+    final ok = await LibraryService.sendWhatsAppDirect(phone: cleanPhone, message: message);
+                                    ^^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:93:21: Error: The method 'formatTemplate' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatTemplate'.
+    return _service.formatTemplate(
+                    ^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:103:34: Error: The method 'getStudentsWithDues' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'getStudentsWithDues'.
+    final dueStudents = _service.getStudentsWithDues();
+                                 ^^^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:209:34: Error: The method 'useWhatsAppCredit' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'useWhatsAppCredit'.
+                        _service.useWhatsAppCredit(1);
+                                 ^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:240:28: Error: The method 'useWhatsAppCredit' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'useWhatsAppCredit'.
+                  _service.useWhatsAppCredit(dueStudents.length);
+                           ^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:398:71: Error: Member not found: 'LibraryService.sendSmsDirect'.
+                                      final ok = await LibraryService.sendSmsDirect(phone: s.phone, message: msg);
+                                                                      ^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:413:48: Error: The method 'useWhatsAppCredit' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'useWhatsAppCredit'.
+                                      _service.useWhatsAppCredit(1);
+                                               ^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:550:30: Error: The method 'saveWhatsAppSettings' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'saveWhatsAppSettings'.
+                    _service.saveWhatsAppSettings(
+                             ^^^^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:881:63: Error: Member not found: 'LibraryService.sendWhatsAppDirect'.
+                              final ok = await LibraryService.sendWhatsAppDirect(
+                                                              ^^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:914:63: Error: Member not found: 'LibraryService.sendSmsDirect'.
+                              final ok = await LibraryService.sendSmsDirect(
+                                                              ^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:604:26: Error: The method 'formatTemplate' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'formatTemplate'.
+      var msg = _service.formatTemplate(
+                         ^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:875:40: Error: The method 'useWhatsAppCredit' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'useWhatsAppCredit'.
+                              _service.useWhatsAppCredit(1);
+                                       ^^^^^^^^^^^^^^^^^
+lib/screens/tools/whatsapp_automation_screen.dart:970:24: Error: The method 'addWhatsAppCredits' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'addWhatsAppCredits'.
+              _service.addWhatsAppCredits(100);
+                       ^^^^^^^^^^^^^^^^^^
+lib/screens/tools/library_branding_screen.dart:150:18: Error: The method 'saveBranding' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'saveBranding'.
+        _service.saveBranding(
+                 ^^^^^^^^^^^^
+lib/screens/tools/library_branding_screen.dart:191:14: Error: The method 'saveBranding' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'saveBranding'.
+    _service.saveBranding(
+             ^^^^^^^^^^^^
+lib/screens/tools/library_branding_screen.dart:301:14: Error: The method 'saveBranding' isn't defined for the class 'LibraryService'.
+ - 'LibraryService' is from 'package:library_manager/services/library_service.dart' ('lib/services/library_service.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'saveBranding'.
+    _service.saveBranding(
+             ^^^^^^^^^^^^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: ThemeService Tests Default ThemeMode is Light and themeModeName is Light
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: ThemeService Tests setThemeMode updates themeMode and notifies listeners
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: AppTheme Specifications lightTheme has correct brightness and Material 3 flags
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: AppTheme Specifications darkTheme has correct brightness and Slate dark tokens
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers AppColors returns light tokens in light mode
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers AppColors returns dark tokens in dark mode
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers ThemeService.isDarkMode resolves correctly across modes
+
+::error::7 tests passed, 7 failed.
