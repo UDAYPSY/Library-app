@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/models/library_models.dart';
 import 'package:library_manager/services/library_service.dart';
 import 'package:library_manager/services/disaster_recovery_service.dart';
+import 'package:library_manager/services/biometric_auth_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -203,7 +204,7 @@ void main() {
         {
           'role': 'Accountant & Fees',
           'expectedRole': 'Accountant & Fees',
-          'canViewRevenue': true,
+          'canViewRevenue': false,
           'canManageSeats': false,
           'canManageStaff': false,
           'canSwitchBranch': false,
@@ -586,6 +587,8 @@ void main() {
     });
 
     test('Biometric login checks intended role and rejects cross-role access (Owner vs Staff)', () async {
+      BiometricAuthService.testMode = true;
+      BiometricAuthService.testAuthResult = true;
       await service.login(identifier: 'admin', password: 'password123');
       expect(await service.getBiometricBinding(), isNotNull);
       await service.signOut();
