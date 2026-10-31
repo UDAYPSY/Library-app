@@ -896,6 +896,13 @@ class LibraryService {
           }
         }
 
+        // Purge staff directory lookup entries for this library
+        for (final s in staffList) {
+          try {
+            await _removeStaffMemberFromDirectory(s);
+          } catch (_) {}
+        }
+
         // Delete parent library root document
         try {
           await _db.collection('libraries').doc(tId).delete();
