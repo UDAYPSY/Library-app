@@ -89,6 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final hasHardware = await BiometricAuthService.canAuthenticate();
     final saved = await LocalStorageService.getString('app_last_login_identifier');
     final savedSession = await LocalStorageService.getString('app_active_session');
+    final biometricBinding = await _service.getBiometricBinding();
     if (mounted) {
       setState(() {
         if (saved != null && saved.isNotEmpty) {
@@ -97,8 +98,8 @@ class _LoginScreenState extends State<LoginScreen> {
           _emailCtrl.text = '';
         }
         _canUseBiometrics = hasHardware &&
-            ((savedSession != null && savedSession.isNotEmpty) ||
-             (saved != null && saved.isNotEmpty));
+            (biometricBinding != null ||
+             (savedSession != null && savedSession.isNotEmpty));
       });
     }
   }
@@ -322,7 +323,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Biometric verified! Welcome back, ${result.userName}.',
+                      'Biometric verified! Welcome back, ${result.userName} (${result.role}).',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),

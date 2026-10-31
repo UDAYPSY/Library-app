@@ -585,6 +585,15 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     final isInactive = _student.status == 'INACTIVE';
 
     if (isInactive) {
+      if (!_service.canDeleteRecords) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Access restricted: Only the library owner can permanently delete records.'),
+            backgroundColor: Color(0xFFDC2626),
+          ),
+        );
+        return;
+      }
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -676,27 +685,29 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                       }
                     },
                   ),
-                  const Divider(height: 16),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 20),
+                  if (_service.canDeleteRecords) ...[
+                    const Divider(height: 16),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 20),
+                      ),
+                      title: const Text('Permanently Delete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFEF4444))),
+                      subtitle: const Text('Completely purges this student record from the database. Cannot be undone.', style: TextStyle(fontSize: 11)),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        await _service.permanentlyDeleteStudent(_student.id, _student.seatNumber);
+                        if (mounted) {
+                          Navigator.pop(context, true);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('${_student.name} permanently deleted.'), backgroundColor: Colors.black87),
+                          );
+                        }
+                      },
                     ),
-                    title: const Text('Permanently Delete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFEF4444))),
-                    subtitle: const Text('Completely purges this student record from the database. Cannot be undone.', style: TextStyle(fontSize: 11)),
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      await _service.permanentlyDeleteStudent(_student.id, _student.seatNumber);
-                      if (mounted) {
-                        Navigator.pop(context, true);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('${_student.name} permanently deleted.'), backgroundColor: Colors.black87),
-                        );
-                      }
-                    },
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -1823,21 +1834,23 @@ _Powered by TrackMyLibrary_
                                   child: const Icon(Icons.swap_horiz_rounded, size: 22, color: AppColors.textNavy),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              // Delete/Deactivate Button
-                              InkWell(
-                                onTap: _confirmDeleteStudent,
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  padding: const EdgeInsets.all(11),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFEF2F2),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFFFECACA)),
+                              // Delete/Deactivate Button (Hidden for Inactive student if staff lacks delete permission)
+                              if (_student.status != 'INACTIVE' || _service.canDeleteRecords) ...[
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: _confirmDeleteStudent,
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(11),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF2F2),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: const Color(0xFFFECACA)),
+                                    ),
+                                    child: const Icon(Icons.delete_outline_rounded, size: 22, color: Color(0xFFEF4444)),
                                   ),
-                                  child: const Icon(Icons.delete_outline_rounded, size: 22, color: Color(0xFFEF4444)),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ],

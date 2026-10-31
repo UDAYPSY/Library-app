@@ -557,6 +557,15 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     final isInactive = s.status == 'INACTIVE';
 
     if (isInactive) {
+      if (!_service.canDeleteRecords) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Access restricted: Only the library owner can permanently delete records.'),
+            backgroundColor: Color(0xFFDC2626),
+          ),
+        );
+        return;
+      }
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -646,26 +655,28 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                       }
                     },
                   ),
-                  const Divider(height: 16),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 20),
+                  if (_service.canDeleteRecords) ...[
+                    const Divider(height: 16),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 20),
+                      ),
+                      title: const Text('Permanently Delete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFEF4444))),
+                      subtitle: const Text('Completely purges this student record from the database. Cannot be undone.', style: TextStyle(fontSize: 11)),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        await _service.permanentlyDeleteStudent(s.id, s.seatNumber);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('${s.name} permanently deleted.'), backgroundColor: Colors.black87),
+                          );
+                        }
+                      },
                     ),
-                    title: const Text('Permanently Delete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFEF4444))),
-                    subtitle: const Text('Completely purges this student record from the database. Cannot be undone.', style: TextStyle(fontSize: 11)),
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      await _service.permanentlyDeleteStudent(s.id, s.seatNumber);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('${s.name} permanently deleted.'), backgroundColor: Colors.black87),
-                        );
-                      }
-                    },
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -1652,19 +1663,20 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                         ],
                                                       ),
                                                     ),
-                                                  PopupMenuItem(
-                                                    value: 'delete',
-                                                    child: Row(
-                                                      children: [
-                                                        const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
-                                                        const SizedBox(width: 8),
-                                                        Text(
-                                                          st.status == 'INACTIVE' ? 'Delete Permanently' : 'Move to Inactive',
-                                                          style: const TextStyle(color: Color(0xFFEF4444)),
-                                                        ),
-                                                      ],
+                                                  if (st.status != 'INACTIVE' || _service.canDeleteRecords)
+                                                    PopupMenuItem(
+                                                      value: 'delete',
+                                                      child: Row(
+                                                        children: [
+                                                          const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                                                          const SizedBox(width: 8),
+                                                          Text(
+                                                            st.status == 'INACTIVE' ? 'Delete Permanently' : 'Move to Inactive',
+                                                            style: const TextStyle(color: Color(0xFFEF4444)),
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
-                                                  ),
                                                 ],
                                               ),
                                             ],

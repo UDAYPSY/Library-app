@@ -836,6 +836,177 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showBiometricTagModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 24,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.fingerprint_rounded, color: Color(0xFF0D766E), size: 24),
+                        SizedBox(width: 8),
+                        Text(
+                          'Fingerprint Login Binding',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textNavy),
+                        ),
+                      ],
+                    ),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Tag exactly one account identity to the physical fingerprint sensor on this phone. Scanning a fingerprint directly authenticates into this tagged account with its exact role.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: _service.getBiometricBinding(),
+                  builder: (context, snap) {
+                    final binding = snap.data;
+                    final isTaggedToActive = binding != null &&
+                        binding['user_id'] == _service.currentUserId;
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isTaggedToActive ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isTaggedToActive ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                binding != null ? Icons.verified_user_rounded : Icons.fingerprint_outlined,
+                                color: isTaggedToActive ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  binding != null
+                                      ? 'Tagged: ${binding['user_name'] ?? 'User'}'
+                                      : 'No Account Currently Tagged',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textNavy),
+                                ),
+                              ),
+                              if (isTaggedToActive)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text('ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF16A34A))),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (binding != null) ...[
+                            Text(
+                              'Role: ${binding['user_role'] ?? 'Staff'} • Identifier: ${binding['user_email'] != null && binding['user_email'].toString().isNotEmpty ? binding['user_email'] : binding['user_id']}',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+                            ),
+                            if (binding['enrolled_at'] != null)
+                              Text(
+                                'Enrolled: ${binding['enrolled_at']}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              ),
+                          ] else
+                            const Text(
+                              'Tap the button below to bind fingerprint login to your currently logged in account.',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D766E),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.fingerprint_rounded, size: 20),
+                              label: Text(
+                                isTaggedToActive ? 'Re-enroll This Account' : 'Tag Fingerprint to Current Account (${_service.currentUserName})',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              onPressed: () async {
+                                await _service.bindBiometricsToActiveUser();
+                                setModalState(() {});
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Fingerprint tagged to ${_service.currentUserName} (${_service.currentUserRole})'),
+                                      backgroundColor: const Color(0xFF0D766E),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                          if (binding != null) ...[
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+                                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                                label: const Text('Remove Fingerprint Tag (Unlink)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                onPressed: () async {
+                                  await _service.clearBiometricBinding();
+                                  setModalState(() {});
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Fingerprint tag removed. Direct login disabled until re-tagged.'),
+                                        backgroundColor: Colors.black87,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAddBranchDialog() {
     final nameCtrl = TextEditingController();
     final addrCtrl = TextEditingController();
@@ -2699,6 +2870,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Cloud Auth UID & Admin Password change',
                     onTap: _showSecurityModal,
                   ),
+                _settingsTile(
+                  icon: Icons.fingerprint_rounded,
+                  iconBg: const Color(0xFFF0FDF4),
+                  iconColor: const Color(0xFF16A34A),
+                  title: 'Fingerprint Login Tag',
+                  subtitle: 'Tag 1-touch fingerprint access to your account',
+                  onTap: _showBiometricTagModal,
+                ),
                 if (_service.isAdmin)
                   _settingsTile(
                     icon: Icons.cloud_sync_rounded,

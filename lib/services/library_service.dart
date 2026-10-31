@@ -962,8 +962,8 @@ class LibraryService {
     );
     isAuthenticated = false;
     currentUserId = null;
-    currentUserRole = 'Admin';
-    currentUserName = 'Admin';
+    currentUserRole = 'Guest';
+    currentUserName = 'Guest';
     currentUserEmail = '';
     activeBranchId = 'branch_1';
     _loadedFromLocalStorage = false;
@@ -1002,6 +1002,7 @@ class LibraryService {
     await LocalStorageService.remove('app_setup_completed');
     await LocalStorageService.remove('app_active_session');
     await LocalStorageService.remove('app_last_login_identifier');
+    await LocalStorageService.remove('app_biometric_binding');
     await LocalStorageService.remove('app_admin_password');
     await LocalStorageService.remove('app_admin_password_hash');
     await LocalStorageService.remove('gdrive_auto_backup_enabled');
@@ -1836,6 +1837,7 @@ class LibraryService {
           if (currentUserEmail.isNotEmpty) {
             await LocalStorageService.saveString('app_last_login_identifier', currentUserEmail);
           }
+          await bindBiometricsToActiveUser();
           return AuthResult(
             success: true,
             role: currentUserRole,
@@ -1875,6 +1877,7 @@ class LibraryService {
         if (cleanId.isNotEmpty) {
           await LocalStorageService.saveString('app_last_login_identifier', cleanId);
         }
+        await bindBiometricsToActiveUser();
         return AuthResult(
           success: true,
           role: 'Admin',
@@ -1962,6 +1965,10 @@ class LibraryService {
           }),
         );
         notifyStreamControllers();
+        if (cleanId.isNotEmpty) {
+          await LocalStorageService.saveString('app_last_login_identifier', cleanId);
+        }
+        await bindBiometricsToActiveUser();
         return AuthResult(
           success: true,
           role: currentUserRole,
@@ -2043,6 +2050,7 @@ class LibraryService {
               await LocalStorageService.saveString('app_last_login_identifier', cleanId);
             }
             notifyStreamControllers();
+            await bindBiometricsToActiveUser();
             return AuthResult(
               success: true,
               role: currentUserRole,
@@ -2239,12 +2247,13 @@ class LibraryService {
           if (currentUserEmail.isNotEmpty) {
             await LocalStorageService.saveString('app_last_login_identifier', currentUserEmail);
           }
-            return AuthResult(
-              success: true,
-              role: 'Admin',
-              userName: currentUserName,
-              userId: currentUserId,
-            );
+          await bindBiometricsToActiveUser();
+          return AuthResult(
+            success: true,
+            role: 'Admin',
+            userName: currentUserName,
+            userId: currentUserId,
+          );
           }
         } on FirebaseAuthException catch (e) {
         final code = e.code.toLowerCase();
@@ -2351,6 +2360,7 @@ class LibraryService {
       }),
     );
     await LocalStorageService.saveString('app_last_login_identifier', googleEmail);
+    await bindBiometricsToActiveUser();
     return AuthResult(
       success: true,
       role: 'Admin',
@@ -2359,24 +2369,42 @@ class LibraryService {
     );
   }
 
+  /// Enrolls or updates the active identity bound to biometric fingerprint authentication
+  Future<void> bindBiometricsToActiveUser() async {
+    if (!isAuthenticated || currentUserId == null || currentUserId!.isEmpty) return;
+    final binding = {
+      'user_id': currentUserId,
+      'user_name': currentUserName,
+      'user_email': currentUserEmail,
+      'user_role': currentUserRole,
+      'library_id': profile.libraryId,
+      'branch_id': activeBranchId,
+      'is_owner': isAdmin,
+      'enrolled_at': DateTime.now().toIso8601String(),
+    };
+    await LocalStorageService.saveString('app_biometric_binding', json.encode(binding));
+  }
+
+  /// Clears biometric binding (e.g. when user unlinks fingerprint or resets security)
+  Future<void> clearBiometricBinding() async {
+    await LocalStorageService.remove('app_biometric_binding');
+  }
+
+  /// Gets the currently bound biometric profile metadata, if any
+  Future<Map<String, dynamic>?> getBiometricBinding() async {
+    final str = await LocalStorageService.getString('app_biometric_binding');
+    if (str == null || str.isEmpty) return null;
+    try {
+      return json.decode(str) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<AuthResult> loginWithBiometrics() async {
     ensureInitialized();
 
-    // 1. Check if device has registered local credentials
-    final sessionStr = await LocalStorageService.getString('app_active_session');
-    final lastIdentifier = await LocalStorageService.getString('app_last_login_identifier');
-    final effectiveId = (lastIdentifier != null && lastIdentifier.isNotEmpty)
-        ? lastIdentifier
-        : (profile.adminEmail.isNotEmpty ? profile.adminEmail : '');
-
-    if ((sessionStr == null || sessionStr.isEmpty) && effectiveId.isEmpty) {
-      return const AuthResult(
-        success: false,
-        message: 'No registered credentials found on this device. Please log in with Google or your credentials first.',
-      );
-    }
-
-    // 2. Check if hardware biometric sensor is available
+    // 1. Check if hardware biometric sensor is available
     final canUseHardware = await BiometricAuthService.canAuthenticate();
     if (!canUseHardware) {
       return const AuthResult(
@@ -2385,9 +2413,21 @@ class LibraryService {
       );
     }
 
+    // 2. Read explicit biometric enrollment binding
+    final binding = await getBiometricBinding();
+    final sessionStr = await LocalStorageService.getString('app_active_session');
+
+    // If neither explicit binding nor active session exists, reject backdoor access!
+    if (binding == null && (sessionStr == null || sessionStr.isEmpty)) {
+      return const AuthResult(
+        success: false,
+        message: 'No account is currently tagged to fingerprint login. Please log in with your credentials first.',
+      );
+    }
+
     // 3. Prompt native phone OS biometric hardware sensor (BiometricPrompt)
     final biometricPassed = await BiometricAuthService.authenticate(
-      reason: 'Scan your fingerprint or verify biometrics to log in to TrackMyLibrary',
+      reason: 'Scan your fingerprint to log in to TrackMyLibrary',
     );
 
     if (!biometricPassed) {
@@ -2397,10 +2437,65 @@ class LibraryService {
       );
     }
 
-    // 4. Physical fingerprint verified! Restore active session or saved credential
+    // 4. Restore EXACT bound user identity (Owner or Staff) without role confusion!
+    if (binding != null) {
+      currentUserId = binding['user_id']?.toString() ?? 'user_001';
+      currentUserName = binding['user_name']?.toString() ?? 'User';
+      currentUserEmail = binding['user_email']?.toString() ?? '';
+      final boundRole = binding['user_role']?.toString() ?? 'Receptionist';
+      currentUserRole = normalizeRole(boundRole);
+      final boundLibId = binding['library_id']?.toString() ?? '';
+      if (boundLibId.isNotEmpty) {
+        profile = profile.copyWith(libraryId: boundLibId);
+      }
+      final boundBranchId = binding['branch_id']?.toString() ?? 'branch_1';
+      activeBranchId = boundBranchId;
+      isAuthenticated = true;
+
+      // If bound user is Owner:
+      if (binding['is_owner'] == true || currentUserRole == 'Admin') {
+        currentUserRole = 'Admin';
+        if (isFirebaseConnected && FirebaseAuth.instance.currentUser != null && !FirebaseAuth.instance.currentUser!.isAnonymous) {
+          profile.libraryId = FirebaseAuth.instance.currentUser!.uid;
+        }
+      } else {
+        // Staff user: STRICTLY preserve staff role and tenant binding!
+        // NEVER upgrade to Admin! NEVER overwrite adminEmail or adminPhone!
+        if (isFirebaseConnected && FirebaseAuth.instance.currentUser == null) {
+          try {
+            await FirebaseAuth.instance.signInAnonymously();
+          } catch (_) {}
+        }
+        if (profile.libraryId.isNotEmpty) {
+          await _loadStaffLibraryData(profile.libraryId);
+        }
+      }
+
+      await LocalStorageService.saveString(
+        'app_active_session',
+        json.encode({
+          'user_id': currentUserId,
+          'email': currentUserEmail,
+          'role': currentUserRole,
+          'name': currentUserName,
+          'branch_id': activeBranchId,
+          'library_id': profile.libraryId,
+        }),
+      );
+      notifyStreamControllers();
+      return AuthResult(
+        success: true,
+        role: currentUserRole,
+        userName: currentUserName,
+        userId: currentUserId,
+      );
+    }
+
+    // Fallback if session exists but binding was legacy
     if (sessionStr != null && sessionStr.isNotEmpty) {
       await restoreSession();
       if (isAuthenticated) {
+        await bindBiometricsToActiveUser();
         return AuthResult(
           success: true,
           role: currentUserRole,
@@ -2410,29 +2505,9 @@ class LibraryService {
       }
     }
 
-    // Re-authenticate using local admin session
-    currentUserId = 'admin_bio_001';
-    currentUserName = (profile.adminName.isNotEmpty && profile.adminName != 'Admin')
-        ? profile.adminName
-        : 'Administrator';
-    currentUserEmail = effectiveId;
-    currentUserRole = 'Admin';
-    isAuthenticated = true;
-    await LocalStorageService.saveString(
-      'app_active_session',
-      json.encode({
-        'user_id': currentUserId,
-        'email': currentUserEmail,
-        'role': currentUserRole,
-        'name': currentUserName,
-      }),
-    );
-    await LocalStorageService.saveString('app_last_login_identifier', effectiveId);
-    return AuthResult(
-      success: true,
-      role: 'Admin',
-      userName: currentUserName,
-      userId: currentUserId,
+    return const AuthResult(
+      success: false,
+      message: 'Fingerprint session expired. Please log in with your credentials.',
     );
   }
 
@@ -2514,6 +2589,7 @@ class LibraryService {
         await _tenantCol('settings').doc('branding').set(profile.toMap(), SetOptions(merge: true));
       } catch (_) {}
     }
+    await bindBiometricsToActiveUser();
     return AuthResult(
       success: true,
       role: 'Admin',
@@ -2531,7 +2607,7 @@ class LibraryService {
     currentUserId = null;
     currentUserName = 'Guest';
     currentUserEmail = '';
-    currentUserRole = 'Admin';
+    currentUserRole = 'Guest';
     isAuthenticated = false;
     await LocalStorageService.remove('app_active_session');
   }
@@ -2606,6 +2682,7 @@ class LibraryService {
       if (currentUserEmail.isNotEmpty) {
         await LocalStorageService.saveString('app_last_login_identifier', currentUserEmail);
       }
+      await bindBiometricsToActiveUser();
       return {'success': true, 'role': 'Admin', 'uid': uid};
     } on FirebaseAuthException catch (e) {
       String message = 'Login failed';
@@ -2802,6 +2879,9 @@ class LibraryService {
   // Delete Expense
   Future<void> deleteExpense(String expenseId) async {
     ensureInitialized();
+    if (!canDeleteRecords) {
+      throw UnsupportedError('Permission denied: Only the library owner can delete expense records.');
+    }
     if (isFirebaseConnected) {
       try {
         await _tenantCol('expenses').doc(expenseId).delete();
@@ -3862,6 +3942,9 @@ class LibraryService {
   // Permanently purge student from records and delete associated payments
   Future<void> permanentlyDeleteStudent(String studentId, int? seatNumber) async {
     ensureInitialized();
+    if (!canDeleteRecords) {
+      throw UnsupportedError('Permission denied: Only the library owner can permanently delete student records.');
+    }
     if (isFirebaseConnected) {
       try {
         final batch = _db.batch();
@@ -4479,6 +4562,9 @@ class LibraryService {
     String? receiptFooterNote,
     bool? showBrandingWatermark,
   }) {
+    if (!canEditSettings) {
+      throw UnsupportedError('Permission denied: Only the library owner can edit library branding.');
+    }
     if (logoEmblem != null) profile.logoEmblem = logoEmblem;
     if (tagline != null) profile.tagline = tagline;
     if (accentColorHex != null) profile.accentColorHex = accentColorHex;
@@ -4522,6 +4608,9 @@ class LibraryService {
     String? shiftChangeTpl,
     String? seatAllotmentTpl,
   }) {
+    if (!canEditSettings) {
+      throw UnsupportedError('Permission denied: Only the library owner can edit WhatsApp automation settings.');
+    }
     if (notifications != null) profile.whatsappNotifications = notifications;
     if (autoReminders != null) profile.autoFeeReminders = autoReminders;
     if (autoWelcome != null) profile.autoWelcomeMessage = autoWelcome;

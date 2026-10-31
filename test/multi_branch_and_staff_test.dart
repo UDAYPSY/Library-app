@@ -471,5 +471,108 @@ void main() {
       expect(service.currentUserRole, equals('Shift Manager'));
       expect(service.profile.libraryId, equals('owner_firebase_uid_99'));
     });
+
+    test('Biometric identity binding tags 1 ID at a time and preserves exact staff role without Admin elevation', () async {
+      // 1. Owner registers / logs in
+      service.profile.adminEmail = 'owner@library.com';
+      service.profile.adminName = 'Library Owner';
+      service.profile.libraryId = 'lib_owner_100';
+      await service.login(identifier: 'admin', password: 'password123');
+      expect(service.isAdmin, isTrue);
+
+      // Verify biometric binding tags owner as Admin
+      var binding = await service.getBiometricBinding();
+      expect(binding, isNotNull);
+      expect(binding!['user_role'], equals('Admin'));
+      expect(binding['is_owner'], isTrue);
+      expect(binding['user_email'], equals('owner@library.com'));
+
+      // 2. Staff member logs in
+      final staff = StaffMember(
+        id: 'staff_bio_01',
+        name: 'Vikas Assistant',
+        phone: '9888877777',
+        role: 'Branch Assistant',
+        pinHash: LibraryService.hashPin('staffPass'),
+        branchId: 'branch_1',
+        isActive: true,
+        addedAt: DateTime.now(),
+      );
+      service.addStaffMember(staff);
+
+      await service.signOut();
+      expect(service.currentUserRole, equals('Guest'));
+
+      await service.login(identifier: '9888877777', password: 'staffPass');
+      expect(service.currentUserRole, equals('Branch Assistant'));
+      expect(service.isAdmin, isFalse);
+
+      // Verify biometric binding has now re-tagged to Vikas (Branch Assistant)
+      binding = await service.getBiometricBinding();
+      expect(binding, isNotNull);
+      expect(binding!['user_id'], equals('staff_bio_01'));
+      expect(binding['user_name'], equals('Vikas Assistant'));
+      expect(binding['user_role'], equals('Branch Assistant'));
+      expect(binding['is_owner'], isFalse);
+
+      // Verify owner's email was NEVER replaced by staff phone!
+      expect(service.profile.adminEmail, equals('owner@library.com'));
+    });
+
+    test('Strict staff RBAC enforcement blocks unauthorized deletions and settings edits', () async {
+      final staff = StaffMember(
+        id: 'staff_rbac_01',
+        name: 'Rohan Desk',
+        phone: '9555544444',
+        role: 'Receptionist',
+        pinHash: LibraryService.hashPin('deskPass'),
+        branchId: 'branch_1',
+        isActive: true,
+        addedAt: DateTime.now(),
+      );
+      service.addStaffMember(staff);
+
+      // Login as staff
+      await service.login(identifier: '9555544444', password: 'deskPass');
+      expect(service.currentUserRole, equals('Receptionist'));
+      expect(service.canDeleteRecords, isFalse);
+      expect(service.canEditSettings, isFalse);
+
+      // Attempt permanentlyDeleteStudent -> must throw UnsupportedError
+      expect(
+        () async => await service.permanentlyDeleteStudent('student_123', 5),
+        throwsA(isA<UnsupportedError>()),
+      );
+
+      // Attempt deleteExpense -> must throw UnsupportedError
+      expect(
+        () async => await service.deleteExpense('exp_123'),
+        throwsA(isA<UnsupportedError>()),
+      );
+
+      // Attempt saveBranding -> must throw UnsupportedError
+      expect(
+        () => service.saveBranding(tagline: 'Unauthorized Branding Edit'),
+        throwsA(isA<UnsupportedError>()),
+      );
+
+      // Attempt saveWhatsAppSettings -> must throw UnsupportedError
+      expect(
+        () => service.saveWhatsAppSettings(autoReminders: false),
+        throwsA(isA<UnsupportedError>()),
+      );
+    });
+
+    test('Permanent account deletion clears biometric binding and resets role to Guest', () async {
+      await service.login(identifier: 'admin', password: 'password123');
+      expect(await service.getBiometricBinding(), isNotNull);
+
+      await service.deleteAccountPermanently();
+
+      expect(service.isAuthenticated, isFalse);
+      expect(service.currentUserRole, equals('Guest'));
+      expect(await service.getBiometricBinding(), isNull);
+    });
   });
 }
+
