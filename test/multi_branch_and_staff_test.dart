@@ -3,6 +3,7 @@ import 'package:library_manager/models/library_models.dart';
 import 'package:library_manager/services/library_service.dart';
 import 'package:library_manager/services/disaster_recovery_service.dart';
 import 'package:library_manager/services/biometric_auth_service.dart';
+import 'package:library_manager/services/excel_import_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -760,6 +761,119 @@ void main() {
       expect(ok, isTrue);
       expect(await drService.getLastBackupStatus(), equals('Success (Google Drive Sync)'));
       expect(await drService.getLastBackupTime(), isNotNull);
+    });
+  });
+
+  group('Ongoing Library Paper Register Onboarding & Non-Breaking Compatibility Tests', () {
+    test('ExcelImportService backward compatibility: legacy 7-column CSV imports cleanly', () {
+      const legacyCsv = '''Full Name,Phone Number,Shift,Seat Number,Monthly Fee,Father Name,Address
+Aarav Sharma,9876543210,Full Day,1,800,Ramesh Sharma,Patna Bihar
+Priya Singh,9812345678,Morning,2,500,Vijay Singh,Boring Road Patna''';
+
+      final result = ExcelImportService.parseAndImport(legacyCsv);
+      expect(result.success, isTrue);
+      expect(result.students.length, equals(2));
+      expect(result.students[0].name, equals('Aarav Sharma'));
+      expect(result.students[0].status, equals('Active'));
+      expect(result.students[0].duesAmount, equals(0));
+      expect(result.students[1].name, equals('Priya Singh'));
+      expect(result.students[1].status, equals('Active'));
+    });
+
+    test('ExcelImportService 10-column CSV imports historical join date, custom next due date and past dues', () {
+      const registerCsv = '''Full Name,Phone Number,Shift,Seat Number,Monthly Fee,Father Name,Address,Joining Date,Next Fee Due Date,Past Dues
+Amit Kumar,9876543211,Full Day,5,800,Rajesh Kumar,Patna,15-08-2026,18-11-2026,0
+Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,10-11-2026,300''';
+
+      final result = ExcelImportService.parseAndImport(registerCsv);
+      expect(result.success, isTrue);
+      expect(result.students.length, equals(2));
+
+      // Amit Kumar: fee paid up to 18-Nov-2026, no past dues -> Active
+      final amit = result.students[0];
+      expect(amit.name, equals('Amit Kumar'));
+      expect(amit.joinedAt.year, equals(2026));
+      expect(amit.joinedAt.month, equals(8));
+      expect(amit.joinedAt.day, equals(15));
+      expect(amit.feeDueDate?.year, equals(2026));
+      expect(amit.feeDueDate?.month, equals(11));
+      expect(amit.feeDueDate?.day, equals(18));
+      expect(amit.duesAmount, equals(0));
+      expect(amit.status, equals('Active'));
+
+      // Suman Roy: has 300 past register dues -> DUES
+      final suman = result.students[1];
+      expect(suman.name, equals('Suman Roy'));
+      expect(suman.duesAmount, equals(300));
+      expect(suman.status, equals('DUES'));
+      expect(suman.note, contains('Past Dues: ₹300'));
+    });
+
+    test('assignSeatAndRegisterStudent with feeAmount: 0 onboard register student without skewing today cash ledger', () async {
+      final initialPaymentCount = service.paymentsStream.value.length;
+
+      final historicalJoiningDate = DateTime(2026, 7, 10);
+      final nextDueDate = DateTime(2026, 11, 25);
+
+      // Onboard student from physical register who already paid fee in register
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 15,
+        studentName: 'Register Student Rahul',
+        phone: '9876543299',
+        shift: 'Full Day',
+        feeAmount: 0,
+        monthlyFee: 800,
+        duesAmount: 0,
+        durationMonths: 1,
+        paymentMode: 'Cash',
+        status: 'ACTIVE',
+        joiningDate: historicalJoiningDate,
+        validUntil: nextDueDate,
+        paymentDate: DateTime.now(),
+        note: 'Migrated from paper register.',
+      );
+
+      // Verify student is active and seat is occupied
+      final student = service.studentsStream.value.firstWhere((s) => s.phone == '9876543299');
+      expect(student.status, equals('ACTIVE'));
+      expect(student.seatNumber, equals(15));
+      expect(student.joinedAt, equals(historicalJoiningDate));
+      expect(student.feeDueDate, equals(nextDueDate));
+      expect(student.duesAmount, equals(0));
+
+      // Verify ZERO new payment transactions were recorded in today's cash book
+      expect(service.paymentsStream.value.length, equals(initialPaymentCount));
+    });
+
+    test('Regular walk-in admission records payment in ledger normally without disruption', () async {
+      final initialPaymentCount = service.paymentsStream.value.length;
+
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 16,
+        studentName: 'Walk-In Student Sneha',
+        phone: '9876543288',
+        shift: 'Morning',
+        feeAmount: 600,
+        monthlyFee: 600,
+        duesAmount: 0,
+        durationMonths: 1,
+        paymentMode: 'Cash',
+        status: 'ACTIVE',
+        joiningDate: DateTime.now(),
+        validUntil: DateTime.now().add(const Duration(days: 30)),
+        paymentDate: DateTime.now(),
+      );
+
+      // Verify student is active and seat is assigned
+      final student = service.studentsStream.value.firstWhere((s) => s.phone == '9876543288');
+      expect(student.status, equals('ACTIVE'));
+      expect(student.seatNumber, equals(16));
+
+      // Verify normal payment transaction was created
+      expect(service.paymentsStream.value.length, equals(initialPaymentCount + 1));
+      final payment = service.paymentsStream.value.first;
+      expect(payment.studentName, equals('Walk-In Student Sneha'));
+      expect(payment.amount, equals(600));
     });
   });
 }

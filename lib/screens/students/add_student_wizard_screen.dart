@@ -56,6 +56,11 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
   final TextEditingController _aadhaarCtrl = TextEditingController();
   final TextEditingController _notesCtrl = TextEditingController();
 
+  // Existing Ongoing Library Register Onboarding Mode
+  bool _isExistingRegisterMember = false;
+  bool _feeAlreadyPaidInRegister = false;
+  final TextEditingController _pastRegisterDuesCtrl = TextEditingController(text: '0');
+
   // Step 2: Schedule & Fees
   String _selectedSection = 'Main Hall';
   int? _selectedSeat; // null = unallocated
@@ -913,22 +918,42 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         );
       }
 
+      int effectivePaidAmount = finalPaidAmount;
+      int effectiveDuesAmount = finalDuesAmount;
+      String effectiveStatus = finalStatus;
+      String effectiveNote = _notesCtrl.text.trim();
+
+      if (!_isTrial && _isExistingRegisterMember && _feeAlreadyPaidInRegister) {
+        effectivePaidAmount = 0;
+        final regPastDues = int.tryParse(_pastRegisterDuesCtrl.text.trim()) ?? 0;
+        effectiveDuesAmount = regPastDues;
+        if (effectiveDuesAmount > 0) {
+          effectiveStatus = 'DUES';
+        } else if (_validUntilDate.isBefore(DateTime.now())) {
+          effectiveStatus = 'DUES';
+        } else {
+          effectiveStatus = 'ACTIVE';
+        }
+        final regLog = 'Migrated from paper register (Paid up to ${DateFormat('dd-MMM-yyyy').format(_validUntilDate)}${effectiveDuesAmount > 0 ? ", Past Dues: ₹$effectiveDuesAmount" : ""}).';
+        effectiveNote = LibraryService.appendNote(effectiveNote, regLog);
+      }
+
       await _service.assignSeatAndRegisterStudent(
         seatNumber: seatNum,
         studentName: name,
         phone: phone,
         shift: _selectedShift.name,
         deviceUserId: _service.profile.adminName,
-        feeAmount: finalPaidAmount,
+        feeAmount: effectivePaidAmount,
         monthlyFee: fixedMonthly,
-        duesAmount: finalDuesAmount,
+        duesAmount: effectiveDuesAmount,
         durationMonths: _selectedDurationMonths,
         paymentMode: _selectedPaymentMethod,
-        status: finalStatus,
+        status: effectiveStatus,
         joiningDate: _joiningDate,
         validUntil: _validUntilDate,
         paymentDate: _paymentDate,
-        note: _notesCtrl.text.trim(),
+        note: effectiveNote,
         fatherName: _sanitize(_fatherNameCtrl.text),
         address: _sanitize(_addressCtrl.text),
         aadhaarNumber: _aadhaarCtrl.text.replaceAll(' ', '').trim(),
@@ -949,16 +974,25 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         if (!_isTrial && _service.profile.autoWelcomeMessage) {
           _sendWelcomeWhatsApp(name, phone, seatNum, _selectedShift.name);
         }
+        final String successMsg;
+        if (_isTrial) {
+          successMsg = 'Trial Student $name registered successfully!';
+        } else if (_isExistingRegisterMember && _feeAlreadyPaidInRegister) {
+          successMsg = effectiveDuesAmount > 0
+              ? 'Register student $name onboarded with ₹$effectiveDuesAmount past dues!'
+              : 'Register student $name onboarded successfully!';
+        } else if (effectiveDuesAmount > 0) {
+          successMsg = 'Student $name registered with ₹$effectiveDuesAmount pending due!';
+        } else {
+          successMsg = 'Student $name added successfully (Fully Paid)!';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isTrial
-                ? 'Trial Student $name registered successfully!'
-                : (finalDuesAmount > 0
-                    ? 'Student $name registered with ₹$finalDuesAmount pending due!'
-                    : 'Student $name added successfully (Fully Paid)!')),
+            content: Text(successMsg),
             backgroundColor: _isTrial
                 ? const Color(0xFFD97706)
-                : (finalDuesAmount > 0 ? const Color(0xFFE11D48) : AppColors.successGreen),
+                : (effectiveDuesAmount > 0 ? const Color(0xFFE11D48) : AppColors.successGreen),
           ),
         );
         Navigator.pop(context, true);
@@ -1268,6 +1302,119 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Admission Mode Switcher: New Walk-in vs Ongoing Register Migration
+              if (!isEditing && widget.registrationRequest == null) ...[
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () {
+                            setState(() {
+                              _isExistingRegisterMember = false;
+                              _feeAlreadyPaidInRegister = false;
+                              _joiningDate = DateTime.now();
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: !_isExistingRegisterMember ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: !_isExistingRegisterMember
+                                  ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person_add_rounded, size: 16, color: !_isExistingRegisterMember ? AppColors.primaryTeal : const Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'New Admission',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: !_isExistingRegisterMember ? AppColors.textNavy : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () {
+                            setState(() {
+                              _isExistingRegisterMember = true;
+                              _feeAlreadyPaidInRegister = true;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _isExistingRegisterMember ? const Color(0xFF0D9488) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: _isExistingRegisterMember
+                                  ? [BoxShadow(color: const Color(0xFF0D9488).withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.menu_book_rounded, size: 16, color: _isExistingRegisterMember ? Colors.white : const Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Existing Register Student',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isExistingRegisterMember ? Colors.white : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isExistingRegisterMember) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF059669)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Migration Mode: Onboarding an active student from your physical register. Tap Joining Date below to select their past admission date.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF065F46), fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+              ],
+
               _fieldLabel('Full Name', isRequired: true),
               const SizedBox(height: 6),
               _formTextField(
@@ -1293,87 +1440,150 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _fieldLabel('Joining Date', isRequired: true),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.lock_outline_rounded, size: 12, color: Color(0xFF64748B)),
-                        SizedBox(width: 4),
-                        Text(
-                          'Fixed / Non-editable',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF64748B),
-                          ),
+                  if (_isExistingRegisterMember)
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _joiningDate,
+                          firstDate: DateTime(2015),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _joiningDate = picked;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCCFBF1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF99F6E4)),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today_rounded, color: Color(0xFF0D9488), size: 18),
-                        const SizedBox(width: 10),
-                        Text(
-                          dateStr,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textNavy,
-                          ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_calendar_rounded, size: 12, color: Color(0xFF0F766E)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Tap to pick register date',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F766E),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0F2FE),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFBAE6FD)),
                       ),
-                      child: Row(
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 13),
-                          const SizedBox(width: 4),
+                          Icon(Icons.lock_outline_rounded, size: 12, color: Color(0xFF64748B)),
+                          SizedBox(width: 4),
                           Text(
-                            '${(DateTime.now().difference(DateTime(_joiningDate.year, _joiningDate.month, _joiningDate.day)).inDays + 1).clamp(1, 99999)}d Completed',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0284C7),
+                            'Fixed / Non-editable',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF64748B),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              InkWell(
+                onTap: _isExistingRegisterMember
+                    ? () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _joiningDate,
+                          firstDate: DateTime(2015),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _joiningDate = picked;
+                          });
+                        }
+                      }
+                    : null,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  height: 50,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: _isExistingRegisterMember ? const Color(0xFFF0FDFA) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _isExistingRegisterMember ? const Color(0xFF5EEAD4) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_rounded, color: _isExistingRegisterMember ? const Color(0xFF0D9488) : const Color(0xFF0D9488), size: 18),
+                          const SizedBox(width: 10),
+                          Text(
+                            dateStr,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textNavy,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_isExistingRegisterMember)
+                        const Icon(Icons.edit_rounded, size: 16, color: Color(0xFF0D9488))
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE0F2FE),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFBAE6FD)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 13),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${(DateTime.now().difference(DateTime(_joiningDate.year, _joiningDate.month, _joiningDate.day)).inDays + 1).clamp(1, 99999)}d Completed',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0284C7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Joining date is fixed from registration to track student tenure in the library.',
-                style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+              Text(
+                _isExistingRegisterMember
+                    ? 'Student\'s original admission date from your physical library register.'
+                    : 'Joining date is fixed from registration to track student tenure in the library.',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 16),
 
@@ -2301,10 +2511,124 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                       ),
                     ),
 
+                  // Migration Fee Status for Ongoing Register Students
+                  if (_isExistingRegisterMember && !isEditing) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDFA),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF99F6E4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.menu_book_rounded, color: Color(0xFF0D9488), size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'Register Migration: Fee Status',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () {
+                                    setState(() {
+                                      _feeAlreadyPaidInRegister = true;
+                                      _amountPaidCtrl.text = '0';
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      color: _feeAlreadyPaidInRegister ? const Color(0xFF0D9488) : Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: _feeAlreadyPaidInRegister ? const Color(0xFF0D9488) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '✓ Fee Paid in Register',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: _feeAlreadyPaidInRegister ? Colors.white : const Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () {
+                                    setState(() {
+                                      _feeAlreadyPaidInRegister = false;
+                                      _amountPaidCtrl.text = '$_calculatedTotalFee';
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      color: !_feeAlreadyPaidInRegister ? const Color(0xFF0D9488) : Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: !_feeAlreadyPaidInRegister ? const Color(0xFF0D9488) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Collecting Fee Today',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: !_feeAlreadyPaidInRegister ? Colors.white : const Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _feeAlreadyPaidInRegister
+                                ? '💡 No revenue will be added to today\'s collection. The student will be registered as ACTIVE and valid until the Next Due Date chosen below.'
+                                : '💡 Normal payment mode: The fee collected today will be recorded in today\'s revenue ledger.',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF047857), height: 1.4),
+                          ),
+                          const SizedBox(height: 14),
+                          _fieldLabel('Previous Register Dues (Optional)', isRequired: false),
+                          const SizedBox(height: 6),
+                          _formTextField(
+                            controller: _pastRegisterDuesCtrl,
+                            hintText: 'Enter past dues from register if any (e.g. 500)',
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18, color: Color(0xFFEF4444)),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'If this student owes any past balance from your physical register, enter it here to carry forward.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _fieldLabel(widget.studentToEdit != null ? 'Due Amount to Accept (₹)' : 'Amount Paid Now (₹)', isRequired: true),
+                      _fieldLabel(widget.studentToEdit != null ? 'Due Amount to Accept (₹)' : (_feeAlreadyPaidInRegister ? 'Admission Fee (Covered in Register)' : 'Amount Paid Now (₹)'), isRequired: true),
                       // Auto-determined payment status pill
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -2738,53 +3062,79 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
                         ),
                         const SizedBox(width: 10),
 
-                        // Valid Until Date (LOCKED / AUTO-POPULATED NON-EDITABLE)
+                        // Valid Until Date (LOCKED for regular / EDITABLE for register migration)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  _fieldLabel('Valid Until Date', isRequired: false),
+                                  _fieldLabel(_isExistingRegisterMember ? 'Next Fee Due Date' : 'Valid Until Date', isRequired: false),
                                   const SizedBox(width: 4),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFCCFBF1),
+                                      color: _isExistingRegisterMember ? const Color(0xFFD1FAE5) : const Color(0xFFCCFBF1),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
-                                    child: const Text(
-                                      'Auto',
+                                    child: Text(
+                                      _isExistingRegisterMember ? 'Tap to edit' : 'Auto',
                                       style: TextStyle(
                                         fontSize: 9,
                                         fontWeight: FontWeight.w900,
-                                        color: Color(0xFF0F766E),
+                                        color: _isExistingRegisterMember ? const Color(0xFF047857) : const Color(0xFF0F766E),
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      DateFormat('dd-MMM-yyyy').format(_validUntilDate),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFF0D9488),
-                                      ),
+                              InkWell(
+                                onTap: _isExistingRegisterMember
+                                    ? () async {
+                                        final picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: _validUntilDate,
+                                          firstDate: DateTime(2020),
+                                          lastDate: DateTime(2035),
+                                          helpText: 'SELECT NEXT DUE DATE (FROM REGISTER)',
+                                        );
+                                        if (picked != null) {
+                                          setState(() {
+                                            _validUntilDate = picked;
+                                          });
+                                        }
+                                      }
+                                    : null,
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _isExistingRegisterMember ? Colors.white : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: _isExistingRegisterMember ? const Color(0xFF0D9488) : const Color(0xFFCBD5E1),
+                                      width: _isExistingRegisterMember ? 1.5 : 1.0,
                                     ),
-                                    const Icon(Icons.lock_clock_rounded, size: 16, color: Color(0xFF0D9488)),
-                                  ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        DateFormat('dd-MMM-yyyy').format(_validUntilDate),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: _isExistingRegisterMember ? const Color(0xFF0F766E) : const Color(0xFF0D9488),
+                                        ),
+                                      ),
+                                      Icon(
+                                        _isExistingRegisterMember ? Icons.edit_calendar_rounded : Icons.lock_clock_rounded,
+                                        size: 16,
+                                        color: _isExistingRegisterMember ? const Color(0xFF0D9488) : const Color(0xFF0D9488),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
