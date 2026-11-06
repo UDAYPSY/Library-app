@@ -74,8 +74,8 @@ Future<bool> saveAndDownloadFile({
             await launchUrl(driveUri, mode: LaunchMode.externalApplication);
           }
         } catch (_) {}
-        return true;
       }
+      return true;
     }
 
     // For general non-Drive file exports (e.g. student CSVs, fee reports), invoke standard system share
