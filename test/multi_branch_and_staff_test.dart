@@ -799,9 +799,9 @@ Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,10-11-2026,300''
       final amit = service.findStudentByPhone('9876543211');
       expect(amit, isNotNull);
       expect(amit!.name, equals('Amit Kumar'));
-      expect(amit.joinedAt.year, equals(2026));
-      expect(amit.joinedAt.month, equals(8));
-      expect(amit.joinedAt.day, equals(15));
+      expect(amit.joinedAt?.year, equals(2026));
+      expect(amit.joinedAt?.month, equals(8));
+      expect(amit.joinedAt?.day, equals(15));
       expect(amit.feeDueDate?.year, equals(2026));
       expect(amit.feeDueDate?.month, equals(11));
       expect(amit.feeDueDate?.day, equals(18));
@@ -818,7 +818,7 @@ Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,10-11-2026,300''
     });
 
     test('assignSeatAndRegisterStudent with feeAmount: 0 onboard register student without skewing today cash ledger', () async {
-      final initialPaymentCount = service.paymentsStream.value.length;
+      final initialPaymentCount = service.currentPayments.length;
 
       final historicalJoiningDate = DateTime(2026, 7, 10);
       final nextDueDate = DateTime(2026, 11, 25);
@@ -842,19 +842,20 @@ Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,10-11-2026,300''
       );
 
       // Verify student is active and seat is occupied
-      final student = service.studentsStream.value.firstWhere((s) => s.phone == '9876543299');
-      expect(student.status, equals('ACTIVE'));
+      final student = service.findStudentByPhone('9876543299');
+      expect(student, isNotNull);
+      expect(student!.status, equals('ACTIVE'));
       expect(student.seatNumber, equals(15));
       expect(student.joinedAt, equals(historicalJoiningDate));
       expect(student.feeDueDate, equals(nextDueDate));
       expect(student.duesAmount, equals(0));
 
       // Verify ZERO new payment transactions were recorded in today's cash book
-      expect(service.paymentsStream.value.length, equals(initialPaymentCount));
+      expect(service.currentPayments.length, equals(initialPaymentCount));
     });
 
     test('Regular walk-in admission records payment in ledger normally without disruption', () async {
-      final initialPaymentCount = service.paymentsStream.value.length;
+      final initialPaymentCount = service.currentPayments.length;
 
       await service.assignSeatAndRegisterStudent(
         seatNumber: 16,
@@ -873,13 +874,14 @@ Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,10-11-2026,300''
       );
 
       // Verify student is active and seat is assigned
-      final student = service.studentsStream.value.firstWhere((s) => s.phone == '9876543288');
-      expect(student.status, equals('ACTIVE'));
+      final student = service.findStudentByPhone('9876543288');
+      expect(student, isNotNull);
+      expect(student!.status, equals('ACTIVE'));
       expect(student.seatNumber, equals(16));
 
       // Verify normal payment transaction was created
-      expect(service.paymentsStream.value.length, equals(initialPaymentCount + 1));
-      final payment = service.paymentsStream.value.first;
+      expect(service.currentPayments.length, equals(initialPaymentCount + 1));
+      final payment = service.currentPayments.first;
       expect(payment.studentName, equals('Walk-In Student Sneha'));
       expect(payment.amount, equals(600));
     });
