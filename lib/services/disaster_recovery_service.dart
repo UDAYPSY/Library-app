@@ -29,12 +29,12 @@ class DisasterRecoveryService {
   }
 
   Future<String> getBackupEmail() async {
-    final val = await LocalStorageService.getString(keyBackupEmail);
-    if (val != null && val.trim().isNotEmpty) return val.trim();
     // Google Drive backup email belongs strictly to the Owner/Admin onboarding email, never staff
     if (_service.profile.adminEmail.trim().isNotEmpty) {
       return _service.profile.adminEmail.trim();
     }
+    final val = await LocalStorageService.getString(keyBackupEmail);
+    if (val != null && val.trim().isNotEmpty) return val.trim();
     if (_service.isAdmin && _service.currentUserEmail.trim().isNotEmpty) {
       return _service.currentUserEmail.trim();
     }

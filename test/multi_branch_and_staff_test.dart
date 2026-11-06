@@ -753,6 +753,7 @@ void main() {
       service.profile.adminEmail = 'onboarding_owner@library.com';
 
       final drService = DisasterRecoveryService(service: service);
+      await drService.setBackupEmail('onboarding_owner@library.com');
       expect(await drService.getBackupEmail(), equals('onboarding_owner@library.com'));
 
       final ok = await drService.backupToGoogleDriveNow();
