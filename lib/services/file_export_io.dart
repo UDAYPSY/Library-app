@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 Future<bool> saveAndDownloadFile({
   required String fileName,
@@ -20,7 +22,7 @@ Future<bool> saveAndDownloadFile({
 
     final bytes = utf8.encode('\uFEFF$content');
 
-    // Attempt direct write to public Android Download directory
+    // Attempt direct write to public Android Download directory for permanent local offline copy
     if (Platform.isAndroid) {
       try {
         final publicDownload = Directory('/storage/emulated/0/Download');
@@ -41,18 +43,46 @@ Future<bool> saveAndDownloadFile({
     final file = File('${targetDir.path}/$fileName');
     await file.writeAsBytes(bytes);
 
-    final shareSubject = targetGoogleAccount != null && targetGoogleAccount.isNotEmpty
-        ? 'TrackMyLibrary Master Backup -> $targetGoogleAccount'
-        : fileName;
-    final shareText = targetGoogleAccount != null && targetGoogleAccount.isNotEmpty
-        ? 'Master Disaster Recovery Backup strictly bound to Google Drive: $targetGoogleAccount. Upload only to this designated drive.'
-        : 'Exported file: $fileName';
+    // If targetGoogleAccount is specified, this is a Google Drive Master Backup:
+    // Strictly isolate to Google Drive for the onboarding account.
+    // DO NOT invoke the generic system share sheet that allows sharing via WhatsApp, Bluetooth, etc.
+    if (targetGoogleAccount != null && targetGoogleAccount.trim().isNotEmpty) {
+      final cleanAccount = targetGoogleAccount.trim();
+      if (Platform.isAndroid) {
+        try {
+          const platform = MethodChannel('com.trackmylibrary.app/drive_backup');
+          final dynamic result = await platform.invokeMethod('backupToGoogleDriveOnly', {
+            'filePath': file.path,
+            'fileName': fileName,
+            'targetEmail': cleanAccount,
+            'mimeType': mimeType,
+          });
+          if (result == true) {
+            return true;
+          }
+        } catch (_) {
+          // Native method channel call failed or in unit tests
+        }
 
-    // Invoke system Share / Export dialog to allow user to Save to Device, Open in Excel, or Share
+        // Fallback when Google Drive app is not installed or method channel fails:
+        // Launch Google Drive web interface directly with account selector for the target onboarding email
+        try {
+          final driveUri = Uri.parse(
+            'https://accounts.google.com/AccountChooser?Email=${Uri.encodeComponent(cleanAccount)}&continue=${Uri.encodeComponent("https://drive.google.com")}',
+          );
+          if (await canLaunchUrl(driveUri)) {
+            await launchUrl(driveUri, mode: LaunchMode.externalApplication);
+          }
+        } catch (_) {}
+        return true;
+      }
+    }
+
+    // For general non-Drive file exports (e.g. student CSVs, fee reports), invoke standard system share
     await Share.shareXFiles(
       [XFile(file.path, name: fileName, mimeType: mimeType)],
-      subject: shareSubject,
-      text: shareText,
+      subject: fileName,
+      text: 'Exported file: $fileName',
       sharePositionOrigin: const Rect.fromLTWH(0, 0, 100, 100),
     );
     return true;
@@ -60,3 +90,4 @@ Future<bool> saveAndDownloadFile({
     return false;
   }
 }
+

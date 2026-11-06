@@ -20,6 +20,12 @@ Future<bool> saveAndDownloadFile({
     anchor.click();
     html.document.body?.children.remove(anchor);
     html.Url.revokeObjectUrl(url);
+
+    if (targetGoogleAccount != null && targetGoogleAccount.trim().isNotEmpty) {
+      final cleanAccount = targetGoogleAccount.trim();
+      final driveUrl = 'https://accounts.google.com/AccountChooser?Email=${Uri.encodeComponent(cleanAccount)}&continue=${Uri.encodeComponent("https://drive.google.com")}';
+      html.window.open(driveUrl, '_blank');
+    }
     return true;
   } catch (e) {
     return false;

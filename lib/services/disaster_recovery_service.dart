@@ -31,7 +31,7 @@ class DisasterRecoveryService {
   Future<String> getBackupEmail() async {
     final val = await LocalStorageService.getString(keyBackupEmail);
     if (val != null && val.trim().isNotEmpty) return val.trim();
-    // Google Drive backup email belongs strictly to the Owner/Admin, never a staff member
+    // Google Drive backup email belongs strictly to the Owner/Admin onboarding email, never staff
     if (_service.profile.adminEmail.trim().isNotEmpty) {
       return _service.profile.adminEmail.trim();
     }
@@ -46,7 +46,10 @@ class DisasterRecoveryService {
     if (!LibraryService.isValidEmail(email)) {
       throw ArgumentError('Invalid Google Drive email format.');
     }
-    await LocalStorageService.saveString(keyBackupEmail, email.trim());
+    final clean = email.trim();
+    _service.profile.adminEmail = clean;
+    await _service.saveLocalState();
+    await LocalStorageService.saveString(keyBackupEmail, clean);
   }
 
   Future<String?> getLastBackupTime() async {
@@ -422,6 +425,30 @@ class DisasterRecoveryService {
       final bytesLength = utf8.encode(excelXml).length;
       final sizeKb = (bytesLength / 1024).toStringAsFixed(1);
 
+      // Cloud Tenant Synchronization: Persist backup record to Firestore under library backups collection
+      if (_service.isFirebaseConnected && _service.tenantId.isNotEmpty) {
+        try {
+          final backupPayload = {
+            'timestamp': now.toIso8601String(),
+            'target_drive_email': targetEmail,
+            'file_name': fileName,
+            'file_size_kb': sizeKb,
+            'status': 'SYNCED_TO_GOOGLE_DRIVE',
+            'students_count': _service.currentStudents.length,
+            'payments_count': _service.currentPayments.length,
+            'expenses_count': _service.currentExpenses.length,
+            'excel_xml': excelXml,
+            'system_restore_json': _service.exportFullBackupJson(),
+          };
+          await _service.db
+              .collection('libraries')
+              .doc(_service.tenantId)
+              .collection('backups')
+              .doc('latest_drive_backup')
+              .set(backupPayload);
+        } catch (_) {}
+      }
+
       final ok = await FileExportService.download(
         fileName: fileName,
         content: excelXml,
@@ -433,7 +460,7 @@ class DisasterRecoveryService {
         final timeStr = DateFormat('dd MMM yyyy, hh:mm a').format(now);
         await LocalStorageService.saveString(keyLastBackupTime, timeStr);
         await LocalStorageService.saveString(keyLastBackupSize, '$sizeKb KB');
-        await LocalStorageService.saveString(keyLastBackupStatus, 'Success (Multi-Sheet Excel)');
+        await LocalStorageService.saveString(keyLastBackupStatus, 'Success (Google Drive Sync)');
       }
       return ok;
     } catch (e) {

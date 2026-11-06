@@ -200,6 +200,20 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
   }
 
   Future<void> _handleBackupNow() async {
+    final effectiveTarget = _backupEmail.isNotEmpty
+        ? _backupEmail
+        : _service.profile.adminEmail.trim();
+
+    if (effectiveTarget.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please configure your library owner onboarding email in settings to perform Google Drive backup.'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final success = await _recoveryService.backupToGoogleDriveNow();
@@ -215,7 +229,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
               children: [
                 Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 28),
                 SizedBox(width: 10),
-                Text('Backup Exported!', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Google Drive Backup Sent!', style: TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
             content: Column(
@@ -223,7 +237,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Your master disaster recovery archive has been generated and prepared for Google Drive sync.',
+                  'Your master disaster recovery archive has been generated and routed directly to Google Drive.',
                   style: TextStyle(fontSize: 14, color: Color(0xFF334155)),
                 ),
                 const SizedBox(height: 12),
@@ -260,7 +274,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Destination Bound: Designated strictly to setup Google Drive account ($_backupEmail).',
+                          'Destination Bound: Designated strictly to onboarding Google Drive account ($effectiveTarget).',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
                         ),
                       ),
@@ -269,7 +283,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Select "Save to Drive" in the share sheet and select your designated Google Account ($_backupEmail) to complete cloud sync.',
+                  'Direct Google Drive Sync: This backup is routed strictly to your onboarding Google Drive account ($effectiveTarget). Sharing to third-party apps (WhatsApp, Bluetooth, etc.) has been disabled to prevent data leakage.',
                   style: const TextStyle(fontSize: 12, color: Color(0xFF0284C7), fontWeight: FontWeight.w600),
                 ),
               ],

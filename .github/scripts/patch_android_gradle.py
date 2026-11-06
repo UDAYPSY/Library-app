@@ -88,6 +88,7 @@ def patch_gradle_files():
 def patch_manifest():
     manifest_paths = ['android/app/src/main/AndroidManifest.xml']
     queries_block = """    <queries>
+        <package android:name="com.google.android.apps.docs" />
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
         <intent>
@@ -118,37 +119,102 @@ def patch_manifest():
                 content = content.replace('<application', '<uses-permission android:name="android.permission.USE_BIOMETRIC"/>\n    <uses-permission android:name="android.permission.USE_FINGERPRINT"/>\n\n    <application')
             if '<queries>' not in content and '</manifest>' in content:
                 content = content.replace('</manifest>', queries_block)
+            elif 'com.google.android.apps.docs' not in content:
+                content = content.replace('<queries>', '<queries>\n        <package android:name="com.google.android.apps.docs" />')
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(content)
             print(f"Patched AndroidManifest at {path}")
 
 def patch_main_activity():
     activity_files = glob.glob('android/app/src/main/**/MainActivity.*', recursive=True)
-    for file_path in activity_files:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # local_auth requires FlutterFragmentActivity instead of FlutterActivity
-        content = content.replace(
-            'import io.flutter.embedding.android.FlutterActivity',
-            'import io.flutter.embedding.android.FlutterFragmentActivity'
-        )
-        content = content.replace(
-            ': FlutterActivity()',
-            ': FlutterFragmentActivity()'
-        )
-        content = content.replace(
-            'extends FlutterActivity',
-            'extends FlutterFragmentActivity'
-        )
-        if 'FlutterFragmentActivity' not in content:
-            content = re.sub(r'class\s+MainActivity\s*:\s*FlutterActivity\(\)', 'class MainActivity: FlutterFragmentActivity()', content)
-            if 'FlutterFragmentActivity' not in content:
-                content = 'import io.flutter.embedding.android.FlutterFragmentActivity\n' + content
+    full_activity_code = '''package com.trackmylibrary.app
 
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-        print(f"Patched {file_path} for FlutterFragmentActivity")
+import android.content.Intent
+import android.net.Uri
+import androidx.core.content.FileProvider
+import io.flutter.embedding.android.FlutterFragmentActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import java.io.File
+
+class MainActivity: FlutterFragmentActivity() {
+    private val CHANNEL = "com.trackmylibrary.app/drive_backup"
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "backupToGoogleDriveOnly") {
+                val filePath = call.argument<String>("filePath")
+                val fileName = call.argument<String>("fileName") ?: "TrackMyLibrary_Master_Backup.xls"
+                val targetEmail = call.argument<String>("targetEmail") ?: ""
+                val mimeType = call.argument<String>("mimeType") ?: "application/vnd.ms-excel"
+
+                if (filePath == null) {
+                    result.error("ARG_ERROR", "filePath is required", null)
+                    return@setMethodCallHandler
+                }
+
+                try {
+                    val file = File(filePath)
+                    val uri: Uri = try {
+                        FileProvider.getUriForFile(this, "${applicationContext.packageName}.flutter.share_provider", file)
+                    } catch (e1: Exception) {
+                        try {
+                            FileProvider.getUriForFile(this, "${applicationContext.packageName}.fileprovider", file)
+                        } catch (e2: Exception) {
+                            Uri.fromFile(file)
+                        }
+                    }
+
+                    // Strictly restrict Intent to Google Drive package (com.google.android.apps.docs).
+                    // This prevents arbitrary apps (WhatsApp, Bluetooth, etc.) from intercepting disaster recovery backups.
+                    val driveIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = mimeType
+                        setPackage("com.google.android.apps.docs")
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_TITLE, fileName)
+                        putExtra(Intent.EXTRA_SUBJECT, "Master Backup strictly bound to $targetEmail")
+                        putExtra("account_name", targetEmail)
+                        putExtra("authAccount", targetEmail)
+                        putExtra("android.intent.extra.EMAIL", arrayOf(targetEmail))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+
+                    val pm = packageManager
+                    val activities = pm.queryIntentActivities(driveIntent, 0)
+                    if (activities.isNotEmpty()) {
+                        startActivity(driveIntent)
+                        result.success(true)
+                    } else {
+                        // Google Drive app is not installed on device
+                        result.success(false)
+                    }
+                } catch (e: Exception) {
+                    result.error("DRIVE_ERROR", e.message, null)
+                }
+            } else {
+                result.notImplemented()
+            }
+        }
+    }
+}
+'''
+    for file_path in activity_files:
+        if file_path.endswith('.kt'):
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(full_activity_code)
+            print(f"Injected full MainActivity with Google Drive MethodChannel at {file_path}")
+        else:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            content = content.replace('import io.flutter.embedding.android.FlutterActivity', 'import io.flutter.embedding.android.FlutterFragmentActivity')
+            content = content.replace(': FlutterActivity()', ': FlutterFragmentActivity()')
+            content = content.replace('extends FlutterActivity', 'extends FlutterFragmentActivity')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f"Patched {file_path} for FlutterFragmentActivity")
+
 
 if __name__ == '__main__':
     patch_gradle_files()

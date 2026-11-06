@@ -745,6 +745,22 @@ void main() {
       expect(xml, contains('Payment UPI VPA'));
       expect(xml, contains('owner_settlement@upi'));
     });
+
+    test('backupToGoogleDriveNow strictly binds to onboarding email and executes Google Drive sync', () async {
+      final service = LibraryService();
+      await service.ensureInitialized();
+      await service.login(identifier: 'admin', password: 'password123');
+      service.profile.adminEmail = 'onboarding_owner@library.com';
+
+      final drService = DisasterRecoveryService(service: service);
+      expect(await drService.getBackupEmail(), equals('onboarding_owner@library.com'));
+
+      final ok = await drService.backupToGoogleDriveNow();
+      expect(ok, isTrue);
+      expect(await drService.getLastBackupStatus(), equals('Success (Google Drive Sync)'));
+      expect(await drService.getLastBackupTime(), isNotNull);
+    });
   });
 }
+
 

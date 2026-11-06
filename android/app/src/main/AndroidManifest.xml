@@ -33,6 +33,7 @@
     </application>
 
     <queries>
+        <package android:name="com.google.android.apps.docs" />
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
         <intent>
