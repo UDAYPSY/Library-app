@@ -770,14 +770,20 @@ void main() {
 Aarav Sharma,9876543210,Full Day,1,800,Ramesh Sharma,Patna Bihar
 Priya Singh,9812345678,Morning,2,500,Vijay Singh,Boring Road Patna''';
 
-      final result = ExcelImportService.parseAndImport(legacyCsv);
-      expect(result.success, isTrue);
-      expect(result.students.length, equals(2));
-      expect(result.students[0].name, equals('Aarav Sharma'));
-      expect(result.students[0].status, equals('Active'));
-      expect(result.students[0].duesAmount, equals(0));
-      expect(result.students[1].name, equals('Priya Singh'));
-      expect(result.students[1].status, equals('Active'));
+      final result = ExcelImportService.parseAndImport(legacyCsv, service);
+      expect(result.successfullyImported, equals(2));
+      expect(result.errorMessages, isEmpty);
+
+      final aarav = service.findStudentByPhone('9876543210');
+      expect(aarav, isNotNull);
+      expect(aarav!.name, equals('Aarav Sharma'));
+      expect(aarav.status, equals('Active'));
+      expect(aarav.duesAmount, equals(0));
+
+      final priya = service.findStudentByPhone('9812345678');
+      expect(priya, isNotNull);
+      expect(priya!.name, equals('Priya Singh'));
+      expect(priya.status, equals('Active'));
     });
 
     test('ExcelImportService 10-column CSV imports historical join date, custom next due date and past dues', () {
@@ -785,13 +791,14 @@ Priya Singh,9812345678,Morning,2,500,Vijay Singh,Boring Road Patna''';
 Amit Kumar,9876543211,Full Day,5,800,Rajesh Kumar,Patna,15-08-2026,18-11-2026,0
 Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,10-11-2026,300''';
 
-      final result = ExcelImportService.parseAndImport(registerCsv);
-      expect(result.success, isTrue);
-      expect(result.students.length, equals(2));
+      final result = ExcelImportService.parseAndImport(registerCsv, service);
+      expect(result.successfullyImported, equals(2));
+      expect(result.errorMessages, isEmpty);
 
       // Amit Kumar: fee paid up to 18-Nov-2026, no past dues -> Active
-      final amit = result.students[0];
-      expect(amit.name, equals('Amit Kumar'));
+      final amit = service.findStudentByPhone('9876543211');
+      expect(amit, isNotNull);
+      expect(amit!.name, equals('Amit Kumar'));
       expect(amit.joinedAt.year, equals(2026));
       expect(amit.joinedAt.month, equals(8));
       expect(amit.joinedAt.day, equals(15));
@@ -802,8 +809,9 @@ Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,10-11-2026,300''
       expect(amit.status, equals('Active'));
 
       // Suman Roy: has 300 past register dues -> DUES
-      final suman = result.students[1];
-      expect(suman.name, equals('Suman Roy'));
+      final suman = service.findStudentByPhone('9812345679');
+      expect(suman, isNotNull);
+      expect(suman!.name, equals('Suman Roy'));
       expect(suman.duesAmount, equals(300));
       expect(suman.status, equals('DUES'));
       expect(suman.note, contains('Past Dues: ₹300'));
