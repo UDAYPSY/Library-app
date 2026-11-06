@@ -748,7 +748,7 @@ void main() {
 
     test('backupToGoogleDriveNow strictly binds to onboarding email and executes Google Drive sync', () async {
       final service = LibraryService();
-      await service.ensureInitialized();
+      service.ensureInitialized();
       await service.login(identifier: 'admin', password: 'password123');
       service.profile.adminEmail = 'onboarding_owner@library.com';
 
