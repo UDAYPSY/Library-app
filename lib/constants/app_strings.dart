@@ -1,4 +1,8 @@
-import '../services/language_service.dart';
+/// Supported app languages
+enum AppLanguage {
+  en,
+  hi,
+}
 
 /// Centralized strings and Hindi / English translations for TrackMyLibrary.
 class AppStrings {
@@ -94,9 +98,8 @@ class AppStrings {
     'pending_dues': {AppLanguage.en: 'Pending Dues', AppLanguage.hi: 'कुल बकाया'},
   };
 
-  /// Translate a given key to current language (or fallback to English)
-  static String t(String key, {String? fallback}) {
-    final lang = LanguageService().currentLanguage;
+  /// Translate a given key using explicit language or English default
+  static String get(String key, AppLanguage lang, {String? fallback}) {
     final map = _strings[key];
     if (map != null) {
       return map[lang] ?? map[AppLanguage.en] ?? fallback ?? key;

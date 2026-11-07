@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_strings.dart';
 import 'local_storage_service.dart';
 
-enum AppLanguage {
-  en,
-  hi,
-}
+export '../constants/app_strings.dart' show AppLanguage;
 
 class LanguageService extends ChangeNotifier {
   static final LanguageService _instance = LanguageService._internal();
@@ -21,7 +18,7 @@ class LanguageService extends ChangeNotifier {
   String get currentLanguageName => _language == AppLanguage.hi ? 'हिंदी (Hindi)' : 'English';
 
   /// Translation shortcut
-  String t(String key, {String? fallback}) => AppStrings.t(key, fallback: fallback);
+  String t(String key, {String? fallback}) => AppStrings.get(key, _language, fallback: fallback);
 
   Future<void> init() async {
     if (_initialized) return;

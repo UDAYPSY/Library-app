@@ -22,10 +22,11 @@ void main() {
     });
 
     test('Translations return English strings by default', () {
-      expect(AppStrings.t('nav_home'), equals('Home'));
-      expect(AppStrings.t('nav_seats'), equals('Seats'));
-      expect(AppStrings.t('collect_payment'), equals('Collect Payment'));
-      expect(AppStrings.t('clear_due_only'), equals('Clear Due Only'));
+      final service = LanguageService();
+      expect(service.t('nav_home'), equals('Home'));
+      expect(service.t('nav_seats'), equals('Seats'));
+      expect(service.t('collect_payment'), equals('Collect Payment'));
+      expect(service.t('clear_due_only'), equals('Clear Due Only'));
     });
 
     test('Switching to Hindi updates language, notifies listeners and persists', () async {
@@ -47,10 +48,10 @@ void main() {
       expect(saved, equals('hi'));
 
       // Check Hindi translations
-      expect(AppStrings.t('nav_home'), equals('होम'));
-      expect(AppStrings.t('nav_seats'), equals('सीटें'));
-      expect(AppStrings.t('collect_payment'), equals('फीस जमा करें'));
-      expect(AppStrings.t('clear_due_only'), equals('केवल बकाया जमा करें'));
+      expect(service.t('nav_home'), equals('होम'));
+      expect(service.t('nav_seats'), equals('सीटें'));
+      expect(service.t('collect_payment'), equals('फीस जमा करें'));
+      expect(service.t('clear_due_only'), equals('केवल बकाया जमा करें'));
 
       service.removeListener(listener);
     });
@@ -67,8 +68,10 @@ void main() {
     });
 
     test('Fallback handling for unknown keys', () {
-      expect(AppStrings.t('unknown_key_xyz', fallback: 'Default Text'), equals('Default Text'));
-      expect(AppStrings.t('unknown_key_xyz'), equals('unknown_key_xyz'));
+      final service = LanguageService();
+      expect(service.t('unknown_key_xyz', fallback: 'Default Text'), equals('Default Text'));
+      expect(service.t('unknown_key_xyz'), equals('unknown_key_xyz'));
+      expect(AppStrings.get('unknown_key_xyz', AppLanguage.en, fallback: 'Default Text'), equals('Default Text'));
     });
   });
 }

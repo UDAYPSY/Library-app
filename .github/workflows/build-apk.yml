@@ -41,8 +41,11 @@ jobs:
 
       - name: Run Automated Test Suite
         run: |
-          set -e -o pipefail
-          flutter test 2>&1 | tee test_run.log
+          flutter test 2>&1 | tee test_run.log || {
+            echo "==================== TEST FAILURE LOG ===================="
+            tail -n 150 test_run.log
+            exit 1
+          }
 
       - name: Setup Permanent Release Keystore
         env:
