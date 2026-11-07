@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../constants/app_colors.dart';
+import '../constants/app_strings.dart';
 import '../models/library_models.dart';
+import '../services/language_service.dart';
 import '../services/library_service.dart';
 
 /// Shows a comprehensive payment collection modal for any student.
@@ -184,7 +186,7 @@ Future<void> showCollectPaymentModal(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Record Payment',
+                          LanguageService().t('record_payment'),
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
@@ -193,7 +195,7 @@ Future<void> showCollectPaymentModal(
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Track & collect membership fees',
+                          LanguageService().isHindi ? 'लाइब्रेरी फीस ट्रैक करें और जमा करें' : 'Track & collect membership fees',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -274,7 +276,9 @@ Future<void> showCollectPaymentModal(
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Seat: ${student.seatNumber != null ? "S-${student.seatNumber}" : "Unallocated"} • Shift: ${student.shift}',
+                              LanguageService().isHindi
+                                  ? 'सीट: ${student.seatNumber != null ? "S-${student.seatNumber}" : "आवंटित नहीं"} • शिफ्ट: ${student.shift}'
+                                  : 'Seat: ${student.seatNumber != null ? "S-${student.seatNumber}" : "Unallocated"} • Shift: ${student.shift}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -297,7 +301,7 @@ Future<void> showCollectPaymentModal(
                           ),
                           if (student.effectiveDues > 0)
                             Text(
-                              'Due: ₹${student.effectiveDues}',
+                              LanguageService().isHindi ? 'बकाया: ₹${student.effectiveDues}' : 'Due: ₹${student.effectiveDues}',
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
@@ -316,7 +320,7 @@ Future<void> showCollectPaymentModal(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Payment Duration / Advance Period',
+                      LanguageService().t('payment_duration_advance'),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -331,7 +335,7 @@ Future<void> showCollectPaymentModal(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '$selectedAdvanceMonths Months Advance',
+                          LanguageService().isHindi ? '$selectedAdvanceMonths माह अग्रिम' : '$selectedAdvanceMonths Months Advance',
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
@@ -348,7 +352,7 @@ Future<void> showCollectPaymentModal(
                     children: [
                       if (hasPastDue) ...[
                         _durationChip(
-                          label: 'Clear Due Only (₹${student.duesAmount})',
+                          label: LanguageService().isHindi ? 'केवल बकाया जमा (₹${student.duesAmount})' : 'Clear Due Only (₹${student.duesAmount})',
                           isSelected: selectedAdvanceMonths == -1,
                           isDark: isDark,
                           onTap: () => applyDuration(-1),
@@ -357,50 +361,54 @@ Future<void> showCollectPaymentModal(
                       ],
                       _durationChip(
                         label: hasPastDue && isExpired
-                            ? '1 Mo + Due (₹${student.duesAmount + defaultMonthly})'
-                            : (hasUnexpiredDue ? '1 Month (Renew)' : '1 Month'),
+                            ? (LanguageService().isHindi ? '1 माह + बकाया (₹${student.duesAmount + defaultMonthly})' : '1 Mo + Due (₹${student.duesAmount + defaultMonthly})')
+                            : (hasUnexpiredDue ? (LanguageService().isHindi ? '1 माह (नवीनीकरण)' : '1 Month (Renew)') : (LanguageService().isHindi ? '1 माह' : '1 Month')),
                         isSelected: selectedAdvanceMonths == 1,
                         isDark: isDark,
                         onTap: () => applyDuration(1),
                       ),
                       const SizedBox(width: 8),
                       _durationChip(
-                        label: hasUnexpiredDue ? '2 Mo (+1 Adv)' : '2 Months',
+                        label: hasUnexpiredDue
+                            ? (LanguageService().isHindi ? '2 माह (+1 अग्रिम)' : '2 Mo (+1 Adv)')
+                            : (LanguageService().isHindi ? '2 माह' : '2 Months'),
                         isSelected: selectedAdvanceMonths == 2,
                         isDark: isDark,
                         onTap: () => applyDuration(2),
                       ),
                       const SizedBox(width: 8),
                       _durationChip(
-                        label: hasUnexpiredDue ? '3 Mo (+2 Adv)' : '3 Months',
+                        label: hasUnexpiredDue
+                            ? (LanguageService().isHindi ? '3 माह (+2 अग्रिम)' : '3 Mo (+2 Adv)')
+                            : (LanguageService().isHindi ? '3 माह' : '3 Months'),
                         isSelected: selectedAdvanceMonths == 3,
                         isDark: isDark,
                         onTap: () => applyDuration(3),
                       ),
                       const SizedBox(width: 8),
                       _durationChip(
-                        label: '5 Months ⭐',
+                        label: LanguageService().isHindi ? '5 माह ⭐' : '5 Months ⭐',
                         isSelected: selectedAdvanceMonths == 5,
                         isDark: isDark,
                         onTap: () => applyDuration(5),
                       ),
                       const SizedBox(width: 8),
                       _durationChip(
-                        label: '6 Months',
+                        label: LanguageService().isHindi ? '6 माह' : '6 Months',
                         isSelected: selectedAdvanceMonths == 6,
                         isDark: isDark,
                         onTap: () => applyDuration(6),
                       ),
                       const SizedBox(width: 8),
                       _durationChip(
-                        label: '1 Year',
+                        label: LanguageService().isHindi ? '1 वर्ष' : '1 Year',
                         isSelected: selectedAdvanceMonths == 12,
                         isDark: isDark,
                         onTap: () => applyDuration(12),
                       ),
                       const SizedBox(width: 8),
                       _durationChip(
-                        label: 'Custom',
+                        label: LanguageService().isHindi ? 'कस्टम' : 'Custom',
                         isSelected: selectedAdvanceMonths == 0,
                         isDark: isDark,
                         onTap: () {
@@ -453,7 +461,7 @@ Future<void> showCollectPaymentModal(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Total Fee (${selectedAdvanceMonths == -1 ? "Clear Due" : (selectedAdvanceMonths > 0 ? "$selectedAdvanceMonths mo" : "Custom")}):',
+                                '${LanguageService().t('total_fee')} (${selectedAdvanceMonths == -1 ? (LanguageService().isHindi ? "केवल बकाया" : "Clear Due") : (selectedAdvanceMonths > 0 ? (LanguageService().isHindi ? "$selectedAdvanceMonths माह" : "$selectedAdvanceMonths mo") : (LanguageService().isHindi ? "कस्टम" : "Custom"))}):',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -477,7 +485,7 @@ Future<void> showCollectPaymentModal(
                         Row(
                           children: [
                             Text(
-                              'Already Paid (₹)',
+                              LanguageService().isHindi ? 'पहले से जमा (₹)' : 'Already Paid (₹)',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
@@ -492,14 +500,14 @@ Future<void> showCollectPaymentModal(
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.lock_rounded, size: 10, color: Color(0xFF64748B)),
-                                  SizedBox(width: 4),
+                                  const Icon(Icons.lock_rounded, size: 10, color: Color(0xFF64748B)),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'FIXED / LOCKED',
-                                    style: TextStyle(
+                                    LanguageService().isHindi ? 'सुरक्षित / लॉक' : 'FIXED / LOCKED',
+                                    style: const TextStyle(
                                       fontSize: 9,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 0.5,
@@ -537,9 +545,9 @@ Future<void> showCollectPaymentModal(
                                   ),
                                 ],
                               ),
-                              const Text(
-                                'Non-editable',
-                                style: TextStyle(
+                              Text(
+                                LanguageService().t('non_editable'),
+                                style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFF94A3B8),
@@ -579,9 +587,9 @@ Future<void> showCollectPaymentModal(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
-                                        'ADVANCE MONEY WITH LIBRARY',
-                                        style: TextStyle(
+                                      Text(
+                                        LanguageService().isHindi ? 'लाइब्रेरी के पास अग्रिम (Advance) राशि' : 'ADVANCE MONEY WITH LIBRARY',
+                                        style: const TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w900,
                                           letterSpacing: 0.5,
@@ -590,7 +598,9 @@ Future<void> showCollectPaymentModal(
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '₹${student.advanceAmount} Available (₹$advanceToApply Adjusted)',
+                                        LanguageService().isHindi
+                                            ? '₹${student.advanceAmount} उपलब्ध (₹$advanceToApply समायोजित)'
+                                            : '₹${student.advanceAmount} Available (₹$advanceToApply Adjusted)',
                                         style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w900,
@@ -622,7 +632,7 @@ Future<void> showCollectPaymentModal(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Due Amount to Accept (₹)',
+                              LanguageService().isHindi ? 'स्वीकार की जाने वाली राशि (₹)' : 'Due Amount to Accept (₹)',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
@@ -637,7 +647,7 @@ Future<void> showCollectPaymentModal(
                                 border: Border.all(color: const Color(0xFFFECDD3)),
                               ),
                               child: Text(
-                                'Max Payable: ₹$netPayable',
+                                LanguageService().isHindi ? 'अधिकतम देय: ₹$netPayable' : 'Max Payable: ₹$netPayable',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
@@ -666,7 +676,7 @@ Future<void> showCollectPaymentModal(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               border: InputBorder.none,
                               prefixIcon: const Icon(Icons.currency_rupee, color: Color(0xFF0D9488), size: 20),
-                              hintText: netPayable == 0 ? 'Covered by Advance Credit' : 'Enter amount to collect',
+                              hintText: netPayable == 0 ? (LanguageService().isHindi ? 'अग्रिम राशि से चुकता' : 'Covered by Advance Credit') : (LanguageService().isHindi ? 'जमा की जाने वाली राशि दर्ज करें' : 'Enter amount to collect'),
                             ),
                             onChanged: (val) {
                               final p = int.tryParse(val.trim());
@@ -697,8 +707,8 @@ Future<void> showCollectPaymentModal(
                               ),
                               child: Text(
                                 remainingAfter == 0
-                                    ? '✓ Full Due Cleared (₹0 Due)${advanceToApply > 0 ? " • ₹$advanceToApply Advance Adjusted" : ""}'
-                                    : 'Remaining Due: ₹$remainingAfter',
+                                    ? (LanguageService().isHindi ? '✓ पूरा बकाया चुकता (₹0 बकाया)${advanceToApply > 0 ? " • ₹$advanceToApply अग्रिम समायोजित" : ""}' : '✓ Full Due Cleared (₹0 Due)${advanceToApply > 0 ? " • ₹$advanceToApply Advance Adjusted" : ""}')
+                                    : (LanguageService().isHindi ? 'शेष बकाया: ₹$remainingAfter' : 'Remaining Due: ₹$remainingAfter'),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
@@ -753,7 +763,7 @@ Future<void> showCollectPaymentModal(
                           Row(
                             children: [
                               Text(
-                                'From Date',
+                                LanguageService().isHindi ? 'शुरुआती तिथि' : 'From Date',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
@@ -812,7 +822,7 @@ Future<void> showCollectPaymentModal(
                           Row(
                             children: [
                               Text(
-                                'Valid Until Date',
+                                LanguageService().isHindi ? 'वैधता समाप्ति तिथि' : 'Valid Until Date',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
@@ -874,7 +884,7 @@ Future<void> showCollectPaymentModal(
                 Row(
                   children: [
                     Text(
-                      'Payment Date',
+                      LanguageService().isHindi ? 'भुगतान तिथि' : 'Payment Date',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -926,7 +936,7 @@ Future<void> showCollectPaymentModal(
 
                 // Payment Method
                 Text(
-                  'Payment Method',
+                  LanguageService().t('payment_method'),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -936,19 +946,19 @@ Future<void> showCollectPaymentModal(
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _methodButton('Cash', Icons.payments_outlined, selectedMethod == 'Cash', isDark, () {
+                    _methodButton(LanguageService().isHindi ? 'नकद (Cash)' : 'Cash', Icons.payments_outlined, selectedMethod == 'Cash', isDark, () {
                       setModalState(() => selectedMethod = 'Cash');
                     }),
                     const SizedBox(width: 8),
-                    _methodButton('UPI', Icons.phone_android_rounded, selectedMethod == 'UPI', isDark, () {
+                    _methodButton(LanguageService().isHindi ? 'यूपीआई (UPI)' : 'UPI', Icons.phone_android_rounded, selectedMethod == 'UPI', isDark, () {
                       setModalState(() => selectedMethod = 'UPI');
                     }),
                     const SizedBox(width: 8),
-                    _methodButton('Card', Icons.credit_card_rounded, selectedMethod == 'Card', isDark, () {
+                    _methodButton(LanguageService().isHindi ? 'कार्ड (Card)' : 'Card', Icons.credit_card_rounded, selectedMethod == 'Card', isDark, () {
                       setModalState(() => selectedMethod = 'Card');
                     }),
                     const SizedBox(width: 8),
-                    _methodButton('Online', Icons.account_balance_rounded, selectedMethod == 'Online', isDark, () {
+                    _methodButton(LanguageService().isHindi ? 'ऑनलाइन (Net)' : 'Online', Icons.account_balance_rounded, selectedMethod == 'Online', isDark, () {
                       setModalState(() => selectedMethod = 'Online');
                     }),
                   ],
@@ -998,7 +1008,7 @@ Future<void> showCollectPaymentModal(
 
                 // Notes (Optional)
                 Text(
-                  'Notes / Remarks (Optional)',
+                  LanguageService().isHindi ? 'नोट्स / टिप्पणी (वैकल्पिक)' : 'Notes / Remarks (Optional)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -1020,10 +1030,10 @@ Future<void> showCollectPaymentModal(
                       fontWeight: FontWeight.w600,
                       color: AppColors.text(sheetContext),
                     ),
-                    decoration: const InputDecoration(
-                      hintText: 'Add remark (e.g. advance payment, discount note)...',
-                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: InputDecoration(
+                      hintText: LanguageService().isHindi ? 'टिप्पणी लिखें (उदा. अग्रिम फीस, छूट नोट)...' : 'Add remark (e.g. advance payment, discount note)...',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       border: InputBorder.none,
                     ),
                   ),
@@ -1045,9 +1055,9 @@ Future<void> showCollectPaymentModal(
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         onPressed: () => Navigator.pop(ctx),
-                        child: const Text(
-                          'Discard',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                        child: Text(
+                          LanguageService().isHindi ? 'रद्द करें' : 'Discard',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                         ),
                       ),
                     ),
@@ -1063,9 +1073,9 @@ Future<void> showCollectPaymentModal(
                           elevation: 0,
                         ),
                         icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                        label: const Text(
-                          'Save Payment',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                        label: Text(
+                          LanguageService().isHindi ? 'भुगतान सुरक्षित करें' : 'Save Payment',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         onPressed: () async {
                           if (isSubmitting) return;

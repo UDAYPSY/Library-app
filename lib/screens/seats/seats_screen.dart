@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
+import '../../constants/app_strings.dart';
 import '../../models/library_models.dart';
+import '../../services/language_service.dart';
 import '../../services/library_service.dart';
 import '../students/member_profile_screen.dart';
 import '../students/add_student_wizard_screen.dart';
@@ -17,11 +19,41 @@ class SeatsScreen extends StatefulWidget {
 
 class _SeatsScreenState extends State<SeatsScreen> {
   final LibraryService _service = LibraryService();
+  final LanguageService _lang = LanguageService();
   final TextEditingController _searchCtrl = TextEditingController();
 
   String _selectedShift = 'ALL';
   String _selectedStatus = 'ALL';
   String _selectedDues = 'ALL';
+
+  String _translateFilter(String val) {
+    switch (val.toUpperCase()) {
+      case 'ALL':
+        return _lang.t('all');
+      case 'VACANT':
+        return _lang.t('vacant');
+      case 'OCCUPIED':
+        return _lang.t('occupied');
+      case 'PAID':
+        return _lang.t('paid');
+      case 'UNPAID':
+        return _lang.t('unpaid');
+      case 'TRIAL':
+        return _lang.t('trial');
+      default:
+        return val;
+    }
+  }
+
+  String _translateShift(String sh) {
+    if (sh.toUpperCase() == 'ALL') return _lang.t('all');
+    final sLow = sh.toLowerCase();
+    if (sLow.contains('morning')) return _lang.t('morning_shift');
+    if (sLow.contains('evening')) return _lang.t('evening_shift');
+    if (sLow.contains('night')) return _lang.t('night_shift');
+    if (sLow.contains('full')) return _lang.t('full_day_shift');
+    return sh;
+  }
 
   @override
   void dispose() {
@@ -117,7 +149,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Assign Seat S-${seat.seatNumber}',
+                            _lang.isHindi ? 'सीट S-${seat.seatNumber} आवंटित करें' : 'Assign Seat S-${seat.seatNumber}',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
@@ -126,7 +158,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '$selectedSection • Space Grid',
+                            '$selectedSection • ${_lang.t('space_grid')}',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -160,10 +192,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
                               borderRadius: BorderRadius.circular(10),
                               boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 4)],
                             ),
-                            child: const Center(
+                            child: Center(
                               child: Text(
-                                'Enrolled Student',
-                                style: TextStyle(
+                                _lang.isHindi ? 'नामांकित छात्र' : 'Enrolled Student',
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.textNavy,
@@ -196,14 +228,14 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                 color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.person_add_rounded, size: 14, color: Color(0xFF0D9488)),
-                                  SizedBox(width: 4),
+                                  const Icon(Icons.person_add_rounded, size: 14, color: Color(0xFF0D9488)),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    '+ Register New',
-                                    style: TextStyle(
+                                    _lang.isHindi ? '+ नया पंजीकरण' : '+ Register New',
+                                    style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,
                                       color: Color(0xFF0D9488),
@@ -219,9 +251,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
                   ),
                   const SizedBox(height: 16),
                     // SELECT STUDENT DROPDOWN
-                    const Text(
-                      'Select Student',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
+                    Text(
+                      _lang.t('select_student'),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
                     ),
                     const SizedBox(height: 6),
                     Container(
@@ -233,12 +265,12 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<StudentInfo>(
-                          hint: const Text('Choose an enrolled student', style: TextStyle(fontSize: 13)),
+                          hint: Text(_lang.isHindi ? 'नामांकित छात्र चुनें' : 'Choose an enrolled student', style: const TextStyle(fontSize: 13)),
                           value: selectedStudent,
                           isExpanded: true,
                           items: students.map((s) {
-                            final seatTag = s.seatNumber != null ? 'Seat S-${s.seatNumber}' : 'No Seat';
-                            final feeTag = s.hasDues ? 'Dues: ₹${s.effectiveDues}' : (s.status == 'TRIAL' ? 'Trial' : 'Paid');
+                            final seatTag = s.seatNumber != null ? '${_lang.t('seat')} S-${s.seatNumber}' : (_lang.isHindi ? 'कोई सीट नहीं' : 'No Seat');
+                            final feeTag = s.hasDues ? '${_lang.t('due')}: ₹${s.effectiveDues}' : (s.status == 'TRIAL' ? _lang.t('trial') : _lang.t('paid'));
                             return DropdownMenuItem<StudentInfo>(
                               value: s,
                               child: Text(
@@ -541,17 +573,17 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           child: const Icon(Icons.chat_rounded, color: Color(0xFF16A34A), size: 16),
                         ),
                         const SizedBox(width: 10),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Notify student on WhatsApp',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
+                                _lang.t('notify_student_whatsapp'),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textNavy),
                               ),
                               Text(
-                                'Send seat allocation confirmation & details',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                                _lang.t('send_seat_allocation_details'),
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
                               ),
                             ],
                           ),
@@ -580,7 +612,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       onPressed: () async {
                         if (selectedStudent == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please select a student from the dropdown')),
+                            SnackBar(content: Text(_lang.isHindi ? 'कृपया ड्रॉपडाउन से एक छात्र चुनें' : 'Please select a student from the dropdown')),
                           );
                           return;
                         }
@@ -590,7 +622,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           final occ = _service.getStudentForSeat(seat.seatNumber, shift: chosenShift);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Seat S-${seat.seatNumber} is already occupied for "$chosenShift"${occ != null ? " by ${occ.name}" : ""}.'),
+                              content: Text(_lang.isHindi
+                                  ? 'सीट S-${seat.seatNumber} पहले से "$chosenShift" के लिए ${occ != null ? "${occ.name} द्वारा " : ""}भरी हुई है।'
+                                  : 'Seat S-${seat.seatNumber} is already occupied for "$chosenShift"${occ != null ? " by ${occ.name}" : ""}.'),
                               backgroundColor: const Color(0xFFE11D48),
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -611,7 +645,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Seat S-${seat.seatNumber} successfully assigned to ${studentToAssign.name}!'),
+                              content: Text(_lang.isHindi
+                                  ? 'सीट S-${seat.seatNumber} सफलतापूर्वक ${studentToAssign.name} को आवंटित की गई!'
+                                  : 'Seat S-${seat.seatNumber} successfully assigned to ${studentToAssign.name}!'),
                               backgroundColor: const Color(0xFF0D766E),
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -629,7 +665,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         }
                       },
                       child: Text(
-                        'Confirm Seat S-${seat.seatNumber} Assignment',
+                        _lang.isHindi ? 'सीट S-${seat.seatNumber} आवंटन की पुष्टि करें' : 'Confirm Seat S-${seat.seatNumber} Assignment',
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                       ),
                     ),
@@ -654,7 +690,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       },
                       icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: Color(0xFF0D9488)),
                       label: Text(
-                        'Register a new student for Seat S-${seat.seatNumber} →',
+                        _lang.isHindi
+                            ? 'सीट S-${seat.seatNumber} के लिए नया छात्र पंजीकृत करें →'
+                            : 'Register a new student for Seat S-${seat.seatNumber} →',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -684,7 +722,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
 
     if (candidateSeats.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No other seats available for $studentShift right now.')),
+        SnackBar(content: Text(_lang.isHindi ? '$studentShift के लिए इस समय कोई अन्य सीट उपलब्ध नहीं है।' : 'No other seats available for $studentShift right now.')),
       );
       return;
     }
@@ -695,13 +733,15 @@ class _SeatsScreenState extends State<SeatsScreen> {
       builder: (dlgCtx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Move $studentName', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+          title: Text(_lang.isHindi ? '$studentName की सीट बदलें' : 'Move $studentName', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Move from Seat S-${currentSeat.seatNumber} to an available seat for $studentShift:',
+                _lang.isHindi
+                    ? 'सीट S-${currentSeat.seatNumber} से $studentShift की खाली सीट चुनें:'
+                    : 'Move from Seat S-${currentSeat.seatNumber} to an available seat for $studentShift:',
                 style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
               ),
               const SizedBox(height: 14),
@@ -718,7 +758,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                     items: candidateSeats.map((vs) {
                       return DropdownMenuItem<int>(
                         value: vs.seatNumber,
-                        child: Text('Seat S-${vs.seatNumber} (${vs.sectionName})', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        child: Text('${_lang.t('seat')} S-${vs.seatNumber} (${vs.sectionName})', style: const TextStyle(fontWeight: FontWeight.w700)),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -730,7 +770,10 @@ class _SeatsScreenState extends State<SeatsScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dlgCtx),
+              child: Text(_lang.isHindi ? 'रद्द करें' : 'Cancel'),
+            ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0D766E),
@@ -747,13 +790,15 @@ class _SeatsScreenState extends State<SeatsScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('$studentName moved to Seat S-$selectedNewSeat ($studentShift).'),
+                      content: Text(_lang.isHindi
+                          ? '$studentName को सीट S-$selectedNewSeat ($studentShift) पर स्थानांतरित कर दिया गया।'
+                          : '$studentName moved to Seat S-$selectedNewSeat ($studentShift).'),
                       backgroundColor: const Color(0xFF0D766E),
                     ),
                   );
                 }
               },
-              child: const Text('Confirm Move'),
+              child: Text(_lang.isHindi ? 'सीट बदलें' : 'Confirm Move'),
             ),
           ],
         ),
@@ -873,8 +918,8 @@ class _SeatsScreenState extends State<SeatsScreen> {
                         ),
                         child: Text(
                           seatOccupants.length > 1
-                              ? '${seatOccupants.length} Members'
-                              : '1 Member',
+                              ? (_lang.isHindi ? '${seatOccupants.length} सदस्य' : '${seatOccupants.length} Members')
+                              : (_lang.isHindi ? '1 सदस्य' : '1 Member'),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
@@ -892,9 +937,9 @@ class _SeatsScreenState extends State<SeatsScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
-                'ASSIGNED MEMBERS ACROSS SHIFTS',
-                style: TextStyle(
+              Text(
+                _lang.isHindi ? 'शिफ्ट अनुसार आवंटित सदस्य' : 'ASSIGNED MEMBERS ACROSS SHIFTS',
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.8,
@@ -977,7 +1022,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                                 borderRadius: BorderRadius.circular(6),
                                               ),
                                               child: Text(
-                                                occ.shift,
+                                                _translateShift(occ.shift),
                                                 style: const TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w800,
@@ -987,7 +1032,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
-                                              'Member #$memberId',
+                                              _lang.isHindi ? 'सदस्य #$memberId' : 'Member #$memberId',
                                               style: const TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w600,
@@ -1014,8 +1059,8 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                                     ? Icons.warning_amber_rounded
                                                     : (isDueToday ? Icons.alarm : Icons.schedule_rounded);
                                                 final String displayDays = isBreached
-                                                    ? '${diffDays.abs()}d overdue'
-                                                    : (isDueToday ? 'Due today' : '${diffDays}d remaining');
+                                                    ? (_lang.isHindi ? '${diffDays.abs()} दिन overdue' : '${diffDays.abs()}d overdue')
+                                                    : (isDueToday ? (_lang.isHindi ? 'आज अंतिम दिन' : 'Due today') : (_lang.isHindi ? '$diffDays दिन शेष' : '${diffDays}d remaining'));
 
                                                 return Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
@@ -1056,7 +1101,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                         border: Border.all(color: const Color(0xFFFECDD3)),
                                       ),
                                       child: Text(
-                                        'Due ₹${occ.effectiveDues}',
+                                        _lang.isHindi ? 'बकाया ₹${occ.effectiveDues}' : 'Due ₹${occ.effectiveDues}',
                                         style: const TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w900,
@@ -1072,8 +1117,8 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(color: const Color(0xFFA7F3D0)),
                                       ),
-                                      child: const Text(
-                                        'Paid',
+                                      child: Text(
+                                        _lang.t('paid'),
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w900,
@@ -1107,7 +1152,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                     const Icon(Icons.event_outlined, size: 13, color: Color(0xFF64748B)),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Valid till: ${DateFormat('dd-MMM-yyyy').format(occ.feeDueDate!)}',
+                                      _lang.isHindi ? 'वैधता: ${DateFormat('dd-MMM-yyyy').format(occ.feeDueDate!)}' : 'Valid till: ${DateFormat('dd-MMM-yyyy').format(occ.feeDueDate!)}',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
@@ -1131,7 +1176,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                   ),
                                   icon: const Icon(Icons.person_rounded, size: 18),
                                   label: Text(
-                                    'View Profile (${occ.name.split(' ').first})',
+                                    _lang.isHindi ? 'प्रोफाइल देखें (${occ.name.split(' ').first})' : 'View Profile (${occ.name.split(' ').first})',
                                     style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                                   ),
                                   onPressed: () {
@@ -1161,7 +1206,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
                                       icon: const Icon(Icons.sync_alt_rounded, size: 16),
-                                      label: const Text('Move Seat', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                      label: Text(_lang.isHindi ? 'सीट बदलें' : 'Move Seat', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                                       onPressed: () {
                                         Navigator.pop(ctx);
                                         _showChangeSeatDialog(seat, allSeats, targetStudent: occ);
@@ -1178,14 +1223,14 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
                                       icon: const Icon(Icons.cancel_outlined, size: 16),
-                                      label: const Text('Vacate Shift', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                      label: Text(_lang.isHindi ? 'सीट खाली करें' : 'Vacate Shift', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                                       onPressed: () async {
                                         Navigator.pop(ctx);
                                         await _service.vacateSeat(seat.seatNumber, occ.id);
                                         if (mounted) {
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             SnackBar(
-                                              content: Text('${occ.name} vacated from Seat S-${seat.seatNumber} (${occ.shift}).'),
+                                              content: Text(_lang.isHindi ? '${occ.name} को सीट S-${seat.seatNumber} (${occ.shift}) से हटा दिया गया।' : '${occ.name} vacated from Seat S-${seat.seatNumber} (${occ.shift}).'),
                                               backgroundColor: Colors.black87,
                                               behavior: SnackBarBehavior.floating,
                                             ),
@@ -1218,8 +1263,8 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                 children: [
                                   const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 18),
                                   const SizedBox(width: 6),
-                                  const Text(
-                                    'Available Shifts on this Seat:',
+                                  Text(
+                                    _lang.isHindi ? 'इस सीट पर उपलब्ध शिफ्ट:' : 'Available Shifts on this Seat:',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 12,
@@ -1241,7 +1286,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                       border: Border.all(color: const Color(0xFF86EFAC)),
                                     ),
                                     child: Text(
-                                      '✓ $sh',
+                                      '✓ ${_translateShift(sh)}',
                                       style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
@@ -1263,8 +1308,8 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                   icon: const Icon(Icons.person_add_alt_1_rounded, size: 17),
-                                  label: const Text(
-                                    'Assign Student to Remaining Shift',
+                                  label: Text(
+                                    _lang.isHindi ? 'बची हुई शिफ्ट में छात्र आवंटित करें' : 'Assign Student to Remaining Shift',
                                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                                   ),
                                   onPressed: () {
@@ -1374,7 +1419,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'MANAGEMENT',
+                                _lang.t('management'),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
@@ -1384,7 +1429,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Space Grid',
+                                _lang.t('space_grid'),
                                 style: TextStyle(
                                   fontSize: 26,
                                   fontWeight: FontWeight.w900,
@@ -1433,7 +1478,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           style: TextStyle(color: AppColors.text(context), fontSize: 13),
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            hintText: 'Find student or seat...',
+                            hintText: _lang.t('find_student_or_seat'),
                             hintStyle: TextStyle(color: AppColors.textSubtleColor(context), fontSize: 13),
                             prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMutedColor(context), size: 20),
                             border: InputBorder.none,
@@ -1449,13 +1494,13 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Row(
                         children: [
-                          Expanded(child: _metricCard('$occupiedCount', 'FILLED', const Color(0xFF0D766E))),
+                          Expanded(child: _metricCard('$occupiedCount', _lang.t('filled'), const Color(0xFF0D766E))),
                           const SizedBox(width: 8),
-                          Expanded(child: _metricCard('$vacantCount', 'VACANT', const Color(0xFF16A34A))),
+                          Expanded(child: _metricCard('$vacantCount', _lang.t('vacant'), const Color(0xFF16A34A))),
                           const SizedBox(width: 8),
-                          Expanded(child: _metricCard('$studentsCount', 'STUDENTS', const Color(0xFFD97706))),
+                          Expanded(child: _metricCard('$studentsCount', _lang.t('students'), const Color(0xFFD97706))),
                           const SizedBox(width: 8),
-                          Expanded(child: _metricCard('$totalSeats', 'SEATS', AppColors.isDark(context) ? AppColors.darkTextPrimary : AppColors.textNavy)),
+                          Expanded(child: _metricCard('$totalSeats', _lang.t('total_seats_label'), AppColors.isDark(context) ? AppColors.darkTextPrimary : AppColors.textNavy)),
                         ],
                       ),
                     ),
@@ -1470,20 +1515,20 @@ class _SeatsScreenState extends State<SeatsScreen> {
                           color: const Color(0xFF0D766E),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'MAIN HALL',
-                              style: TextStyle(
+                              _lang.t('main_hall'),
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.5,
                                 color: Colors.white,
                               ),
                             ),
-                            SizedBox(width: 6),
-                            Icon(Icons.edit_outlined, color: Colors.white, size: 14),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.edit_outlined, color: Colors.white, size: 14),
                           ],
                         ),
                       ),
@@ -1510,7 +1555,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                     SizedBox(
                                       width: 58,
                                       child: Text(
-                                        'SHIFT',
+                                        _lang.t('shift_label'),
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w800,
@@ -1559,7 +1604,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                                     ),
                                                     const SizedBox(width: 8),
                                                     Text(
-                                                      sh,
+                                                      _translateShift(sh),
                                                       style: TextStyle(
                                                         fontSize: 11,
                                                         fontWeight: FontWeight.w800,
@@ -1587,13 +1632,13 @@ class _SeatsScreenState extends State<SeatsScreen> {
                             },
                           ),
                           _filterRow(
-                            'STATUS',
+                            _lang.t('status_label'),
                             ['ALL', 'VACANT', 'OCCUPIED'],
                             _selectedStatus,
                             (val) => setState(() => _selectedStatus = val),
                           ),
                           _filterRow(
-                            'DUES',
+                            _lang.t('dues_label'),
                             ['ALL', 'PAID', 'UNPAID', 'TRIAL'],
                             _selectedDues,
                             (val) => setState(() => _selectedDues = val),
@@ -1604,11 +1649,13 @@ class _SeatsScreenState extends State<SeatsScreen> {
                     const SizedBox(height: 6),
 
                     // Instruction Note (Image 1 & 2)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Text(
-                        'ⓘ Long press section to rename or delete',
-                        style: TextStyle(
+                        _lang.isHindi
+                            ? 'ⓘ नाम बदलने या हटाने के लिए सेक्शन पर देर तक दबाएं'
+                            : 'ⓘ Long press section to rename or delete',
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                           color: Color(0xFF94A3B8),
@@ -1790,7 +1837,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                                   const SizedBox(width: 4),
                                                 ] else if (hasDues) ...[
                                                   Text(
-                                                    'Due ₹${student.effectiveDues}',
+                                                    _lang.isHindi ? 'बकाया ₹${student.effectiveDues}' : 'Due ₹${student.effectiveDues}',
                                                     style: const TextStyle(
                                                       fontSize: 9,
                                                       fontWeight: FontWeight.w800,
@@ -1938,7 +1985,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                   ),
                                   Center(
                                     child: Text(
-                                      'AVAILABLE',
+                                      _lang.t('available').toUpperCase(),
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w800,
@@ -2046,7 +2093,7 @@ class _SeatsScreenState extends State<SeatsScreen> {
                       ),
                     ),
                     child: Text(
-                      opt,
+                      _translateFilter(opt),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
