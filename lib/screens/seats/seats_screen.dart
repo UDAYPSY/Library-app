@@ -997,25 +997,43 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                             const SizedBox(width: 8),
                                             Builder(
                                               builder: (context) {
-                                                final occJoin = occ.joinedAt ?? DateTime.now();
-                                                final occDays = (DateTime.now().difference(DateTime(occJoin.year, occJoin.month, occJoin.day)).inDays + 1).clamp(1, 99999);
+                                                final now = DateTime.now();
+                                                final today = DateTime(now.year, now.month, now.day);
+                                                final effectiveDueDate = occ.feeDueDate ?? (occ.joinedAt != null ? DateTime(occ.joinedAt!.year, occ.joinedAt!.month + 1, occ.joinedAt!.day) : today);
+                                                final dueDay = DateTime(effectiveDueDate.year, effectiveDueDate.month, effectiveDueDate.day);
+                                                final diffDays = dueDay.difference(today).inDays;
+                                                final bool isBreached = diffDays < 0;
+                                                final bool isDueToday = diffDays == 0;
+                                                final Color badgeColor = isBreached
+                                                    ? const Color(0xFFE11D48)
+                                                    : (isDueToday ? const Color(0xFFEA580C) : const Color(0xFF0284C7));
+                                                final Color bgColor = isBreached
+                                                    ? const Color(0xFFFFF1F2)
+                                                    : (isDueToday ? const Color(0xFFFFF7ED) : const Color(0xFFE0F2FE));
+                                                final IconData badgeIcon = isBreached
+                                                    ? Icons.warning_amber_rounded
+                                                    : (isDueToday ? Icons.alarm : Icons.schedule_rounded);
+                                                final String displayDays = isBreached
+                                                    ? '${diffDays.abs()}d overdue'
+                                                    : (isDueToday ? 'Due today' : '${diffDays}d remaining');
+
                                                 return Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                                   decoration: BoxDecoration(
-                                                    color: const Color(0xFFE0F2FE),
+                                                    color: bgColor,
                                                     borderRadius: BorderRadius.circular(4),
                                                   ),
                                                   child: Row(
                                                     mainAxisSize: MainAxisSize.min,
                                                     children: [
-                                                      const Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 11),
+                                                      Icon(badgeIcon, color: badgeColor, size: 11),
                                                       const SizedBox(width: 2),
                                                       Text(
-                                                        '${occDays}d tenure',
-                                                        style: const TextStyle(
+                                                        displayDays,
+                                                        style: TextStyle(
                                                           fontSize: 10,
                                                           fontWeight: FontWeight.w800,
-                                                          color: Color(0xFF0284C7),
+                                                          color: badgeColor,
                                                         ),
                                                       ),
                                                     ],
@@ -1073,6 +1091,23 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                     const SizedBox(width: 4),
                                     Text(
                                       occ.phone,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              if (occ.feeDueDate != null) ...[
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.event_outlined, size: 13, color: Color(0xFF64748B)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Valid till: ${DateFormat('dd-MMM-yyyy').format(occ.feeDueDate!)}',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
@@ -1715,8 +1750,22 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                         ),
                                         Builder(
                                           builder: (context) {
-                                            final studentJoin = student.joinedAt ?? DateTime.now();
-                                            final daysCompleted = (DateTime.now().difference(DateTime(studentJoin.year, studentJoin.month, studentJoin.day)).inDays + 1).clamp(1, 99999);
+                                            final now = DateTime.now();
+                                            final today = DateTime(now.year, now.month, now.day);
+                                            final effectiveDueDate = student.feeDueDate ?? (student.joinedAt != null ? DateTime(student.joinedAt!.year, student.joinedAt!.month + 1, student.joinedAt!.day) : today);
+                                            final dueDay = DateTime(effectiveDueDate.year, effectiveDueDate.month, effectiveDueDate.day);
+                                            final diffDays = dueDay.difference(today).inDays;
+                                            final bool isBreached = diffDays < 0;
+                                            final bool isDueToday = diffDays == 0;
+                                            final Color badgeColor = isBreached
+                                                ? const Color(0xFFE11D48)
+                                                : (isDueToday ? const Color(0xFFEA580C) : const Color(0xFF0284C7));
+                                            final IconData badgeIcon = isBreached
+                                                ? Icons.warning_amber_rounded
+                                                : (isDueToday ? Icons.alarm : Icons.schedule_rounded);
+                                            final String displayDays = isBreached
+                                                ? '${diffDays.abs()}d'
+                                                : (isDueToday ? '0d' : '${diffDays}d');
 
                                             return Row(
                                               mainAxisSize: MainAxisSize.min,
@@ -1750,14 +1799,14 @@ class _SeatsScreenState extends State<SeatsScreen> {
                                                   ),
                                                   const SizedBox(width: 4),
                                                 ],
-                                                const Icon(Icons.science_outlined, color: Color(0xFF0284C7), size: 12),
+                                                Icon(badgeIcon, color: badgeColor, size: 12),
                                                 const SizedBox(width: 2),
                                                 Text(
-                                                  '${daysCompleted}d',
-                                                  style: const TextStyle(
+                                                  displayDays,
+                                                  style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.w900,
-                                                    color: Color(0xFF0284C7),
+                                                    color: badgeColor,
                                                   ),
                                                 ),
                                               ],
