@@ -44,10 +44,9 @@ Future<bool> saveAndDownloadFile({
     await file.writeAsBytes(bytes);
 
     // If targetGoogleAccount is specified, this is a Google Drive Master Backup:
-    // Strictly isolate to Google Drive for the onboarding account.
-    // DO NOT invoke the generic system share sheet that allows sharing via WhatsApp, Bluetooth, etc.
     if (targetGoogleAccount != null && targetGoogleAccount.trim().isNotEmpty) {
       final cleanAccount = targetGoogleAccount.trim();
+      bool directDriveSucceeded = false;
       if (Platform.isAndroid) {
         try {
           const platform = MethodChannel('com.trackmylibrary.app/drive_backup');
@@ -58,22 +57,22 @@ Future<bool> saveAndDownloadFile({
             'mimeType': mimeType,
           });
           if (result == true) {
-            return true;
+            directDriveSucceeded = true;
           }
         } catch (_) {
           // Native method channel call failed or in unit tests
         }
+      }
 
-        // Fallback when Google Drive app is not installed or method channel fails:
-        // Launch Google Drive web interface directly with account selector for the target onboarding email
-        try {
-          final driveUri = Uri.parse(
-            'https://accounts.google.com/AccountChooser?Email=${Uri.encodeComponent(cleanAccount)}&continue=${Uri.encodeComponent("https://drive.google.com")}',
-          );
-          if (await canLaunchUrl(driveUri)) {
-            await launchUrl(driveUri, mode: LaunchMode.externalApplication);
-          }
-        } catch (_) {}
+      // If direct Google Drive package intent was not triggered or device is non-Android,
+      // invoke Share.shareXFiles so the user can tap "Save to Drive" directly with 100% reliability
+      if (!directDriveSucceeded) {
+        await Share.shareXFiles(
+          [XFile(file.path, name: fileName, mimeType: mimeType)],
+          subject: fileName,
+          text: 'Save Master Backup to Google Drive ($cleanAccount)',
+          sharePositionOrigin: const Rect.fromLTWH(0, 0, 100, 100),
+        );
       }
       return true;
     }

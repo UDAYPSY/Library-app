@@ -5,6 +5,46 @@ import 'file_export_service.dart';
 import 'library_service.dart';
 import 'local_storage_service.dart';
 
+class BackupRecord {
+  final String fileName;
+  final String timestamp;
+  final String sizeKb;
+  final String type; // 'MANUAL' or 'AUTOMATIC'
+  final String targetEmail;
+  final String status;
+  final String? excelXml;
+
+  BackupRecord({
+    required this.fileName,
+    required this.timestamp,
+    required this.sizeKb,
+    required this.type,
+    required this.targetEmail,
+    required this.status,
+    this.excelXml,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'fileName': fileName,
+    'timestamp': timestamp,
+    'sizeKb': sizeKb,
+    'type': type,
+    'targetEmail': targetEmail,
+    'status': status,
+    'excelXml': excelXml,
+  };
+
+  factory BackupRecord.fromMap(Map<String, dynamic> map) => BackupRecord(
+    fileName: map['fileName']?.toString() ?? '',
+    timestamp: map['timestamp']?.toString() ?? '',
+    sizeKb: map['sizeKb']?.toString() ?? '',
+    type: map['type']?.toString() ?? 'MANUAL',
+    targetEmail: map['targetEmail']?.toString() ?? '',
+    status: map['status']?.toString() ?? 'Success',
+    excelXml: map['excelXml']?.toString(),
+  );
+}
+
 class DisasterRecoveryService {
   final LibraryService _service;
 
@@ -17,6 +57,33 @@ class DisasterRecoveryService {
   static const String keyLastBackupSize = 'gdrive_last_backup_size';
   static const String keyLastBackupStatus = 'gdrive_last_backup_status';
   static const String keyLastSnapshotContent = 'gdrive_last_snapshot_content';
+  static const String keyBackupHistory = 'gdrive_backup_history_records';
+
+  Future<List<BackupRecord>> getBackupHistory() async {
+    try {
+      final jsonStr = await LocalStorageService.getString(keyBackupHistory);
+      if (jsonStr != null && jsonStr.trim().isNotEmpty) {
+        final decoded = json.decode(jsonStr);
+        if (decoded is List) {
+          return decoded.map((item) => BackupRecord.fromMap(Map<String, dynamic>.from(item))).toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> recordBackupHistory(BackupRecord record) async {
+    try {
+      final current = await getBackupHistory();
+      current.removeWhere((r) => r.fileName == record.fileName);
+      current.insert(0, record);
+      final trimmed = current.take(20).toList();
+      await LocalStorageService.saveString(
+        keyBackupHistory,
+        json.encode(trimmed.map((r) => r.toMap()).toList()),
+      );
+    } catch (_) {}
+  }
 
   Future<bool> isAutoBackupEnabled() async {
     final val = await LocalStorageService.getString(keyAutoBackupEnabled);
@@ -68,22 +135,77 @@ class DisasterRecoveryService {
     return await LocalStorageService.getString(keyLastSnapshotContent);
   }
 
-  /// Runs background automated snapshot update without blocking UI
+  /// Runs background automated snapshot update, saving to local device storage, Cloud Firestore, and backup history
   Future<bool> runAutomatedBackupCycle({bool force = false}) async {
     final enabled = await isAutoBackupEnabled();
     if (!enabled && !force) return false;
 
     try {
-      final snapshot = generateMasterExcelSnapshot();
+      final targetEmail = await getBackupEmail();
+      final excelXml = generateMasterExcelWorkbookXml(targetDriveEmail: targetEmail);
       final now = DateTime.now();
-      final bytesLength = utf8.encode(snapshot).length;
+      final stamp = DateFormat('yyyy-MM-dd_hh-mma').format(now);
+      final fileName = 'TrackMyLibrary_AutoBackup_$stamp.xls';
+      final bytesLength = utf8.encode(excelXml).length;
       final sizeKb = (bytesLength / 1024).toStringAsFixed(1);
       final timeStr = DateFormat('dd MMM yyyy, hh:mm a').format(now);
 
-      await LocalStorageService.saveString(keyLastSnapshotContent, snapshot);
+      // 1. Save local offline copy directly to Download directory
+      await FileExportService.download(
+        fileName: fileName,
+        content: excelXml,
+        mimeType: 'application/vnd.ms-excel;charset=utf-8',
+        targetGoogleAccount: null, // Writes to public /Download and app storage without popup
+      );
+
+      // 2. Cloud Tenant Synchronization: Persist backup record to Firestore under library backups collection
+      if (_service.isFirebaseConnected && _service.tenantId.isNotEmpty) {
+        try {
+          final backupPayload = {
+            'timestamp': now.toIso8601String(),
+            'target_drive_email': targetEmail,
+            'file_name': fileName,
+            'file_size_kb': sizeKb,
+            'type': 'AUTOMATIC',
+            'status': 'SAVED_TO_DEVICE_AND_CLOUD',
+            'students_count': _service.currentStudents.length,
+            'payments_count': _service.currentPayments.length,
+            'expenses_count': _service.currentExpenses.length,
+            'excel_xml': excelXml,
+            'system_restore_json': _service.exportFullBackupJson(),
+          };
+          await _service.db
+              .collection('libraries')
+              .doc(_service.tenantId)
+              .collection('backups')
+              .doc('latest_auto_backup')
+              .set(backupPayload);
+
+          await _service.db
+              .collection('libraries')
+              .doc(_service.tenantId)
+              .collection('backups')
+              .doc(fileName.replaceAll('.xls', ''))
+              .set(backupPayload);
+        } catch (_) {}
+      }
+
+      await LocalStorageService.saveString(keyLastSnapshotContent, excelXml);
       await LocalStorageService.saveString(keyLastBackupTime, timeStr);
       await LocalStorageService.saveString(keyLastBackupSize, '$sizeKb KB');
-      await LocalStorageService.saveString(keyLastBackupStatus, 'Auto-Synced (Excel)');
+      await LocalStorageService.saveString(keyLastBackupStatus, 'Success (Auto-Synced Excel)');
+
+      await recordBackupHistory(
+        BackupRecord(
+          fileName: fileName,
+          timestamp: timeStr,
+          sizeKb: sizeKb,
+          type: 'AUTOMATIC',
+          targetEmail: targetEmail,
+          status: 'Success (Auto-Synced Excel)',
+          excelXml: excelXml,
+        ),
+      );
 
       return true;
     } catch (e) {
@@ -420,10 +542,11 @@ class DisasterRecoveryService {
       final targetEmail = await getBackupEmail();
       final excelXml = generateMasterExcelWorkbookXml(targetDriveEmail: targetEmail);
       final now = DateTime.now();
-      final stamp = DateFormat('yyyyMMdd_HHmmss').format(now);
-      final fileName = 'TrackMyLibrary_Master_Backup_$stamp.xls';
+      final stamp = DateFormat('yyyy-MM-dd_hh-mma').format(now);
+      final fileName = 'TrackMyLibrary_Backup_$stamp.xls';
       final bytesLength = utf8.encode(excelXml).length;
       final sizeKb = (bytesLength / 1024).toStringAsFixed(1);
+      final timeStr = DateFormat('dd MMM yyyy, hh:mm a').format(now);
 
       // Cloud Tenant Synchronization: Persist backup record to Firestore under library backups collection
       if (_service.isFirebaseConnected && _service.tenantId.isNotEmpty) {
@@ -433,6 +556,7 @@ class DisasterRecoveryService {
             'target_drive_email': targetEmail,
             'file_name': fileName,
             'file_size_kb': sizeKb,
+            'type': 'MANUAL',
             'status': 'SYNCED_TO_GOOGLE_DRIVE',
             'students_count': _service.currentStudents.length,
             'payments_count': _service.currentPayments.length,
@@ -446,6 +570,13 @@ class DisasterRecoveryService {
               .collection('backups')
               .doc('latest_drive_backup')
               .set(backupPayload);
+
+          await _service.db
+              .collection('libraries')
+              .doc(_service.tenantId)
+              .collection('backups')
+              .doc(fileName.replaceAll('.xls', ''))
+              .set(backupPayload);
         } catch (_) {}
       }
 
@@ -457,10 +588,21 @@ class DisasterRecoveryService {
       );
 
       if (ok) {
-        final timeStr = DateFormat('dd MMM yyyy, hh:mm a').format(now);
         await LocalStorageService.saveString(keyLastBackupTime, timeStr);
         await LocalStorageService.saveString(keyLastBackupSize, '$sizeKb KB');
         await LocalStorageService.saveString(keyLastBackupStatus, 'Success (Google Drive Sync)');
+
+        await recordBackupHistory(
+          BackupRecord(
+            fileName: fileName,
+            timestamp: timeStr,
+            sizeKb: sizeKb,
+            type: 'MANUAL',
+            targetEmail: targetEmail,
+            status: 'Success (Google Drive Sync)',
+            excelXml: excelXml,
+          ),
+        );
       }
       return ok;
     } catch (e) {

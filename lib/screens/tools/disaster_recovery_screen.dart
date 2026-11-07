@@ -23,6 +23,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
   String? _lastBackupTime;
   String? _lastBackupSize;
   String? _lastBackupStatus;
+  List<BackupRecord> _backupHistory = [];
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
     final time = await _recoveryService.getLastBackupTime();
     final size = await _recoveryService.getLastBackupSize();
     final status = await _recoveryService.getLastBackupStatus();
+    final history = await _recoveryService.getBackupHistory();
 
     if (mounted) {
       setState(() {
@@ -45,6 +47,7 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
         _lastBackupTime = time;
         _lastBackupSize = size;
         _lastBackupStatus = status;
+        _backupHistory = history;
       });
     }
   }
@@ -251,12 +254,15 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('📁 File: TrackMyLibrary_Master_Backup_${DateFormat('yyyyMMdd').format(DateTime.now())}.xls (Excel Multi-Sheet)',
+                      Text('📁 File: TrackMyLibrary_Backup_${DateFormat('yyyy-MM-dd_hh-mma').format(DateTime.now())}.xls (Excel Multi-Sheet)',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 4),
                       Text('👥 Registered Members: ${_service.currentStudents.length}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                       Text('💰 Payment Records: ${_service.currentPayments.length}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                       Text('📊 Operating Expenses: ${_service.currentExpenses.length}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      const SizedBox(height: 6),
+                      const Text('💾 Offline Copy: Also saved in your phone\'s Download directory.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF0F766E), fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -852,7 +858,9 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: _lastBackupStatus == 'Success' ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                                  color: (_lastBackupStatus!.contains('Success') || _lastBackupStatus!.contains('Auto-Synced'))
+                                      ? const Color(0xFFDCFCE7)
+                                      : const Color(0xFFFEE2E2),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -860,7 +868,9 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: _lastBackupStatus == 'Success' ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                    color: (_lastBackupStatus!.contains('Success') || _lastBackupStatus!.contains('Auto-Synced'))
+                                        ? const Color(0xFF16A34A)
+                                        : const Color(0xFFDC2626),
                                   ),
                                 ),
                               ),
@@ -886,6 +896,259 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 20),
+
+                  // WHERE BACKUPS ARE SAVED INFORMATION CARD
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFBBF7D0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.folder_special_rounded, color: Color(0xFF16A34A), size: 20),
+                            SizedBox(width: 8),
+                            Text('Where Backups Are Saved & Visible', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF166534))),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('📁', style: TextStyle(fontSize: 14)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: RichText(
+                                text: const TextSpan(
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
+                                  children: [
+                                    TextSpan(text: 'Device Storage: ', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+                                    TextSpan(text: 'Always saved into your phone\'s '),
+                                    TextSpan(text: 'Internal Storage > Download', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    TextSpan(text: ' folder. You can view or copy it anytime in your phone\'s Files / My Files app.'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('☁️', style: TextStyle(fontSize: 14)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
+                                  children: [
+                                    const TextSpan(text: 'Google Drive: ', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                    TextSpan(text: 'Sent to your designated onboarding account ('),
+                                    TextSpan(text: _backupEmail.isNotEmpty ? _backupEmail : 'configured email', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    const TextSpan(text: '). When you tap "Backup to Google Drive Now", tap "Save" in Google Drive to store it in your Drive folder.'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('🛡️', style: TextStyle(fontSize: 14)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
+                                  children: [
+                                    TextSpan(text: 'Cloud Database Vault: ', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                                    TextSpan(text: 'Automated and manual snapshots are also synced to Cloud Firestore, allowing 1-click restoration on any device.'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // AUTOMATIC & MANUAL BACKUP ARCHIVE HISTORY
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'BACKUP ARCHIVES & HISTORY',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 1.0),
+                      ),
+                      if (_backupHistory.isNotEmpty)
+                        Text(
+                          '${_backupHistory.length} saved',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  if (_backupHistory.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.archive_outlined, size: 36, color: Color(0xFF94A3B8)),
+                          SizedBox(height: 8),
+                          Text(
+                            'No Previous Backup Archives Found',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569)),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Your automatic and manual backups will appear here with full timestamps so you can open or save them to Google Drive anytime.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ..._backupHistory.map((rec) {
+                      final isAuto = rec.type == 'AUTOMATIC';
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: isAuto ? const Color(0xFFCCFBF1) : const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    isAuto ? 'AUTOMATIC' : 'MANUAL',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: isAuto ? const Color(0xFF0F766E) : const Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    rec.fileName,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E293B)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '🕒 ${rec.timestamp} • ${rec.sizeKb} KB',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                ),
+                                Row(
+                                  children: [
+                                    if (rec.excelXml != null && rec.excelXml!.isNotEmpty)
+                                      TextButton.icon(
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          visualDensity: VisualDensity.compact,
+                                          foregroundColor: const Color(0xFF0D9488),
+                                        ),
+                                        icon: const Icon(Icons.share_rounded, size: 14),
+                                        label: const Text('Open / Save', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        onPressed: () async {
+                                          await FileExportService.download(
+                                            fileName: rec.fileName,
+                                            content: rec.excelXml!,
+                                            mimeType: 'application/vnd.ms-excel;charset=utf-8',
+                                            targetGoogleAccount: rec.targetEmail,
+                                          );
+                                        },
+                                      ),
+                                    if (rec.excelXml != null && rec.excelXml!.isNotEmpty)
+                                      TextButton.icon(
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          visualDensity: VisualDensity.compact,
+                                          foregroundColor: const Color(0xFF2563EB),
+                                        ),
+                                        icon: const Icon(Icons.restore_rounded, size: 14),
+                                        label: const Text('Restore', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text('Restore from this backup?'),
+                                              content: Text('Do you want to restore library state from "${rec.fileName}"? This will rehydrate your students, seats, and ledger.'),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                                                  onPressed: () => Navigator.pop(ctx, true),
+                                                  child: const Text('Yes, Restore'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true) {
+                                            setState(() => _isLoading = true);
+                                            final res = await _recoveryService.restoreFromBackupContent(rec.excelXml!);
+                                            setState(() => _isLoading = false);
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(res['success'] == true ? 'Restoration complete!' : 'Restore failed: ${res['error']}'),
+                                                  backgroundColor: res['success'] == true ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
 
                   const SizedBox(height: 20),
 

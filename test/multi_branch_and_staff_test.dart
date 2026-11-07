@@ -761,6 +761,22 @@ void main() {
       expect(ok, isTrue);
       expect(await drService.getLastBackupStatus(), equals('Success (Google Drive Sync)'));
       expect(await drService.getLastBackupTime(), isNotNull);
+
+      // Verify manual backup is recorded in history
+      final history = await drService.getBackupHistory();
+      expect(history, isNotEmpty);
+      expect(history.first.type, equals('MANUAL'));
+      expect(history.first.fileName, startsWith('TrackMyLibrary_Backup_'));
+
+      // Test automated backup cycle records and generates visible backup
+      final autoOk = await drService.runAutomatedBackupCycle(force: true);
+      expect(autoOk, isTrue);
+      expect(await drService.getLastBackupStatus(), equals('Success (Auto-Synced Excel)'));
+
+      final updatedHistory = await drService.getBackupHistory();
+      expect(updatedHistory.length, greaterThanOrEqualTo(2));
+      expect(updatedHistory.first.type, equals('AUTOMATIC'));
+      expect(updatedHistory.first.fileName, startsWith('TrackMyLibrary_AutoBackup_'));
     });
   });
 

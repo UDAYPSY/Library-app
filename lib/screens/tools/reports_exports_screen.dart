@@ -821,7 +821,7 @@ class _ReportsExportsScreenState extends State<ReportsExportsScreen> {
                                           payments: payments,
                                           expenses: expenses,
                                         );
-                                        final fileName = 'library_master_backup_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
+                                        final fileName = 'library_master_backup_${DateFormat('yyyy-MM-dd_hh-mma').format(DateTime.now())}.csv';
                                         final ok = await FileExportService.download(fileName: fileName, content: masterCsv);
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(context).showSnackBar(

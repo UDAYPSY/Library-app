@@ -1,5 +1,6 @@
 package com.trackmylibrary.app
 
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
@@ -27,27 +28,42 @@ class MainActivity: FlutterFragmentActivity() {
 
                 try {
                     val file = File(filePath)
+                    if (!file.exists()) {
+                        result.error("FILE_NOT_FOUND", "File not found at $filePath", null)
+                        return@setMethodCallHandler
+                    }
+
+                    // Copy to cacheDir/share_plus to guarantee FileProvider authority compatibility
+                    val shareDir = File(cacheDir, "share_plus")
+                    if (!shareDir.exists()) {
+                        shareDir.mkdirs()
+                    }
+                    val shareFile = File(shareDir, fileName)
+                    file.copyTo(shareFile, overwrite = true)
+
                     val uri: Uri = try {
-                        FileProvider.getUriForFile(this, "${applicationContext.packageName}.flutter.share_provider", file)
+                        FileProvider.getUriForFile(this, "${applicationContext.packageName}.flutter.share_provider", shareFile)
                     } catch (e1: Exception) {
                         try {
-                            FileProvider.getUriForFile(this, "${applicationContext.packageName}.fileprovider", file)
+                            FileProvider.getUriForFile(this, "${applicationContext.packageName}.fileprovider", shareFile)
                         } catch (e2: Exception) {
-                            Uri.fromFile(file)
+                            Uri.fromFile(shareFile)
                         }
                     }
 
-                    // Strictly restrict Intent to Google Drive package (com.google.android.apps.docs).
-                    // This prevents arbitrary apps (WhatsApp, Bluetooth, etc.) from intercepting disaster recovery backups.
+                    // Strictly route Intent to Google Drive app ("Save to Drive") with granted URI permissions
                     val driveIntent = Intent(Intent.ACTION_SEND).apply {
                         type = mimeType
                         setPackage("com.google.android.apps.docs")
                         putExtra(Intent.EXTRA_STREAM, uri)
                         putExtra(Intent.EXTRA_TITLE, fileName)
-                        putExtra(Intent.EXTRA_SUBJECT, "Master Backup strictly bound to $targetEmail")
-                        putExtra("account_name", targetEmail)
-                        putExtra("authAccount", targetEmail)
-                        putExtra("android.intent.extra.EMAIL", arrayOf(targetEmail))
+                        putExtra(Intent.EXTRA_SUBJECT, fileName)
+                        if (targetEmail.isNotEmpty()) {
+                            putExtra("account_name", targetEmail)
+                            putExtra("authAccount", targetEmail)
+                            putExtra("android.intent.extra.EMAIL", arrayOf(targetEmail))
+                        }
+                        clipData = ClipData.newRawUri(fileName, uri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
@@ -55,10 +71,11 @@ class MainActivity: FlutterFragmentActivity() {
                     val pm = packageManager
                     val activities = pm.queryIntentActivities(driveIntent, 0)
                     if (activities.isNotEmpty()) {
+                        grantUriPermission("com.google.android.apps.docs", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         startActivity(driveIntent)
                         result.success(true)
                     } else {
-                        // Google Drive app is not installed on device
+                        // Google Drive app is not installed or unable to handle directly; return false to trigger share sheet fallback
                         result.success(false)
                     }
                 } catch (e: Exception) {
