@@ -1,0 +1,121 @@
+
+✅ /home/runner/work/Library-app/Library-app/test/excel_import_test.dart: Excel & CSV Spreadsheet Import Tests generateTemplateCsv outputs standard valid CSV header
+✅ /home/runner/work/Library-app/Library-app/test/excel_import_test.dart: Excel & CSV Spreadsheet Import Tests parseAndImport successfully parses standard CSV rows
+✅ /home/runner/work/Library-app/Library-app/test/excel_import_test.dart: Excel & CSV Spreadsheet Import Tests parseAndImport handles Tab-Separated Values (TSV) directly from Microsoft Excel
+✅ /home/runner/work/Library-app/Library-app/test/excel_import_test.dart: Excel & CSV Spreadsheet Import Tests parseAndImport records errors for invalid rows
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Adding and switching active library branch updates profile
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Staff member management: Add, toggle active, and remove
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Owner adds student, creates Branch Assistant, staff logs in and sees student in directory and stream
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Staff member can log in using email address and password
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Comprehensive role boundaries matrix audit across all 6 roles
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Staff login never changes Google Drive backup email and staff cannot alter backup settings
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Staff member cannot switch branch, add branch, or add staff
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Staff operational workflow: Staff adds student, collects fee, tags collector info, and handles advance renewal
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Staff session restore preserves owner libraryId and does not overwrite with anonymous UID
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Biometric identity binding tags 1 ID at a time and preserves exact staff role without Admin elevation
+✅ /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart: Database Full Backup and Disaster Recovery Tests exportFullBackupJson generates valid JSON schema with all entities
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Strict staff RBAC enforcement blocks unauthorized deletions and settings edits
+✅ /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart: Database Full Backup and Disaster Recovery Tests restoreFromBackupJson rehydrates complete state safely
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Permanent account deletion clears biometric binding and resets role to Guest
+✅ /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart: Database Full Backup and Disaster Recovery Tests restoreFromBackupJson handles invalid input gracefully
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Owner-configured seat capacity synchronizes to branches and totalSeatsCount
+✅ /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart: Database Full Backup and Disaster Recovery Tests Schema migration converts legacy v1 backup with missing gender and updatedAt to v3
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Biometric login checks intended role and rejects cross-role access (Owner vs Staff)
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Least-privilege RBAC strictly blocks staff from viewing revenue, editing admin profile, and exporting data
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Strict 10-digit mobile number and RFC email validation utilities
+✅ /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart: Database Full Backup and Disaster Recovery Tests Disaster recovery generates properly formatted multi-sheet Excel (.xls) and restores
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Library setup and registration strictly rejects 18-digit phone numbers and invalid emails
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests saveProfile strictly blocks invalid phone and email formats
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests Disaster Recovery service enforces setup Google Drive binding and static lock
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Multi-Branch & Staff Role Boundaries Tests backupToGoogleDriveNow strictly binds to onboarding email and executes Google Drive sync
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Ongoing Library Paper Register Onboarding & Non-Breaking Compatibility Tests ExcelImportService backward compatibility: legacy 7-column CSV imports cleanly
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Ongoing Library Paper Register Onboarding & Non-Breaking Compatibility Tests ExcelImportService 10-column CSV imports historical join date, custom next due date and past dues
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Ongoing Library Paper Register Onboarding & Non-Breaking Compatibility Tests assignSeatAndRegisterStudent with feeAmount: 0 onboard register student without skewing today cash ledger
+✅ /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart: Ongoing Library Paper Register Onboarding & Non-Breaking Compatibility Tests Regular walk-in admission records payment in ledger normally without disruption
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Default admin credentials log in successfully as Admin
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Incorrect admin password fails authentication gracefully
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Registering new admin account updates session and tenant ID
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Admin registration rejects weak password
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Staff Receptionist logs in with phone and PIN, role strictly Receptionist
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Deactivated staff member is barred from logging in
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Sign out cleanly clears active user session
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Multi-tenant isolation namespaces collection paths under tenant ID
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Google Sign-In logs in successfully as Admin
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Biometric login authenticates administrator session after enrollment
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Biometric login rejects when fingerprint hardware verification fails
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) sendPasswordReset rejects non-email identifiers honestly
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) hasConfiguredLibrary detects configured vs unconfigured state
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) deleteAccountPermanently completely wipes state, storage, and library configuration
+✅ /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart: Authentication & Security (RBAC & Multi-Tenant) Financial ledger immutability blocks manual payment deletion
+✅ /home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart: Financial Ledger & Payment Reconciliation Tests Student fee collection decreases dues and records payment transaction
+✅ /home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart: Financial Ledger & Payment Reconciliation Tests Adding and deleting expense item
+✅ /home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart: Financial Ledger & Payment Reconciliation Tests Payment transaction query by student ID and phone
+✅ /home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart: Financial Ledger & Payment Reconciliation Tests Filtering payments by student name returns exact matching transactions
+lib/screens/main_hub_screen.dart:521:41: Error: Not a constant expression.
+                                        isHindi ? 'लाइव स्थिति' : 'LIVE STATUS',
+                                        ^^^^^^^
+lib/screens/main_hub_screen.dart:1523:37: Error: Not a constant expression.
+                                    isHindi ? 'प्ले स्टोर पर रेटिंग दें' : 'Rate on Play Store',
+                                    ^^^^^^^
+lib/screens/students/member_profile_screen.dart:1701:33: Error: Cannot invoke a non-'const' factory where a const expression is expected.
+Try using a constructor or factory that is 'const'.
+                                LanguageService().isHindi ? 'फीस जमा करें' : 'Collect Payment',
+                                ^^^^^^^^^^^^^^^
+lib/screens/students/member_profile_screen.dart:1796:45: Error: Cannot invoke a non-'const' factory where a const expression is expected.
+Try using a constructor or factory that is 'const'.
+                                            LanguageService().isHindi ? 'पहचान पत्र' : 'ID Card',
+                                            ^^^^^^^^^^^^^^^
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Phone normalization handles various Indian format inputs
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Duplicate phone detection across active students
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Seat collision check and student association
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Shift conflict rules detect overlapping vs non-overlapping shifts
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Shift-wise seat allocation allows different students in different shifts on same seat
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Multi-month advance registration calculates duration, total fee and validUntil
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Payment status determination for Full Paid, Partial Paid, and Unpaid
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Vacating a student frees seat ONLY for that shift, preserving other shift occupant
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Marking dues and fee payment reconciliation
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Assign seat to existing student works smoothly
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Shift update: upgrade, downgrade excess credit, and upgrade back to same level
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Payment transaction records multi-month tenure and dates correctly
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Student tenure days completed calculation from joinedAt
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Input sanitization and validation rules: Name, Phone, Aadhaar, and Address
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Data sync conflict resolution detects stale edits via optimistic locking
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Shift change for existing student calculates upgrade and downgrade across whole multi-month tenure
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Activity notes are automatically appended for payment collection and seat change
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Payment transactions can be filtered by specific single date
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Multiple shift changes in the same tenure accurately compute dues and advance credit every time
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Due payment collection explicitly notes the validity time period in payment records
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart
+
+::endgroup::
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Multiple sequential shift downgrades and upgrades in same tenure show only current excess credit
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests All actions on a student add persistent, cumulative notes to student profile
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Shift downgrade updates last tenure payment amount in payments ledger
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Follow-up template and action drafts do not dump historical notes, but support custom remarks
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests DisasterRecoveryService generates multi-section Excel snapshot and performs lossless database restoration
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests runAutomatedBackupCycle saves timestamped snapshot content into local storage for background recovery
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests UPI Payment QR generation and dynamic payee resolution
+::group::✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Students with identical names do NOT share payment transactions
+[Payment] Ignored rapid duplicate payment transaction submission.
+::endgroup::
+::group::✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Permanently deleting a student purges their payments and prevents transfer to future same-named student
+[Payment] Ignored rapid duplicate payment transaction submission.
+::endgroup::
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests deleteAccountPermanently completely wipes state and logs out
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests QR Self-Registration: Submit, reject, and accept workflows work accurately
+✅ /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart: Seat Allocation and Student Management Tests Wizard QR admission workflow removes placeholder and marks accepted safely
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: ThemeService Tests Default ThemeMode is Light and themeModeName is Light
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: ThemeService Tests setThemeMode updates themeMode and notifies listeners
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: AppTheme Specifications lightTheme has correct brightness and Material 3 flags
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: AppTheme Specifications darkTheme has correct brightness and Slate dark tokens
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests Default language is English
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests Translations return English strings by default
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests Switching to Hindi updates language, notifies listeners and persists
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests toggleLanguage toggles between English and Hindi
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests Fallback handling for unknown keys
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers AppColors returns light tokens in light mode
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers AppColors returns dark tokens in dark mode
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers ThemeService.isDarkMode resolves correctly across modes
+
+::error::96 tests passed, 1 failed.
