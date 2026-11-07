@@ -14,6 +14,7 @@ import 'services/disaster_recovery_service.dart';
 import 'services/library_service.dart';
 
 import 'constants/app_theme.dart';
+import 'services/language_service.dart';
 import 'services/theme_service.dart';
 
 void main() async {
@@ -79,6 +80,7 @@ void main() async {
 
   // Initialize theme & services
   await ThemeService().init();
+  await LanguageService().init();
   LibraryService().ensureInitialized();
 
   // Safe Firebase Initialization
@@ -147,7 +149,7 @@ class TrackMyLibraryApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: ThemeService(),
+      animation: Listenable.merge([ThemeService(), LanguageService()]),
       builder: (context, _) {
         final initial = determineInitialRoute();
         return MaterialApp(

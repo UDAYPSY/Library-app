@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
+import '../../constants/app_strings.dart';
 import '../../models/library_models.dart';
 import '../../services/excel_import_service.dart';
 import '../../services/file_export_service.dart';
+import '../../services/language_service.dart';
 import '../../services/library_service.dart';
 import '../../services/theme_service.dart';
 import '../login_screen.dart';
@@ -381,6 +383,122 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SnackBar(
                     content: Text('Theme set to follow System Default!'),
                     backgroundColor: Color(0xFF0D766E),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLanguageSelector() {
+    final langService = LanguageService();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.translate_rounded, color: Color(0xFFD97706), size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      langService.isHindi ? 'भाषा चुनें (Select Language)' : 'Select Language / भाषा चुनें',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.text(context),
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              tileColor: langService.currentLanguage == AppLanguage.en
+                  ? (AppColors.isDark(context) ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF))
+                  : null,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDBEAFE),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text('EN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF1D4ED8))),
+              ),
+              title: Text(
+                'English (Standard)',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.text(context)),
+              ),
+              subtitle: const Text('Default system language', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              trailing: langService.currentLanguage == AppLanguage.en
+                  ? const Icon(Icons.check_circle, color: Color(0xFF2563EB))
+                  : null,
+              onTap: () async {
+                await langService.setLanguage(AppLanguage.en);
+                if (mounted) setState(() {});
+                if (ctx.mounted) Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Switched to English!'),
+                    backgroundColor: Color(0xFF0D766E),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              tileColor: langService.currentLanguage == AppLanguage.hi
+                  ? (AppColors.isDark(context) ? const Color(0xFF332A15) : const Color(0xFFFEF3C7))
+                  : null,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE68A),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text('हि', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFFB45309))),
+              ),
+              title: Text(
+                'हिंदी (Hindi)',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.text(context)),
+              ),
+              subtitle: const Text('पूरी ऐप हिंदी भाषा में देखें', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              trailing: langService.currentLanguage == AppLanguage.hi
+                  ? const Icon(Icons.check_circle, color: Color(0xFFD97706))
+                  : null,
+              onTap: () async {
+                await langService.setLanguage(AppLanguage.hi);
+                if (mounted) setState(() {});
+                if (ctx.mounted) Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('ऐप की भाषा बदलकर हिंदी कर दी गई है! 🇮🇳'),
+                    backgroundColor: Color(0xFFD97706),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
@@ -2879,15 +2997,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ]),
               const SizedBox(height: 24),
 
-              // SECTION: APPEARANCE (Image 1)
-              _sectionHeader('APPEARANCE'),
+              // SECTION: APPEARANCE & LANGUAGE
+              _sectionHeader(LanguageService().isHindi ? 'दिखावट और भाषा (APPEARANCE & LANGUAGE)' : 'APPEARANCE & LANGUAGE'),
               const SizedBox(height: 10),
               _cardGroup([
+                _settingsTile(
+                  icon: Icons.translate_rounded,
+                  iconBg: const Color(0xFFFEF3C7),
+                  iconColor: const Color(0xFFD97706),
+                  title: LanguageService().isHindi ? 'ऐप की भाषा (Language)' : 'App Language / भाषा',
+                  subtitle: LanguageService().currentLanguageName,
+                  showDivider: true,
+                  onTap: _showLanguageSelector,
+                ),
                 _settingsTile(
                   icon: Icons.palette_outlined,
                   iconBg: const Color(0xFFE6F4EA),
                   iconColor: const Color(0xFF0D9488),
-                  title: 'Theme Mode',
+                  title: LanguageService().isHindi ? 'थीम मोड (Theme Mode)' : 'Theme Mode',
                   subtitle: 'Currently: $_currentTheme',
                   showDivider: false,
                   onTap: _showThemeSelector,

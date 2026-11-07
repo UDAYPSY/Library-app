@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
+import '../constants/app_strings.dart';
 import '../models/library_models.dart';
+import '../services/language_service.dart';
 import '../services/library_service.dart';
 import 'analytics/financial_analytics_screen.dart';
 import 'analytics/add_expense_sheet.dart';
@@ -215,11 +217,54 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           ),
                         ],
                       ),
-                      // Avatar Card with Star (Image 1)
-                      Stack(
-                        clipBehavior: Clip.none,
+                      // Quick Language Switcher & Avatar
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
+                          InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () async {
+                              await LanguageService().toggleLanguage();
+                              if (mounted) setState(() {});
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: LanguageService().isHindi
+                                    ? (AppColors.isDark(context) ? const Color(0xFF422006) : const Color(0xFFFEF3C7))
+                                    : (AppColors.isDark(context) ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: LanguageService().isHindi
+                                      ? const Color(0xFFF59E0B)
+                                      : (AppColors.isDark(context) ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.translate_rounded, size: 13, color: Color(0xFFD97706)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    LanguageService().isHindi ? 'हि' : 'EN',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 11.5,
+                                      color: LanguageService().isHindi
+                                          ? const Color(0xFFF59E0B)
+                                          : (AppColors.isDark(context) ? Colors.white70 : const Color(0xFF334155)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          // Avatar Card with Star (Image 1)
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
                             width: 48,
                             height: 48,
                             decoration: BoxDecoration(
@@ -3398,18 +3443,19 @@ Have a productive study session!
   // ROLE-AWARE DYNAMIC BOTTOM NAVIGATION BAR
   // -------------------------------------------------------------
   List<_HubTabItem> get _availableTabs {
+    final lang = LanguageService();
     final tabs = <_HubTabItem>[
-      const _HubTabItem(0, Icons.grid_view_rounded, 'Home'),
-      const _HubTabItem(1, Icons.people_alt_rounded, 'Students'),
+      _HubTabItem(0, Icons.grid_view_rounded, lang.t('nav_home')),
+      _HubTabItem(1, Icons.people_alt_rounded, lang.t('nav_students')),
     ];
     if (_service.canManageSeats || _service.isAdmin) {
-      tabs.add(const _HubTabItem(2, Icons.chair_alt_rounded, 'Seats'));
+      tabs.add(_HubTabItem(2, Icons.chair_alt_rounded, lang.t('nav_seats')));
     }
     if (_service.canViewRevenue) {
-      tabs.add(const _HubTabItem(3, Icons.credit_card_rounded, 'Payments'));
-      tabs.add(const _HubTabItem(4, Icons.bar_chart_rounded, 'Analytics'));
+      tabs.add(_HubTabItem(3, Icons.credit_card_rounded, lang.t('nav_payments')));
+      tabs.add(_HubTabItem(4, Icons.bar_chart_rounded, lang.t('nav_analytics')));
     }
-    tabs.add(const _HubTabItem(5, Icons.settings_outlined, 'Settings'));
+    tabs.add(_HubTabItem(5, Icons.settings_outlined, lang.t('nav_settings')));
     return tabs;
   }
 
