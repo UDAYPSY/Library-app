@@ -512,11 +512,11 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                     color: Colors.white.withOpacity(0.18),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.show_chart_rounded, size: 14, color: Colors.white),
-                                      SizedBox(width: 5),
+                                      const Icon(Icons.show_chart_rounded, size: 14, color: Colors.white),
+                                      const SizedBox(width: 5),
                                       Text(
                                         isHindi ? 'लाइव स्थिति' : 'LIVE STATUS',
                                         style: TextStyle(
@@ -1516,7 +1516,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 ),
                               ),
                               onPressed: _showRatingDialog,
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(

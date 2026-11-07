@@ -1697,7 +1697,7 @@ _Powered by TrackMyLibrary_
                                 ),
                               ),
                               icon: const Icon(Icons.account_balance_wallet_outlined, size: 20),
-                              label: const Text(
+                              label: Text(
                                 LanguageService().isHindi ? 'फीस जमा करें' : 'Collect Payment',
                                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                               ),
@@ -1787,11 +1787,11 @@ _Powered by TrackMyLibrary_
                                       borderRadius: BorderRadius.circular(14),
                                       border: Border.all(color: const Color(0xFFE2E8F0)),
                                     ),
-                                    child: const Row(
+                                    child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.badge_outlined, size: 18, color: AppColors.textNavy),
-                                        SizedBox(width: 6),
+                                        const Icon(Icons.badge_outlined, size: 18, color: AppColors.textNavy),
+                                        const SizedBox(width: 6),
                                         Text(
                                             LanguageService().isHindi ? 'पहचान पत्र' : 'ID Card',
                                           style: TextStyle(
