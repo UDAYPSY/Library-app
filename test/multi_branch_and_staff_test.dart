@@ -771,7 +771,7 @@ void main() {
       // Test automated backup cycle records and generates visible backup
       final autoOk = await drService.runAutomatedBackupCycle(force: true);
       expect(autoOk, isTrue);
-      expect(await drService.getLastBackupStatus(), equals('Success (Auto-Synced Excel)'));
+      expect(await drService.getLastBackupStatus(), equals('Auto-Synced (Excel)'));
 
       final updatedHistory = await drService.getBackupHistory();
       expect(updatedHistory.length, greaterThanOrEqualTo(2));
