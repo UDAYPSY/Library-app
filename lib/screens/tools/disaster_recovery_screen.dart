@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../constants/app_colors.dart';
 import '../../services/disaster_recovery_service.dart';
+import '../../services/file_export_service.dart';
 import '../../services/library_service.dart';
 import '../../services/local_storage_service.dart';
 
@@ -961,14 +962,14 @@ class _DisasterRecoveryScreenState extends State<DisasterRecoveryScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        const Row(
+                        Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('🛡️', style: TextStyle(fontSize: 14)),
-                            SizedBox(width: 8),
+                            const Text('🛡️', style: TextStyle(fontSize: 14)),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: RichText(
-                                text: TextSpan(
+                                text: const TextSpan(
                                   style: TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
                                   children: [
                                     TextSpan(text: 'Cloud Database Vault: ', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),

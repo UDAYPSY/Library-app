@@ -142,6 +142,7 @@ class DisasterRecoveryService {
 
     try {
       final targetEmail = await getBackupEmail();
+      final snapshot = generateMasterExcelSnapshot();
       final excelXml = generateMasterExcelWorkbookXml(targetDriveEmail: targetEmail);
       final now = DateTime.now();
       final stamp = DateFormat('yyyy-MM-dd_hh-mma').format(now);
@@ -190,10 +191,10 @@ class DisasterRecoveryService {
         } catch (_) {}
       }
 
-      await LocalStorageService.saveString(keyLastSnapshotContent, excelXml);
+      await LocalStorageService.saveString(keyLastSnapshotContent, snapshot);
       await LocalStorageService.saveString(keyLastBackupTime, timeStr);
       await LocalStorageService.saveString(keyLastBackupSize, '$sizeKb KB');
-      await LocalStorageService.saveString(keyLastBackupStatus, 'Success (Auto-Synced Excel)');
+      await LocalStorageService.saveString(keyLastBackupStatus, 'Auto-Synced (Excel)');
 
       await recordBackupHistory(
         BackupRecord(
@@ -202,7 +203,7 @@ class DisasterRecoveryService {
           sizeKb: sizeKb,
           type: 'AUTOMATIC',
           targetEmail: targetEmail,
-          status: 'Success (Auto-Synced Excel)',
+          status: 'Auto-Synced (Excel)',
           excelXml: excelXml,
         ),
       );
