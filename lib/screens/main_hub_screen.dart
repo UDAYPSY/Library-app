@@ -307,6 +307,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                       ),
                     ],
                   ),
+                ],
+              ),
                   const SizedBox(height: 18),
 
                   // Pill Switcher: Classic vs Modern (Image 1)
