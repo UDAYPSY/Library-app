@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import '../../services/language_service.dart';
 import '../../widgets/collect_payment_modal.dart';
 import 'add_student_wizard_screen.dart';
 
@@ -1385,8 +1386,8 @@ _Powered by TrackMyLibrary_
                       child: const Icon(Icons.chevron_left_rounded, color: AppColors.textNavy, size: 26),
                     ),
                   ),
-                  const Text(
-                    'Member Profile',
+                  Text(
+                    LanguageService().isHindi ? 'सदस्य प्रोफाइल' : 'Member Profile',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -1592,21 +1593,21 @@ _Powered by TrackMyLibrary_
                               Expanded(
                                 child: _statCard(
                                   topText: '#${_student.seatNumber ?? '—'}',
-                                  bottomText: 'SEAT',
+                                  bottomText: LanguageService().isHindi ? 'सीट' : 'SEAT',
                                 ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: _statCard(
                                   topText: _student.shift,
-                                  bottomText: 'SHIFT',
+                                  bottomText: LanguageService().isHindi ? 'शिफ्ट' : 'SHIFT',
                                 ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: _statCard(
                                   topText: _student.hasDues ? '₹${_student.effectiveDues}' : 'PAID',
-                                  bottomText: _student.hasDues ? 'DUES' : 'FEES',
+                                  bottomText: _student.hasDues ? (LanguageService().isHindi ? 'बकाया' : 'DUES') : (LanguageService().isHindi ? 'फीस' : 'FEES'),
                                   textColor: _student.hasDues ? const Color(0xFFE11D48) : const Color(0xFF059669),
                                 ),
                               ),
@@ -1646,8 +1647,8 @@ _Powered by TrackMyLibrary_
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
-                                          'ADVANCE MONEY WITH LIBRARY',
+                                        Text(
+                                          LanguageService().isHindi ? 'लाइब्रेरी के पास अग्रिम राशि' : 'ADVANCE MONEY WITH LIBRARY',
                                           style: TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.w900,
@@ -1697,7 +1698,7 @@ _Powered by TrackMyLibrary_
                               ),
                               icon: const Icon(Icons.account_balance_wallet_outlined, size: 20),
                               label: const Text(
-                                'Collect Payment',
+                                LanguageService().isHindi ? 'फीस जमा करें' : 'Collect Payment',
                                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                               ),
                               onPressed: _showRecordPaymentSheet,
@@ -1792,7 +1793,7 @@ _Powered by TrackMyLibrary_
                                         Icon(Icons.badge_outlined, size: 18, color: AppColors.textNavy),
                                         SizedBox(width: 6),
                                         Text(
-                                          'ID Card',
+                                            LanguageService().isHindi ? 'पहचान पत्र' : 'ID Card',
                                           style: TextStyle(
                                             color: AppColors.textNavy,
                                             fontWeight: FontWeight.w800,
@@ -1859,8 +1860,8 @@ _Powered by TrackMyLibrary_
                     const SizedBox(height: 24),
 
                     // 2. Library Membership Section (Images 2 & 3)
-                    const Text(
-                      'Library Membership',
+                    Text(
+                      LanguageService().isHindi ? 'लाइब्रेरी सदस्यता' : 'Library Membership',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,

@@ -102,12 +102,11 @@ class _MainHubScreenState extends State<MainHubScreen> {
         : (profile.adminName.isNotEmpty ? profile.adminName : 'Administrator');
     final avatarLetter = adminName.isNotEmpty ? adminName[0].toUpperCase() : 'N';
 
+    final isHindi = LanguageService().isHindi;
     final hour = DateTime.now().hour;
-    final greeting = (hour < 12)
-        ? 'Good Morning'
-        : (hour < 17)
-            ? 'Good Afternoon'
-            : 'Good Evening';
+    final greeting = isHindi
+        ? (hour < 12 ? 'शुभ प्रभात' : (hour < 17 ? 'शुभ दोपहर' : 'शुभ संध्या'))
+        : (hour < 12 ? 'Good Morning' : (hour < 17 ? 'Good Afternoon' : 'Good Evening'));
 
     return StreamBuilder<List<StudentInfo>>(
       stream: _service.streamStudents(),
@@ -195,7 +194,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   const SizedBox(width: 4),
                                   Text(
                                     _service.activeBranchId == 'all'
-                                        ? 'All Branches (Combined)'
+                                        ? (isHindi ? 'सभी शाखाएं (संयुक्त)' : 'All Branches (Combined)')
                                         : _service.currentBranch.name,
                                     style: TextStyle(
                                       fontSize: 11.5,
@@ -217,46 +216,128 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           ),
                         ],
                       ),
-                      // Quick Language Switcher & Avatar
+                      // Prominent Dual Segmented Language Switcher & Avatar
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () async {
-                              await LanguageService().toggleLanguage();
-                              if (mounted) setState(() {});
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: LanguageService().isHindi
-                                    ? (AppColors.isDark(context) ? const Color(0xFF422006) : const Color(0xFFFEF3C7))
-                                    : (AppColors.isDark(context) ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: LanguageService().isHindi
-                                      ? const Color(0xFFF59E0B)
-                                      : (AppColors.isDark(context) ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                                ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.isDark(context)
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: AppColors.isDark(context)
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFCBD5E1),
+                                width: 1.5,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.translate_rounded, size: 13, color: Color(0xFFD97706)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    LanguageService().isHindi ? 'हि' : 'EN',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 11.5,
-                                      color: LanguageService().isHindi
-                                          ? const Color(0xFFF59E0B)
-                                          : (AppColors.isDark(context) ? Colors.white70 : const Color(0xFF334155)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.06),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(3),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  onTap: () async {
+                                    if (LanguageService().isHindi) {
+                                      await LanguageService().setLanguage(AppLanguage.en);
+                                      if (mounted) setState(() {});
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: !LanguageService().isHindi
+                                          ? (AppColors.isDark(context) ? AppColors.mintAccent : const Color(0xFF0D9488))
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: !LanguageService().isHindi
+                                          ? [
+                                              BoxShadow(
+                                                color: const Color(0xFF0D9488).withOpacity(0.3),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.language_rounded,
+                                          size: 13,
+                                          color: !LanguageService().isHindi
+                                              ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                                              : (AppColors.isDark(context) ? Colors.white60 : const Color(0xFF64748B)),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'EN',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.5,
+                                            color: !LanguageService().isHindi
+                                                ? (AppColors.isDark(context) ? const Color(0xFF0F172A) : Colors.white)
+                                                : (AppColors.isDark(context) ? Colors.white60 : const Color(0xFF64748B)),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                                InkWell(
+                                  onTap: () async {
+                                    if (!LanguageService().isHindi) {
+                                      await LanguageService().setLanguage(AppLanguage.hi);
+                                      if (mounted) setState(() {});
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: LanguageService().isHindi
+                                          ? const Color(0xFFD97706)
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: LanguageService().isHindi
+                                          ? [
+                                              BoxShadow(
+                                                color: const Color(0xFFD97706).withOpacity(0.35),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'हिन्दी',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w900,
+                                            color: LanguageService().isHindi
+                                                ? Colors.white
+                                                : (AppColors.isDark(context) ? Colors.white60 : const Color(0xFF64748B)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -345,7 +426,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
-                                    'Classic',
+                                    isHindi ? 'क्लासिक' : 'Classic',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
@@ -382,7 +463,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
-                                    'Modern',
+                                    isHindi ? 'मॉडर्न' : 'Modern',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
@@ -437,7 +518,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                       Icon(Icons.show_chart_rounded, size: 14, color: Colors.white),
                                       SizedBox(width: 5),
                                       Text(
-                                        'LIVE STATUS',
+                                        isHindi ? 'लाइव स्थिति' : 'LIVE STATUS',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 10,
@@ -449,8 +530,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                const Text(
-                                  'Library Today',
+                                Text(
+                                  isHindi ? 'लाइब्रेरी आज' : 'Library Today',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 24,
@@ -460,8 +541,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   _service.canViewRevenue
-                                      ? '$activeStudents active • ₹$todayEarnings earned today'
-                                      : '$activeStudents active • $occupiedSeats seats occupied',
+                                      ? (isHindi ? '$activeStudents सक्रिय • ₹$todayEarnings आज कमाई' : '$activeStudents active • ₹$todayEarnings earned today')
+                                      : (isHindi ? '$activeStudents सक्रिय • $occupiedSeats सीटें भरी' : '$activeStudents active • $occupiedSeats seats occupied'),
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.85),
                                     fontSize: 13,
@@ -492,7 +573,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
 
                   // Section Header: Library Overview (Image 1)
                   Text(
-                    'Library Overview',
+                    isHindi ? 'लाइब्रेरी सारांश' : 'Library Overview',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -510,7 +591,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                           iconBg: AppColors.activeGreenBg,
                           iconColor: AppColors.activeGreenIcon,
                           value: '$activeStudents',
-                          label: 'ACTIVE',
+                          label: isHindi ? 'सक्रिय' : 'ACTIVE',
                           onTap: () => _openStudentsWithFilter('ACTIVE'),
                         ),
                       ),
@@ -522,7 +603,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 iconBg: AppColors.todayPurpleBg,
                                 iconColor: AppColors.todayPurpleIcon,
                                 value: '₹$todayEarnings',
-                                label: 'TODAY',
+                                label: isHindi ? 'आज' : 'TODAY',
                                 onTap: () => _openRevenueScreen('TODAY'),
                               )
                             : _overviewCard(
@@ -530,7 +611,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 iconBg: AppColors.todayPurpleBg,
                                 iconColor: AppColors.todayPurpleIcon,
                                 value: '$occupiedSeats',
-                                label: 'OCCUPIED',
+                                label: isHindi ? 'भरी सीटें' : 'OCCUPIED',
                                 onTap: () => setState(() => _currentTabIndex = 2),
                               ),
                       ),
@@ -546,7 +627,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 iconBg: AppColors.monthlyAmberBg,
                                 iconColor: AppColors.monthlyAmberIcon,
                                 value: '₹$monthEarnings',
-                                label: 'MONTHLY',
+                                label: isHindi ? 'मासिक' : 'MONTHLY',
                                 onTap: () => _openRevenueScreen('MONTHLY'),
                               )
                             : _overviewCard(
@@ -554,7 +635,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 iconBg: AppColors.monthlyAmberBg,
                                 iconColor: AppColors.monthlyAmberIcon,
                                 value: '${_service.totalSeatsCount - occupiedSeats}',
-                                label: 'AVAILABLE',
+                                label: isHindi ? 'खाली सीटें' : 'AVAILABLE',
                                 onTap: () => setState(() => _currentTabIndex = 2),
                               ),
                       ),
@@ -566,7 +647,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 iconBg: AppColors.totalBlueBg,
                                 iconColor: AppColors.totalBlueIcon,
                                 value: '${_service.totalSeatsCount}',
-                                label: 'TOTAL',
+                                label: isHindi ? 'कुल सीटें' : 'TOTAL',
                                 onTap: () => _openStudentsWithFilter('RECENT'),
                               )
                             : _overviewCard(
@@ -574,7 +655,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 iconBg: const Color(0xFFFEE2E2),
                                 iconColor: const Color(0xFFEF4444),
                                 value: '$dueStudentsCount',
-                                label: 'FEES DUE',
+                                label: isHindi ? 'बकाया फीस' : 'FEES DUE',
                                 onTap: () => _openStudentsWithFilter('DUES'),
                               ),
                       ),
@@ -584,7 +665,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
 
                   // Section Header: Quick Actions (Image 1)
                   Text(
-                    'Quick Actions',
+                    isHindi ? 'त्वरित कार्य' : 'Quick Actions',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -604,8 +685,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
                           ),
                           icon: Icons.person_add_alt_1_rounded,
-                          title: 'Add Student',
-                          subtitle: 'New admission',
+                          title: isHindi ? 'नया छात्र' : 'Add Student',
+                          subtitle: isHindi ? 'नया प्रवेश' : 'New admission',
                           onTap: () {
                             Navigator.push(
                               context,
@@ -619,8 +700,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             colors: [Color(0xFF10B981), Color(0xFF059669)],
                           ),
                           icon: Icons.chat_bubble_outline_rounded,
-                          title: 'Send Reminders',
-                          subtitle: '$dueStudentsCount students due',
+                          title: isHindi ? 'रिमाइंडर' : 'Send Reminders',
+                          subtitle: isHindi ? '$dueStudentsCount का बकाया' : '$dueStudentsCount students due',
                           onTap: () => _openStudentsWithFilter('DUES'),
                         ),
                         const SizedBox(width: 12),
@@ -629,8 +710,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
                           ),
                           icon: Icons.receipt_long_rounded,
-                          title: 'Log Expense',
-                          subtitle: 'Track costs',
+                          title: isHindi ? 'खर्च दर्ज करें' : 'Log Expense',
+                          subtitle: isHindi ? 'खर्च ट्रैक करें' : 'Track costs',
                           onTap: () => showAddExpenseModal(context),
                         ),
                         const SizedBox(width: 12),
@@ -640,8 +721,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
                             ),
                             icon: Icons.bar_chart_rounded,
-                            title: 'View Reports',
-                            subtitle: 'Deep insights',
+                            title: isHindi ? 'रिपोर्ट्स' : 'View Reports',
+                            subtitle: isHindi ? 'विस्तृत विश्लेषण' : 'Deep insights',
                             onTap: _openFinancialAnalytics,
                           )
                         else
@@ -650,8 +731,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
                             ),
                             icon: Icons.chair_alt_rounded,
-                            title: 'Seat Layout',
-                            subtitle: 'Live seat map',
+                            title: isHindi ? 'सीट व्यवस्था' : 'Seat Layout',
+                            subtitle: isHindi ? 'लाइव मैप' : 'Live seat map',
                             onTap: () => setState(() => _currentTabIndex = 2),
                           ),
                         const SizedBox(width: 12),
@@ -660,8 +741,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
                           ),
                           icon: Icons.qr_code_scanner_rounded,
-                          title: 'Student Portal',
-                          subtitle: 'Live QR & Standee',
+                          title: isHindi ? 'छात्र पोर्टल' : 'Student Portal',
+                          subtitle: isHindi ? 'QR और स्टैंडी' : 'Live QR & Standee',
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const ShareQrScreen()),
@@ -674,7 +755,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
 
                   // Section Header: Recommended for You (Batch 6 Image 2)
                   Text(
-                    'Recommended for You',
+                    isHindi ? 'आपके लिए विशेष' : 'Recommended for You',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -695,8 +776,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                           ),
                           icon: Icons.card_giftcard_rounded,
-                          title: 'Refer & Earn ₹149',
-                          subtitle: 'Get bonus on every referral',
+                          title: isHindi ? 'रेफर और ₹149 कमाएं' : 'Refer & Earn ₹149',
+                          subtitle: isHindi ? 'हर रेफरल पर बोनस' : 'Get bonus on every referral',
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -711,8 +792,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             colors: [Color(0xFF10B981), Color(0xFF059669)],
                           ),
                           icon: Icons.chat_bubble_rounded,
-                          title: 'Join Community',
-                          subtitle: 'Connect with 500+ library owners',
+                          title: isHindi ? 'कम्युनिटी से जुड़ें' : 'Join Community',
+                          subtitle: isHindi ? '500+ लाइब्रेरी संचालक' : 'Connect with 500+ library owners',
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -769,7 +850,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Pending Dues',
+                                isHindi ? 'बकाया फीस' : 'Pending Dues',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
@@ -779,8 +860,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               const SizedBox(height: 3),
                               Text(
                                 dueStudentsCount > 0
-                                    ? '₹$pendingDuesTotal from $dueStudentsCount student${dueStudentsCount == 1 ? '' : 's'}'
-                                    : 'All dues cleared • ₹0 pending',
+                                    ? (isHindi ? '$dueStudentsCount छात्रों से ₹$pendingDuesTotal बाकी' : '₹$pendingDuesTotal from $dueStudentsCount student${dueStudentsCount == 1 ? '' : 's'}')
+                                    : (isHindi ? 'सभी बकाया चुकता • ₹0 शेष' : 'All dues cleared • ₹0 pending'),
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -807,7 +888,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                dueStudentsCount > 0 ? 'Collect' : 'View All',
+                                dueStudentsCount > 0 ? (isHindi ? 'जमा करें' : 'Collect') : (isHindi ? 'सभी देखें' : 'View All'),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 13,
@@ -825,7 +906,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
 
                   // Section Header: Manage (Batch 6 Image 2 & 3)
                   Text(
-                    'Manage',
+                    isHindi ? 'प्रबंधन' : 'Manage',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -841,28 +922,28 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         icon: Icons.people_alt_rounded,
                         iconBg: const Color(0xFFEFF6FF),
                         iconColor: const Color(0xFF3B82F6),
-                        label: 'Students',
+                        label: isHindi ? 'छात्र' : 'Students',
                         onTap: () => _openStudentsWithFilter('ALL'),
                       ),
                       _gridMenuItem(
                         icon: Icons.grid_view_rounded,
                         iconBg: const Color(0xFFECFEFF),
                         iconColor: const Color(0xFF06B6D4),
-                        label: 'Seats',
+                        label: isHindi ? 'सीटें' : 'Seats',
                         onTap: () => setState(() => _currentTabIndex = 2), // Routes to Image 2 (Seats tab)
                       ),
                       _gridMenuItem(
                         icon: Icons.credit_card_rounded,
                         iconBg: const Color(0xFFF3E8FF),
                         iconColor: const Color(0xFFA855F7),
-                        label: 'Payments',
+                        label: isHindi ? 'भुगतान' : 'Payments',
                         onTap: () => setState(() => _currentTabIndex = 3), // Routes to Image 3 (Revenue tab)
                       ),
                       _gridMenuItem(
                         icon: Icons.access_time_filled_rounded,
                         iconBg: const Color(0xFFFFF7ED),
                         iconColor: const Color(0xFFF97316),
-                        label: 'Shifts',
+                        label: isHindi ? 'शिफ्ट' : 'Shifts',
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const ShiftSystemScreen()),
@@ -872,14 +953,14 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         icon: Icons.bar_chart_rounded,
                         iconBg: const Color(0xFFFDF2F8),
                         iconColor: const Color(0xFFEC4899),
-                        label: 'Analytics',
+                        label: isHindi ? 'एनालिटिक्स' : 'Analytics',
                         onTap: _openFinancialAnalytics, // Routes to Image 6 (Financial Analytics tab)
                       ),
                       _gridMenuItem(
                         icon: Icons.assignment_ind_rounded,
                         iconBg: const Color(0xFFCCFBF1),
                         iconColor: const Color(0xFF0D9488),
-                        label: 'Student ID',
+                        label: isHindi ? 'छात्र आईडी' : 'Student ID',
                         onTap: () => setState(() => _currentTabIndex = 1), // Routes to Image 7 (Students tab with Member ID)
                       ),
                     ],
@@ -931,8 +1012,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'PRO TIP • TODAY',
+                                Text(
+                                  isHindi ? 'खास सुझाव • आज' : 'PRO TIP • TODAY',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
@@ -942,7 +1023,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  'Use QR codes to let students check-in automatically.',
+                                  isHindi ? 'छात्रों के स्वचालित चेक-इन के लिए QR कोड का उपयोग करें।' : 'Use QR codes to let students check-in automatically.',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
@@ -965,7 +1046,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
 
                   // Section Header: Tools & More (Batch 6 Image 3)
                   Text(
-                    'Tools & More',
+                    isHindi ? 'टूल्स और अन्य' : 'Tools & More',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -993,7 +1074,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         icon: Icons.insert_chart_rounded,
                         iconBg: const Color(0xFFCCFBF1),
                         iconColor: const Color(0xFF0D9488),
-                        label: 'Reports',
+                        label: isHindi ? 'रिपोर्ट्स' : 'Reports',
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1017,7 +1098,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         icon: Icons.auto_fix_high_rounded,
                         iconBg: const Color(0xFFFFE4E6),
                         iconColor: const Color(0xFFF43F5E),
-                        label: 'Branding',
+                        label: isHindi ? 'ब्रांडिंग' : 'Branding',
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1029,7 +1110,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         icon: Icons.card_giftcard_rounded,
                         iconBg: const Color(0xFFEEF2FF),
                         iconColor: const Color(0xFF6366F1),
-                        label: 'Refer & Earn',
+                        label: isHindi ? 'रेफर और कमाएं' : 'Refer & Earn',
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1041,7 +1122,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         icon: Icons.forum_rounded,
                         iconBg: const Color(0xFFE0F2FE),
                         iconColor: const Color(0xFF0284C7),
-                        label: 'Community',
+                        label: isHindi ? 'कम्युनिटी' : 'Community',
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1209,7 +1290,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Need Help?',
+                                    isHindi ? 'मदद चाहिए?' : 'Need Help?',
                                     style: TextStyle(
                                       fontSize: 17,
                                       fontWeight: FontWeight.w800,
@@ -1218,7 +1299,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Our support team is just a message away',
+                                    isHindi ? 'हमारी सहायता टीम हमेशा उपलब्ध है' : 'Our support team is just a message away',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
@@ -1246,8 +1327,8 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                   ),
                                 ),
                                 icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                                label: const Text(
-                                  'Chat on WhatsApp',
+                                label: Text(
+                                  isHindi ? 'व्हाट्सएप चैट' : 'Chat on WhatsApp',
                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                                 ),
                                 onPressed: () => _showSupportDialog('WhatsApp'),
@@ -1323,7 +1404,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Invite a Friend!',
+                                  isHindi ? 'मित्र को आमंत्रित करें!' : 'Invite a Friend!',
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
@@ -1332,7 +1413,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Help other library owners simplify their work.',
+                                  isHindi ? 'अन्य लाइब्रेरी संचालकों के साथ साझा करें।' : 'Help other library owners simplify their work.',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
@@ -1407,7 +1488,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              'Enjoying the App?',
+                              isHindi ? 'क्या ऐप पसंद आ रहा है?' : 'Enjoying the App?',
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
@@ -1416,7 +1497,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Your 5-star rating helps us grow!',
+                              isHindi ? 'आपकी 5-स्टार रेटिंग हमें बेहतर बनाती है!' : 'Your 5-star rating helps us grow!',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -1439,7 +1520,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'Rate on Play Store',
+                                    isHindi ? 'प्ले स्टोर पर रेटिंग दें' : 'Rate on Play Store',
                                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                                   ),
                                   SizedBox(width: 6),

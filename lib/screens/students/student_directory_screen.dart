@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../constants/app_colors.dart';
 import '../../models/library_models.dart';
 import '../../services/library_service.dart';
+import '../../services/language_service.dart';
 import '../../services/excel_import_service.dart';
 import '../../services/file_export_service.dart';
 import '../../widgets/collect_payment_modal.dart';
@@ -27,6 +28,22 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _selectedShiftFilter = 'ALL SHIFTS';
   String _selectedStatusFilter = 'RECENT'; // Default RECENT (Image 2)
+
+  String _getStatusFilterLabel(String label) {
+    if (!LanguageService().isHindi) return label;
+    switch (label) {
+      case 'RECENT': return 'हाल के';
+      case 'QR REQUESTS': return 'QR अनुरोध';
+      case 'PAID': return 'जमा';
+      case 'DUES': return 'बकाया';
+      case 'REMAINING': return 'शेष राशि';
+      case 'TRIAL': return 'ट्रायल';
+      case 'ACTIVE': return 'सक्रिय';
+      case 'INACTIVE': return 'निष्क्रिय';
+      case 'UNALLOCATED': return 'बिना सीट';
+      default: return label;
+    }
+  }
 
   final List<Map<String, dynamic>> _statusFilters = [
     {'label': 'RECENT', 'icon': Icons.access_time_rounded},
@@ -1032,7 +1049,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'MANAGEMENT',
+                                    LanguageService().isHindi ? 'प्रबंधन' : 'MANAGEMENT',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
@@ -1042,7 +1059,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Directory',
+                                    LanguageService().isHindi ? 'छात्र निर्देशिका' : 'Directory',
                                     style: TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.w900,
@@ -1120,8 +1137,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                         color: AppColors.primaryTeal,
                                       ),
                                     ),
-                                    const Text(
-                                      'PROFILES',
+                                    Text(
+                                      LanguageService().isHindi ? 'प्रोफाइल' : 'PROFILES',
                                       style: TextStyle(
                                         fontSize: 9,
                                         fontWeight: FontWeight.w800,
@@ -1153,7 +1170,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                           style: TextStyle(color: AppColors.text(context), fontSize: 13),
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            hintText: 'Search by name or number...',
+                            hintText: LanguageService().isHindi ? 'नाम या मोबाइल नंबर से खोजें...' : 'Search by name or number...',
                             hintStyle: TextStyle(color: AppColors.textSubtleColor(context), fontSize: 13),
                             prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMutedColor(context), size: 20),
                             border: InputBorder.none,
@@ -1202,7 +1219,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
-                                              'All Shifts',
+                                              LanguageService().isHindi ? 'सभी शिफ्ट' : 'All Shifts',
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 fontSize: 12,
@@ -1281,7 +1298,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
-                                              label,
+                                              _getStatusFilterLabel(label),
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 fontSize: 12,
@@ -1432,8 +1449,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   const SizedBox(height: 40),
-                                  const Text(
-                                    'No students found',
+                                  Text(
+                                    LanguageService().isHindi ? 'कोई छात्र नहीं मिला' : 'No students found',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w800,
@@ -1441,8 +1458,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  const Text(
-                                    'Try adjusting search or filters.',
+                                  Text(
+                                    LanguageService().isHindi ? 'कृपया सर्च या फ़िल्टर बदलकर देखें।' : 'Try adjusting search or filters.',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textMuted,
@@ -1458,7 +1475,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                               itemBuilder: (ctx, i) {
                                 final st = filteredStudents[i];
                                 final memberId = i + 1;
-                                final seatLabel = st.seatNumber != null ? '${st.sectionName} • #${st.seatNumber}' : 'Unallocated';
+                                final seatLabel = st.seatNumber != null ? '${st.sectionName} • #${st.seatNumber}' : (LanguageService().isHindi ? 'बिना सीट' : 'Unallocated');
                                 final joinDateStr = st.joinedAt != null
                                     ? DateFormat('dd-MMM-yyyy').format(st.joinedAt!)
                                     : DateFormat('dd-MMM-yyyy').format(DateTime.now());
@@ -1704,7 +1721,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                       const Icon(Icons.phone_outlined, size: 12, color: Color(0xFF64748B)),
                                                       const SizedBox(width: 4),
                                                       Text(
-                                                        'PHONE',
+                                                         LanguageService().isHindi ? 'फ़ोन' : 'PHONE',
                                                         style: TextStyle(
                                                           fontSize: 9,
                                                           fontWeight: FontWeight.w800,
@@ -1743,7 +1760,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                       Icon(Icons.info_outline_rounded, size: 12, color: AppColors.textSubtleColor(context)),
                                                       const SizedBox(width: 4),
                                                       Text(
-                                                        'STATUS',
+                                                         LanguageService().isHindi ? 'स्थिति' : 'STATUS',
                                                         style: TextStyle(
                                                           fontSize: 9,
                                                           fontWeight: FontWeight.w800,
@@ -1754,11 +1771,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    st.status == 'INACTIVE'
-                                                        ? 'Inactive'
-                                                        : (st.status == 'TRIAL'
-                                                            ? 'Trial'
-                                                            : (st.hasDues ? 'Due: ₹${st.effectiveDues}' : 'Active')),
+                                                    (st.status == 'INACTIVE' ? (LanguageService().isHindi ? 'निष्क्रिय' : 'Inactive') : (st.status == 'TRIAL' ? (LanguageService().isHindi ? 'ट्रायल' : 'Trial') : (st.hasDues ? (LanguageService().isHindi ? 'बकाया: ₹${st.effectiveDues}' : 'Due: ₹${st.effectiveDues}') : (LanguageService().isHindi ? 'सक्रिय' : 'Active')))),
                                                     style: TextStyle(
                                                       fontSize: 13,
                                                       fontWeight: FontWeight.w800,
@@ -1796,7 +1809,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                       Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.textSubtleColor(context)),
                                                       const SizedBox(width: 4),
                                                       Text(
-                                                        'JOINED',
+                                                         LanguageService().isHindi ? 'शामिल' : 'JOINED',
                                                         style: TextStyle(
                                                           fontSize: 9,
                                                           fontWeight: FontWeight.w800,
@@ -1835,7 +1848,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                       Icon(Icons.location_on_outlined, size: 12, color: AppColors.textSubtleColor(context)),
                                                       const SizedBox(width: 4),
                                                       Text(
-                                                        'SEAT',
+                                                         LanguageService().isHindi ? 'सीट' : 'SEAT',
                                                         style: TextStyle(
                                                           fontSize: 9,
                                                           fontWeight: FontWeight.w800,
@@ -1920,8 +1933,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                  borderRadius: BorderRadius.circular(8),
                                                  border: Border.all(color: const Color(0xFFFECACA)),
                                                ),
-                                               child: const Text(
-                                                 'INACTIVE MEMBER',
+                                               child: Text(
+                                                  LanguageService().isHindi ? 'निष्क्रिय सदस्य' : 'INACTIVE MEMBER',
                                                  style: TextStyle(
                                                    fontSize: 10,
                                                    fontWeight: FontWeight.w800,
@@ -1973,8 +1986,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                  borderRadius: BorderRadius.circular(8),
                                                  border: Border.all(color: const Color(0xFFA7F3D0)),
                                                ),
-                                               child: const Text(
-                                                 'PAID • ACTIVE',
+                                               child: Text(
+                                                  LanguageService().isHindi ? 'जमा • सक्रिय' : 'PAID • ACTIVE',
                                                  style: TextStyle(
                                                    fontSize: 10,
                                                    fontWeight: FontWeight.w800,
@@ -2001,8 +2014,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                    ),
                                                  ),
                                                  icon: const Icon(Icons.restore_rounded, size: 18),
-                                                 label: const Text(
-                                                   'Restore Member',
+                                                 label: Text(
+                                                    LanguageService().isHindi ? 'सदस्य बहाल करें' : 'Restore Member',
                                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                                                  ),
                                                  onPressed: () => _restoreStudent(st),
@@ -2043,8 +2056,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                                                     ),
                                                   ),
                                                   icon: const Icon(Icons.visibility_outlined, size: 18, color: Colors.white),
-                                                  label: const Text(
-                                                    "View Profile",
+                                                  label: Text(
+                                                     LanguageService().isHindi ? "प्रोफाइल देखें" : "View Profile",
                                                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
                                                   ),
                                                   onPressed: () {
