@@ -20,7 +20,8 @@ Future<void> showCollectPaymentModal(
   final now = DateTime.now();
 
   // Dues & Expiry state
-  final bool hasUnexpiredDue = student.duesAmount > 0 &&
+  final bool hasPastDue = student.duesAmount > 0;
+  final bool hasUnexpiredDue = hasPastDue &&
       student.feeDueDate != null &&
       student.feeDueDate!.isAfter(now);
   final bool isExpired = student.feeDueDate == null || student.feeDueDate!.isBefore(now);
@@ -28,9 +29,13 @@ Future<void> showCollectPaymentModal(
   int alreadyPaid = 0;
   DateTime fromDate;
   DateTime untilDate;
-  int selectedAdvanceMonths = 1;
+  int selectedAdvanceMonths = hasPastDue ? -1 : 1;
 
-  if (hasUnexpiredDue) {
+  if (selectedAdvanceMonths == -1) {
+    alreadyPaid = 0;
+    fromDate = student.joinedAt ?? (student.feeDueDate != null ? student.feeDueDate!.subtract(const Duration(days: 30)) : now);
+    untilDate = student.feeDueDate ?? now;
+  } else if (hasUnexpiredDue) {
     alreadyPaid = (defaultMonthly - student.duesAmount).clamp(0, defaultMonthly);
     fromDate = student.joinedAt ?? student.feeDueDate!.subtract(const Duration(days: 30));
     untilDate = student.feeDueDate!;
@@ -44,20 +49,32 @@ Future<void> showCollectPaymentModal(
     untilDate = DateTime(fromDate.year, fromDate.month + 1, fromDate.day);
   }
 
-  final initialTotalFee = hasUnexpiredDue ? defaultMonthly : defaultMonthly * selectedAdvanceMonths;
-  final initialGrossDue = hasUnexpiredDue
+  final initialTotalFee = selectedAdvanceMonths == -1
       ? student.duesAmount
-      : (initialTotalFee - alreadyPaid).clamp(0, initialTotalFee);
+      : (hasUnexpiredDue
+          ? defaultMonthly
+          : (isExpired && hasPastDue
+              ? student.duesAmount + defaultMonthly
+              : defaultMonthly * selectedAdvanceMonths));
+  final initialGrossDue = selectedAdvanceMonths == -1
+      ? student.duesAmount
+      : (hasUnexpiredDue
+          ? student.duesAmount
+          : (initialTotalFee - alreadyPaid).clamp(0, initialTotalFee));
   final initialAdvanceApplied = student.advanceAmount.clamp(0, initialGrossDue);
   final initialNetPayable = (initialGrossDue - initialAdvanceApplied).clamp(0, initialGrossDue);
 
   final dueAmountCtrl = TextEditingController(text: '$initialNetPayable');
   final notesCtrl = TextEditingController(
-    text: hasUnexpiredDue
-        ? 'Due payment for period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
-        : (isExpired
-            ? '1 Month Membership Fee Renewal (Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)})'
-            : '1 Month Advance Renewal Fee (Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)})'),
+    text: selectedAdvanceMonths == -1
+        ? 'Past due settlement payment: ₹${student.duesAmount}'
+        : (hasUnexpiredDue
+            ? 'Due payment for period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
+            : (isExpired
+                ? (hasPastDue
+                    ? '1 Month Membership Renewal + Past Due Settled'
+                    : '1 Month Membership Fee Renewal (Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)})')
+                : '1 Month Advance Renewal Fee (Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)})')),
   );
   DateTime paymentDate = DateTime.now();
   String selectedMethod = 'UPI';
@@ -77,7 +94,16 @@ Future<void> showCollectPaymentModal(
         void applyDuration(int months) {
           setModalState(() {
             selectedAdvanceMonths = months;
-            if (months > 0) {
+            if (months == -1) {
+              // Clear Past Due Only: do not advance validity into the future
+              final gross = student.duesAmount;
+              fromDate = student.joinedAt ?? (student.feeDueDate != null ? student.feeDueDate!.subtract(const Duration(days: 30)) : now);
+              untilDate = student.feeDueDate ?? now;
+              final advToApply = student.advanceAmount.clamp(0, gross);
+              final netPay = (gross - advToApply).clamp(0, gross);
+              dueAmountCtrl.text = '$netPay';
+              notesCtrl.text = 'Past due settlement payment: ₹$gross';
+            } else if (months > 0) {
               int gross = 0;
               if (hasUnexpiredDue) {
                 if (months == 1) {
@@ -89,9 +115,16 @@ Future<void> showCollectPaymentModal(
                   final base = student.feeDueDate!;
                   untilDate = DateTime(base.year, base.month + (months - 1), base.day);
                 }
+              } else if (isExpired && hasPastDue) {
+                // Expired student paying both past due and new month(s)
+                final total = student.duesAmount + (defaultMonthly * months);
+                gross = total;
+                fromDate = now;
+                untilDate = DateTime(fromDate.year, fromDate.month + months, fromDate.day);
               } else {
                 final total = defaultMonthly * months;
                 gross = total;
+                fromDate = isExpired ? now : student.feeDueDate!;
                 untilDate = DateTime(fromDate.year, fromDate.month + months, fromDate.day);
               }
 
@@ -104,6 +137,8 @@ Future<void> showCollectPaymentModal(
                 notesCtrl.text = months == 1
                     ? 'Due payment for period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
                     : '$months Months Fee (${student.duesAmount} Due + ${months - 1} mo Advance) • $periodTag';
+              } else if (isExpired && hasPastDue) {
+                notesCtrl.text = '$months Month Renewal + Past Due Settled (₹${student.duesAmount} Due + ₹${defaultMonthly * months} Fee) • $periodTag';
               } else {
                 notesCtrl.text = months > 1
                     ? '$months Months Advance Fees Paid ($periodTag)'
@@ -311,8 +346,19 @@ Future<void> showCollectPaymentModal(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
+                      if (hasPastDue) ...[
+                        _durationChip(
+                          label: 'Clear Due Only (₹${student.duesAmount})',
+                          isSelected: selectedAdvanceMonths == -1,
+                          isDark: isDark,
+                          onTap: () => applyDuration(-1),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       _durationChip(
-                        label: hasUnexpiredDue ? 'Clear Due (₹${student.duesAmount})' : '1 Month',
+                        label: hasPastDue && isExpired
+                            ? '1 Mo + Due (₹${student.duesAmount + defaultMonthly})'
+                            : (hasUnexpiredDue ? '1 Month (Renew)' : '1 Month'),
                         isSelected: selectedAdvanceMonths == 1,
                         isDark: isDark,
                         onTap: () => applyDuration(1),
@@ -371,12 +417,18 @@ Future<void> showCollectPaymentModal(
                 // Total Period Fee & Fixed Already Paid & Advance Credit & Due Amount to Accept
                 Builder(
                   builder: (ctx) {
-                    final totalPeriodFee = hasUnexpiredDue
-                        ? (selectedAdvanceMonths == 1 ? defaultMonthly : defaultMonthly * selectedAdvanceMonths)
-                        : (selectedAdvanceMonths > 0 ? defaultMonthly * selectedAdvanceMonths : defaultMonthly);
-                    final grossDue = hasUnexpiredDue
-                        ? (selectedAdvanceMonths == 1 ? student.duesAmount : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee))
-                        : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee);
+                    final totalPeriodFee = selectedAdvanceMonths == -1
+                        ? student.duesAmount
+                        : (hasUnexpiredDue
+                            ? (selectedAdvanceMonths == 1 ? defaultMonthly : defaultMonthly * selectedAdvanceMonths)
+                            : (isExpired && hasPastDue
+                                ? student.duesAmount + (defaultMonthly * selectedAdvanceMonths)
+                                : (selectedAdvanceMonths > 0 ? defaultMonthly * selectedAdvanceMonths : defaultMonthly)));
+                    final grossDue = selectedAdvanceMonths == -1
+                        ? student.duesAmount
+                        : (hasUnexpiredDue
+                            ? (selectedAdvanceMonths == 1 ? student.duesAmount : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee))
+                            : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee));
 
                     final advanceToApply = student.advanceAmount.clamp(0, grossDue);
                     final netPayable = (grossDue - advanceToApply).clamp(0, grossDue);
@@ -401,7 +453,7 @@ Future<void> showCollectPaymentModal(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Total Fee (${selectedAdvanceMonths > 0 ? "$selectedAdvanceMonths mo" : "Custom"}):',
+                                'Total Fee (${selectedAdvanceMonths == -1 ? "Clear Due" : (selectedAdvanceMonths > 0 ? "$selectedAdvanceMonths mo" : "Custom")}):',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -1047,12 +1099,18 @@ Future<void> showCollectPaymentModal(
                             }
                           }
 
-                          final totalPeriodFee = hasUnexpiredDue
-                              ? (selectedAdvanceMonths == 1 ? defaultMonthly : defaultMonthly * selectedAdvanceMonths)
-                              : (selectedAdvanceMonths > 0 ? defaultMonthly * selectedAdvanceMonths : defaultMonthly);
-                          final grossDue = hasUnexpiredDue
-                              ? (selectedAdvanceMonths == 1 ? student.duesAmount : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee))
-                              : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee);
+                          final totalPeriodFee = selectedAdvanceMonths == -1
+                              ? student.duesAmount
+                              : (hasUnexpiredDue
+                                  ? (selectedAdvanceMonths == 1 ? defaultMonthly : defaultMonthly * selectedAdvanceMonths)
+                                  : (isExpired && hasPastDue
+                                      ? student.duesAmount + (defaultMonthly * selectedAdvanceMonths)
+                                      : (selectedAdvanceMonths > 0 ? defaultMonthly * selectedAdvanceMonths : defaultMonthly)));
+                          final grossDue = selectedAdvanceMonths == -1
+                              ? student.duesAmount
+                              : (hasUnexpiredDue
+                                  ? (selectedAdvanceMonths == 1 ? student.duesAmount : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee))
+                                  : (totalPeriodFee - alreadyPaid).clamp(0, totalPeriodFee));
                           final advanceToApply = student.advanceAmount.clamp(0, grossDue);
                           final netPayable = (grossDue - advanceToApply).clamp(0, grossDue);
                           final rawPaid = int.tryParse(dueAmountCtrl.text.trim()) ?? netPayable;
@@ -1071,13 +1129,39 @@ Future<void> showCollectPaymentModal(
 
                           isSubmitting = true;
                           final remainingAdvance = student.advanceAmount - advanceToApply;
-                          final remainingDues = (grossDue - (paid + advanceToApply)).clamp(0, 999999);
+                          int remainingDues;
+                          DateTime targetDueDate;
+                          String targetStatus;
+
+                          if (selectedAdvanceMonths == -1) {
+                            // Paid ONLY past due: old debt cleared
+                            final pastDueCovered = paid + advanceToApply;
+                            if (isExpired) {
+                              // Student is in new month, so current month fee is due!
+                              remainingDues = pastDueCovered >= student.duesAmount
+                                  ? defaultMonthly
+                                  : (student.duesAmount - pastDueCovered) + defaultMonthly;
+                              targetDueDate = student.feeDueDate ?? now;
+                              targetStatus = 'DUES';
+                            } else {
+                              remainingDues = (student.duesAmount - pastDueCovered).clamp(0, 999999);
+                              targetDueDate = student.feeDueDate ?? now;
+                              targetStatus = remainingDues > 0 ? 'DUES' : 'ACTIVE';
+                            }
+                          } else {
+                            remainingDues = (grossDue - (paid + advanceToApply)).clamp(0, 999999);
+                            targetDueDate = untilDate;
+                            targetStatus = remainingDues > 0 ? 'DUES' : 'ACTIVE';
+                          }
+
                           Navigator.pop(ctx);
 
                           final periodStr = 'Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}';
                           String effectiveNotes = notesCtrl.text.trim();
                           if (effectiveNotes.isEmpty) {
-                            if (hasUnexpiredDue) {
+                            if (selectedAdvanceMonths == -1) {
+                              effectiveNotes = 'Past due settlement payment of ₹$paid';
+                            } else if (hasUnexpiredDue) {
                               effectiveNotes = 'Due payment of ₹$paid${advanceToApply > 0 ? " + ₹$advanceToApply advance credit" : ""} for $periodStr';
                             } else {
                               effectiveNotes = 'Payment of ₹$paid${advanceToApply > 0 ? " + ₹$advanceToApply advance credit" : ""} for $periodStr';
@@ -1099,7 +1183,7 @@ Future<void> showCollectPaymentModal(
                               paymentMode: paid > 0 ? selectedMethod : 'Advance Credit',
                               notes: effectiveNotes,
                               validFrom: fromDate,
-                              validUntil: untilDate,
+                              validUntil: targetDueDate,
                               durationMonths: m,
                             );
                           }
@@ -1112,8 +1196,8 @@ Future<void> showCollectPaymentModal(
                             seatNumber: student.seatNumber,
                             duesAmount: remainingDues,
                             advanceAmount: remainingAdvance,
-                            status: remainingDues > 0 ? 'DUES' : 'ACTIVE',
-                            feeDueDate: untilDate,
+                            status: targetStatus,
+                            feeDueDate: targetDueDate,
                           );
 
                           onPaymentRecorded?.call();
@@ -1121,9 +1205,13 @@ Future<void> showCollectPaymentModal(
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                remainingDues > 0
-                                    ? 'Payment of ₹$paid recorded (${advanceToApply > 0 ? "₹$advanceToApply advance adjusted, " : ""}₹$remainingDues remaining due). Valid until ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
-                                    : 'Payment of ₹$paid recorded${advanceToApply > 0 ? " (₹$advanceToApply advance adjusted)" : ""}! Active until ${DateFormat('dd-MMM-yyyy').format(untilDate)}',
+                                selectedAdvanceMonths == -1
+                                    ? (isExpired
+                                        ? 'Past due of ₹$paid settled! Current month fee of ₹$remainingDues remains pending.'
+                                        : 'Due payment of ₹$paid recorded (₹$remainingDues remaining due).')
+                                    : (remainingDues > 0
+                                        ? 'Payment of ₹$paid recorded (${advanceToApply > 0 ? "₹$advanceToApply advance adjusted, " : ""}₹$remainingDues remaining due). Valid until ${DateFormat('dd-MMM-yyyy').format(targetDueDate)}'
+                                        : 'Payment of ₹$paid recorded${advanceToApply > 0 ? " (₹$advanceToApply advance adjusted)" : ""}! Active until ${DateFormat('dd-MMM-yyyy').format(targetDueDate)}'),
                               ),
                               backgroundColor: remainingDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF0D9488),
                               behavior: SnackBarBehavior.floating,
