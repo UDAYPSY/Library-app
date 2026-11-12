@@ -1,0 +1,1172 @@
+
+lib/services/library_service.dart:1802:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:477:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:478:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:481:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:495:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:518:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1930:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1802:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1931:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1934:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1948:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1971:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:474:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:525:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:529:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:530:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:543:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:551:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:552:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:568:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:747:15: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+        await syncPublicOccupancyToCloud(force: true);
+              ^
+lib/services/library_service.dart:1799:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1850:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1854:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1855:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1868:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:1876:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:1877:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:1893:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:1927:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1978:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1982:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1983:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1996:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:2004:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:2005:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:2021:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:3520:11: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+          syncPublicOccupancyToCloud(students: list);
+          ^
+lib/services/library_service.dart:3595:19: Error: Can't use 'studentsFromPublicOccupancy' because it is declared more than once.
+            yield studentsFromPublicOccupancy(occMap);
+                  ^
+lib/services/library_service.dart:4765:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove('${tenantId.trim()}|$studentId');
+        ^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/backup_restore_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/backup_restore_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/zone.dart 1308:19                     _CustomZone.runUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:1802:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:477:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:478:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:481:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:495:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:518:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1930:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1802:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1931:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1934:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1948:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1971:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:474:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:525:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:529:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:530:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:543:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:551:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:552:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:568:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:747:15: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+        await syncPublicOccupancyToCloud(force: true);
+              ^
+lib/services/library_service.dart:1799:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1850:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1854:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1855:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1868:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:1876:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:1877:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:1893:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:1927:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1978:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1982:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1983:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1996:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:2004:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:2005:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:2021:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:3520:11: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+          syncPublicOccupancyToCloud(students: list);
+          ^
+lib/services/library_service.dart:3595:19: Error: Can't use 'studentsFromPublicOccupancy' because it is declared more than once.
+            yield studentsFromPublicOccupancy(occMap);
+                  ^
+lib/services/library_service.dart:4765:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove('${tenantId.trim()}|$studentId');
+        ^
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests Default language is English
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests Translations return English strings by default
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests Switching to Hindi updates language, notifies listeners and persists
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests toggleLanguage toggles between English and Hindi
+✅ /home/runner/work/Library-app/Library-app/test/language_service_test.dart: LanguageService & Localization Tests Fallback handling for unknown keys
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/excel_import_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/excel_import_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/excel_import_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:1802:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:477:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:478:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:481:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:495:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:518:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1930:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1802:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1931:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1934:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1948:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1971:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:474:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:525:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:529:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:530:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:543:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:551:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:552:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:568:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:747:15: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+        await syncPublicOccupancyToCloud(force: true);
+              ^
+lib/services/library_service.dart:1799:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1850:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1854:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1855:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1868:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:1876:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:1877:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:1893:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:1927:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1978:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1982:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1983:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1996:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:2004:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:2005:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:2021:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:3520:11: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+          syncPublicOccupancyToCloud(students: list);
+          ^
+lib/services/library_service.dart:3595:19: Error: Can't use 'studentsFromPublicOccupancy' because it is declared more than once.
+            yield studentsFromPublicOccupancy(occMap);
+                  ^
+lib/services/library_service.dart:4765:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove('${tenantId.trim()}|$studentId');
+        ^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/financial_ledger_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:1802:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:477:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:478:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:481:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:495:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:518:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1930:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1802:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1931:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1934:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1948:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1971:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:474:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:525:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:529:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:530:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:543:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:551:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:552:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:568:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:747:15: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+        await syncPublicOccupancyToCloud(force: true);
+              ^
+lib/services/library_service.dart:1799:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1850:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1854:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1855:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1868:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:1876:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:1877:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:1893:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:1927:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1978:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1982:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1983:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1996:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:2004:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:2005:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:2021:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:3520:11: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+          syncPublicOccupancyToCloud(students: list);
+          ^
+lib/services/library_service.dart:3595:19: Error: Can't use 'studentsFromPublicOccupancy' because it is declared more than once.
+            yield studentsFromPublicOccupancy(occMap);
+                  ^
+lib/services/library_service.dart:4765:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove('${tenantId.trim()}|$studentId');
+        ^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/auth_and_rbac_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:1802:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:477:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:478:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:481:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:495:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:518:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1930:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1802:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1931:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1934:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1948:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1971:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:474:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:525:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:529:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:530:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:543:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:551:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:552:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:568:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:747:15: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+        await syncPublicOccupancyToCloud(force: true);
+              ^
+lib/services/library_service.dart:1799:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1850:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1854:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1855:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1868:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:1876:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:1877:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:1893:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:1927:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1978:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1982:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1983:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1996:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:2004:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:2005:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:2021:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:3520:11: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+          syncPublicOccupancyToCloud(students: list);
+          ^
+lib/services/library_service.dart:3595:19: Error: Can't use 'studentsFromPublicOccupancy' because it is declared more than once.
+            yield studentsFromPublicOccupancy(occMap);
+                  ^
+lib/services/library_service.dart:4765:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove('${tenantId.trim()}|$studentId');
+        ^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/app_screens_compilation_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:1802:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:477:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:478:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:481:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:495:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:518:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1930:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1802:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1931:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1934:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1948:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1971:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:474:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:525:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:529:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:530:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:543:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:551:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:552:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:568:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:747:15: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+        await syncPublicOccupancyToCloud(force: true);
+              ^
+lib/services/library_service.dart:1799:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1850:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1854:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1855:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1868:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:1876:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:1877:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:1893:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:1927:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1978:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1982:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1983:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1996:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:2004:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:2005:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:2021:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:3520:11: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+          syncPublicOccupancyToCloud(students: list);
+          ^
+lib/services/library_service.dart:3595:19: Error: Can't use 'studentsFromPublicOccupancy' because it is declared more than once.
+            yield studentsFromPublicOccupancy(occMap);
+                  ^
+lib/services/library_service.dart:4765:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove('${tenantId.trim()}|$studentId');
+        ^
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/multi_branch_and_staff_test.dart
+
+::endgroup::
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/backup_restore_test.dart (failed after test completion)
+Error: the Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 10:3  throwToolExit
+package:flutter_tools/src/compile.dart 897:9     DefaultResidentCompiler._compile.<fn>
+dart:async/zone.dart 1407:47                     _rootRunUnary
+dart:async/future_impl.dart 861:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 890:13               Future._propagateToListeners
+dart:async/future_impl.dart 786:9                Future._propagateToListeners
+dart:async/future_impl.dart 666:5                Future._completeWithValue
+dart:async/future_impl.dart 736:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone.dart 1399:13                     _rootRun
+dart:async/zone.dart 1301:19                     _CustomZone.run
+dart:async/zone.dart 1209:7                      _CustomZone.runGuarded
+dart:async/zone.dart 1249:23                     _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:21         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 118:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 185:5      _RawReceivePort._handleMessage
+::endgroup::
+lib/services/library_service.dart:1802:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:477:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:478:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:481:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:495:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:518:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1930:17: Error: '_lastPublicOccupancySig' is already declared in this scope.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1802:17: Context: Previous declaration of '_lastPublicOccupancySig'.
+  static String _lastPublicOccupancySig = '';
+                ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1931:36: Error: '_lastPublicPassSigs' is already declared in this scope.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1803:36: Context: Previous declaration of '_lastPublicPassSigs'.
+  static final Map<String, String> _lastPublicPassSigs = {};
+                                   ^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1934:36: Error: 'buildPublicOccupancyMap' is already declared in this scope.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1806:36: Context: Previous declaration of 'buildPublicOccupancyMap'.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1948:28: Error: 'studentsFromPublicOccupancy' is already declared in this scope.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1820:28: Context: Previous declaration of 'studentsFromPublicOccupancy'.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1971:16: Error: 'syncPublicOccupancyToCloud' is already declared in this scope.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:1843:16: Context: Previous declaration of 'syncPublicOccupancyToCloud'.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: ThemeService Tests Default ThemeMode is Light and themeModeName is Light
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: ThemeService Tests setThemeMode updates themeMode and notifies listeners
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: AppTheme Specifications lightTheme has correct brightness and Material 3 flags
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: AppTheme Specifications darkTheme has correct brightness and Slate dark tokens
+test/seat_and_student_test.dart:1640:37: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+      final occMap = LibraryService.buildPublicOccupancyMap(students);
+                                    ^^^^^^^^^^^^^^^^^^^^^^^
+test/seat_and_student_test.dart:1645:44: Error: Can't use 'studentsFromPublicOccupancy' because it is declared more than once.
+      final reconstructed = LibraryService.studentsFromPublicOccupancy(occMap);
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/services/library_service.dart:474:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:525:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:529:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:530:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:543:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:551:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:552:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:568:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:747:15: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+        await syncPublicOccupancyToCloud(force: true);
+              ^
+lib/services/library_service.dart:1799:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1850:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1854:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1855:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1868:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:1876:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:1877:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:1893:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:1927:5: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+    syncPublicOccupancyToCloud();
+    ^
+lib/services/library_service.dart:1978:20: Error: Can't use 'buildPublicOccupancyMap' because it is declared more than once.
+    final occMap = buildPublicOccupancyMap(targetStudents);
+                   ^
+lib/services/library_service.dart:1982:25: Error: Can't use '_lastPublicOccupancySig' because it is declared more than once.
+    if (force || sig != _lastPublicOccupancySig) {
+                        ^
+lib/services/library_service.dart:1983:31: Error: Can't assign to this.
+      _lastPublicOccupancySig = sig;
+                              ^
+lib/services/library_service.dart:1996:33: Error: Can't assign to this.
+        _lastPublicOccupancySig = '';
+                                ^
+lib/services/library_service.dart:2004:21: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+                    ^
+lib/services/library_service.dart:2005:7: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+      _lastPublicPassSigs[passKey] = passSig;
+      ^
+lib/services/library_service.dart:2021:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove(passKey);
+        ^
+lib/services/library_service.dart:3520:11: Error: Can't use 'syncPublicOccupancyToCloud' because it is declared more than once.
+          syncPublicOccupancyToCloud(students: list);
+          ^
+lib/services/library_service.dart:3595:19: Error: Can't use 'studentsFromPublicOccupancy' because it is declared more than once.
+            yield studentsFromPublicOccupancy(occMap);
+                  ^
+lib/services/library_service.dart:4765:9: Error: Can't use '_lastPublicPassSigs' because it is declared more than once.
+        _lastPublicPassSigs.remove('${tenantId.trim()}|$studentId');
+        ^
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers AppColors returns light tokens in light mode
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers AppColors returns dark tokens in dark mode
+✅ /home/runner/work/Library-app/Library-app/test/dark_mode_and_theme_test.dart: Dynamic AppColors Adaptive Helpers ThemeService.isDarkMode resolves correctly across modes
+::group::❌ loading /home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart (failed)
+Failed to load "/home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart": Compilation failed for testPath=/home/runner/work/Library-app/Library-app/test/seat_and_student_test.dart
+
+::endgroup::
+
+::error::12 tests passed, 7 failed.
