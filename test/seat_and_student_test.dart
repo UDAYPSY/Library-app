@@ -1565,6 +1565,25 @@ void main() {
       expect(registeredStudent!.seatNumber, equals(15));
       expect(registeredStudent.status, equals('ACTIVE'));
     });
+
+    test('Public portal student stream exposes occupied seats even when unauthenticated', () async {
+      service.isAuthenticated = false;
+      service.currentUserId = null;
+
+      await service.assignSeatAndRegisterStudent(
+        seatNumber: 4,
+        studentName: 'Public Portal Student',
+        phone: '9822334455',
+        shift: 'Morning Shift',
+        feeAmount: 700,
+        status: 'ACTIVE',
+      );
+
+      expect(service.isCloudSyncActive, isFalse);
+
+      final firstEmission = await service.streamPublicStudents('default_library').first;
+      expect(firstEmission.any((s) => s.seatNumber == 4 && s.status == 'ACTIVE'), isTrue);
+    });
   });
 }
 

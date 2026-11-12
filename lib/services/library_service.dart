@@ -324,11 +324,21 @@ class LibraryService {
     }
   }
 
+  void _syncShiftsToCloud() {
+    if (!isFirebaseConnected || currentUserId == null) return;
+    try {
+      _tenantCol('settings').doc('shifts').set({
+        'shifts': shifts.map((s) => s.toMap()).toList(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
   void toggleShiftActive(String shiftId) {
     final idx = shifts.indexWhere((s) => s.id == shiftId);
     if (idx != -1) {
       shifts[idx].isActive = !shifts[idx].isActive;
       _saveLocalState();
+      _syncShiftsToCloud();
     }
   }
 
@@ -337,12 +347,14 @@ class LibraryService {
     if (idx != -1) {
       shifts[idx] = updated;
       _saveLocalState();
+      _syncShiftsToCloud();
     }
   }
 
   void addShift(ShiftConfig newShift) {
     shifts.add(newShift);
     _saveLocalState();
+    _syncShiftsToCloud();
   }
 
   bool deleteShift(String shiftId) {
@@ -353,6 +365,7 @@ class LibraryService {
       if (target.isSystemSlot) return false;
       shifts.removeAt(idx);
       _saveLocalState();
+      _syncShiftsToCloud();
       return true;
     }
     return false;
@@ -625,6 +638,9 @@ class LibraryService {
         await _tenantCol('settings').doc('sections').set({
           'sections': sections.map((s) => s.toMap()).toList(),
           'total_seats': totalSeatsCount,
+        }, SetOptions(merge: true));
+        await _tenantCol('settings').doc('shifts').set({
+          'shifts': shifts.map((s) => s.toMap()).toList(),
         }, SetOptions(merge: true));
         if (branches.isNotEmpty) {
           for (final b in branches) {
@@ -1727,15 +1743,111 @@ class LibraryService {
 
   Future<LibraryProfile?> fetchTenantProfile(String targetTenantId) async {
     final clean = targetTenantId.trim();
-    if (clean.isEmpty) return null;
+    if (clean.isEmpty || clean == 'default_library') return null;
     if (isFirebaseConnected) {
       try {
+        int cloudTotalSeats = 0;
+        LibraryProfile? loaded;
+
         final doc = await _db.collection('libraries').doc(clean).get();
         if (doc.exists && doc.data() != null) {
-          final loaded = LibraryProfile.fromMap(doc.data()!);
-          profile = loaded;
-          return loaded;
+          final data = doc.data()!;
+          loaded = LibraryProfile.fromMap(data);
+          if (data['total_seats'] != null) {
+            final sVal = (data['total_seats'] as num).toInt();
+            if (sVal > 0) cloudTotalSeats = sVal;
+          }
         }
+
+        if (loaded == null || loaded.libraryName.trim().isEmpty) {
+          try {
+            final brandingDoc = await _db
+                .collection('libraries')
+                .doc(clean)
+                .collection('settings')
+                .doc('branding')
+                .get();
+            if (brandingDoc.exists && brandingDoc.data() != null) {
+              loaded = LibraryProfile.fromMap(brandingDoc.data()!);
+            }
+          } catch (_) {}
+        }
+
+        if (loaded != null) {
+          loaded.libraryId = clean;
+          profile = loaded;
+        } else if (profile.libraryId.isEmpty) {
+          profile.libraryId = clean;
+        }
+
+        bool loadedSections = false;
+        try {
+          final secDoc = await _db
+              .collection('libraries')
+              .doc(clean)
+              .collection('settings')
+              .doc('sections')
+              .get();
+          if (secDoc.exists && secDoc.data() != null) {
+            final sData = secDoc.data()!;
+            if (sData['sections'] is List && (sData['sections'] as List).isNotEmpty) {
+              sections = (sData['sections'] as List)
+                  .map((x) => SectionConfig.fromMap(Map<String, dynamic>.from(x)))
+                  .toList();
+              loadedSections = true;
+            }
+            if (sData['total_seats'] != null) {
+              final sVal = (sData['total_seats'] as num).toInt();
+              if (sVal > 0) cloudTotalSeats = sVal;
+            }
+          }
+        } catch (_) {}
+
+        try {
+          final branchSnaps = await _db.collection('libraries').doc(clean).collection('branches').get();
+          if (branchSnaps.docs.isNotEmpty) {
+            branches = branchSnaps.docs.map((d) => LibraryBranch.fromMap(d.data())).toList();
+          } else if (cloudTotalSeats > 0) {
+            branches = [
+              LibraryBranch(
+                id: 'branch_1',
+                name: profile.libraryName.isNotEmpty ? profile.libraryName : 'Main Campus',
+                address: profile.city.isNotEmpty ? profile.city : 'Main Branch',
+                totalSeats: cloudTotalSeats,
+                isDefault: true,
+              ),
+            ];
+          }
+          if (cloudTotalSeats > 0 && branches.isNotEmpty) {
+            branches[0] = branches[0].copyWith(totalSeats: cloudTotalSeats);
+          }
+        } catch (_) {}
+
+        // If cloud specifies total_seats without a sections doc, sync the default section size so totalSeatsCount matches
+        if (!loadedSections && cloudTotalSeats > 0) {
+          sections = [
+            SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: cloudTotalSeats),
+          ];
+        }
+
+        try {
+          final shiftDoc = await _db
+              .collection('libraries')
+              .doc(clean)
+              .collection('settings')
+              .doc('shifts')
+              .get();
+          if (shiftDoc.exists && shiftDoc.data() != null) {
+            final sData = shiftDoc.data()!;
+            if (sData['shifts'] is List && (sData['shifts'] as List).isNotEmpty) {
+              shifts = (sData['shifts'] as List)
+                  .map((x) => ShiftConfig.fromMap(Map<String, dynamic>.from(x)))
+                  .toList();
+            }
+          }
+        } catch (_) {}
+
+        return loaded ?? profile;
       } catch (_) {}
     }
     return null;
@@ -3077,6 +3189,37 @@ class LibraryService {
         return;
       } catch (_) {}
     }
+    yield* _mockStudentsController.stream;
+  }
+
+  /// Public read-only student stream for QR portals on unauthenticated devices.
+  /// Queries `libraries/<targetTenantId>/students` directly in Firestore when Firebase is connected,
+  /// without mutating local admin storage, and falls back to in-memory state when offline/local.
+  Stream<List<StudentInfo>> streamPublicStudents(String targetTenantId) async* {
+    ensureInitialized();
+    final clean = targetTenantId.trim();
+    if (isFirebaseConnected && clean.isNotEmpty && clean != 'default_library') {
+      if (isAuthenticated && tenantId == clean && _mockStudents.isNotEmpty) {
+        yield List.unmodifiable(_mockStudents);
+      }
+      try {
+        final cloudStream = _db
+            .collection('libraries')
+            .doc(clean)
+            .collection('students')
+            .snapshots()
+            .map((snapshot) {
+          final list = snapshot.docs
+              .map((d) => StudentInfo.fromFirestore(d.id, d.data()))
+              .toList();
+          list.sort((a, b) => b.joinedAt.compareTo(a.joinedAt));
+          return list;
+        });
+        yield* cloudStream;
+        return;
+      } catch (_) {}
+    }
+    yield List.unmodifiable(_mockStudents);
     yield* _mockStudentsController.stream;
   }
 

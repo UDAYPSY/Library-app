@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -97,13 +98,12 @@ void main() async {
       }
     }
 
-    // Task 1.6: Firebase App Check activation
-    if (Firebase.apps.isNotEmpty) {
+    // Task 1.6: Firebase App Check activation (skip on web while reCAPTCHA site key is a placeholder)
+    if (Firebase.apps.isNotEmpty && !kIsWeb) {
       try {
         await FirebaseAppCheck.instance.activate(
           androidProvider: AndroidProvider.playIntegrity,
           appleProvider: AppleProvider.deviceCheck,
-          webProvider: ReCaptchaV3Provider('6Ld_placeholder_recaptcha_site_key'),
         );
       } catch (e) {
         debugPrint('Firebase App Check activation note: $e');

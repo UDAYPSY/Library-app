@@ -15,6 +15,7 @@ class StudentLivePortalScreen extends StatefulWidget {
 
 class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
   final LibraryService _service = LibraryService();
+  late Stream<List<StudentInfo>> _studentsStream;
   String _selectedShift = 'All Shifts';
   int? _selectedSeatForInquiry;
   DateTime? _gateEntryConfirmedAt;
@@ -65,6 +66,7 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
       }
       _fetchCloudLibraryProfile(targetLib);
     }
+    _studentsStream = _service.streamPublicStudents(targetLib);
   }
 
   Future<void> _fetchCloudLibraryProfile(String targetLib) async {
@@ -122,17 +124,20 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<StudentInfo>>(
-      stream: _service.streamStudents(),
-      initialData: _service.currentStudents,
+      stream: _studentsStream,
       builder: (context, studentSnapshot) {
-        final students = studentSnapshot.data ?? _service.currentStudents;
+        final isInitialLoading = studentSnapshot.connectionState == ConnectionState.waiting && !studentSnapshot.hasData;
+        final students = studentSnapshot.data ?? const <StudentInfo>[];
         final profile = _service.profile;
-        final totalSeats = _service.totalSeatsCount;
+        final maxStudentSeat = students
+            .where((s) => s.seatNumber != null && s.status.toUpperCase() != 'INACTIVE')
+            .fold<int>(0, (maxVal, s) => s.seatNumber! > maxVal ? s.seatNumber! : maxVal);
+        final totalSeats = _service.totalSeatsCount >= maxStudentSeat ? _service.totalSeatsCount : maxStudentSeat;
         final allLibraryShifts = ['All Shifts', ..._service.shifts.map((s) => s.name).toSet()];
 
         int occupiedCount = 0;
         for (int i = 1; i <= totalSeats; i++) {
-          final seatOccupants = students.where((s) => s.seatNumber == i && s.status != 'INACTIVE').toList();
+          final seatOccupants = students.where((s) => s.seatNumber == i && s.status.toUpperCase() != 'INACTIVE').toList();
           final bool isOcc;
           if (_selectedShift == 'All Shifts') {
             isOcc = seatOccupants.isNotEmpty;
@@ -553,6 +558,63 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                   ),
                   const SizedBox(height: 14),
 
+                  if (isInitialLoading)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D9488).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.35)),
+                      ),
+                      child: const Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF5EEAD4)),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Syncing live seat availability from cloud...',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF5EEAD4), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (studentSnapshot.hasError)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE11D48).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE11D48).withOpacity(0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.cloud_off_rounded, size: 16, color: Color(0xFFFDA4AF)),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Unable to load live seat status. Check your internet connection and retry.',
+                              style: TextStyle(fontSize: 11, color: Color(0xFFFDA4AF), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _studentsStream = _service.streamPublicStudents(_effectiveLibraryId);
+                              });
+                            },
+                            child: const Text('Retry', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // Visual Grid
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 280),
@@ -567,7 +629,7 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                       itemCount: totalSeats,
                       itemBuilder: (ctx, idx) {
                         final seatNum = idx + 1;
-                        final seatOccupants = students.where((s) => s.seatNumber == seatNum && s.status != 'INACTIVE').toList();
+                        final seatOccupants = students.where((s) => s.seatNumber == seatNum && s.status.toUpperCase() != 'INACTIVE').toList();
                         final bool isOcc;
                         final String occLabel;
                         if (_selectedShift == 'All Shifts') {
