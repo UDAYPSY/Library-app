@@ -400,6 +400,7 @@ class LibraryService {
   static final List<ExpenseItem> _mockExpenses = [];
   static final List<PaymentTransaction> _mockPayments = [];
   static final List<RegistrationRequest> _mockRegistrationRequests = [];
+  static final List<AttendanceRecord> _mockAttendance = [];
 
   static final StreamController<List<SeatInfo>> _mockSeatsController =
       StreamController<List<SeatInfo>>.broadcast();
@@ -411,6 +412,8 @@ class LibraryService {
       StreamController<List<PaymentTransaction>>.broadcast();
   static final StreamController<List<RegistrationRequest>> _mockRegistrationRequestsController =
       StreamController<List<RegistrationRequest>>.broadcast();
+  static final StreamController<List<AttendanceRecord>> _mockAttendanceController =
+      StreamController<List<AttendanceRecord>>.broadcast();
 
   bool _initialized = false;
   bool _loadedFromLocalStorage = false;
@@ -576,6 +579,20 @@ class LibraryService {
           }
         }
       }
+
+      final attStr = await LocalStorageService.getString('app_library_attendance');
+      if (attStr != null && attStr.isNotEmpty) {
+        final decoded = json.decode(attStr);
+        if (decoded is List) {
+          _mockAttendance.clear();
+          for (var item in decoded) {
+            _mockAttendance.add(AttendanceRecord.fromMap(Map<String, dynamic>.from(item)));
+          }
+          if (!_mockAttendanceController.isClosed) {
+            _mockAttendanceController.add(List.unmodifiable(_mockAttendance));
+          }
+        }
+      }
     } catch (_) {}
   }
 
@@ -591,6 +608,7 @@ class LibraryService {
       await LocalStorageService.saveString('app_library_branches', json.encode(branches.map((b) => b.toMap()).toList()));
       await LocalStorageService.saveString('app_library_active_branch', activeBranchId);
       await LocalStorageService.saveString('app_library_registration_requests', json.encode(_mockRegistrationRequests.map((r) => r.toMap()).toList()));
+      await LocalStorageService.saveString('app_library_attendance', json.encode(_mockAttendance.map((a) => a.toMap()).toList()));
     } catch (_) {}
   }
 
@@ -837,6 +855,7 @@ class LibraryService {
     _mockPayments.clear();
     _mockExpenses.clear();
     _mockRegistrationRequests.clear();
+    _mockAttendance.clear();
     staffList.clear();
     branches = [
       const LibraryBranch(
@@ -868,6 +887,9 @@ class LibraryService {
     if (!_mockRegistrationRequestsController.isClosed) {
       _mockRegistrationRequestsController.add(const []);
     }
+    if (!_mockAttendanceController.isClosed) {
+      _mockAttendanceController.add(const []);
+    }
     if (!_mockSeatsController.isClosed) {
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
     }
@@ -878,6 +900,7 @@ class LibraryService {
     await LocalStorageService.remove('app_library_expenses');
     await LocalStorageService.remove('app_library_staff');
     await LocalStorageService.remove('app_library_registration_requests');
+    await LocalStorageService.remove('app_library_attendance');
     await LocalStorageService.remove('app_library_branches');
     await LocalStorageService.remove('app_library_active_branch');
     await LocalStorageService.remove('app_active_session');
@@ -992,6 +1015,7 @@ class LibraryService {
     _mockPayments.clear();
     _mockExpenses.clear();
     _mockRegistrationRequests.clear();
+    _mockAttendance.clear();
     staffList.clear();
     branches.clear();
     sections = [
@@ -1032,6 +1056,9 @@ class LibraryService {
     if (!_mockRegistrationRequestsController.isClosed) {
       _mockRegistrationRequestsController.add(const []);
     }
+    if (!_mockAttendanceController.isClosed) {
+      _mockAttendanceController.add(const []);
+    }
     if (!_mockSeatsController.isClosed) {
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
     }
@@ -1049,6 +1076,7 @@ class LibraryService {
     await LocalStorageService.remove('app_library_branches');
     await LocalStorageService.remove('app_library_active_branch');
     await LocalStorageService.remove('app_library_registration_requests');
+    await LocalStorageService.remove('app_library_attendance');
     await LocalStorageService.remove('app_setup_completed');
     await LocalStorageService.remove('app_active_session');
     await LocalStorageService.remove('app_last_login_identifier');
@@ -1351,6 +1379,66 @@ class LibraryService {
     if (!_mockRegistrationRequestsController.isClosed) {
       _mockRegistrationRequestsController.add(List.unmodifiable(_mockRegistrationRequests));
     }
+  }
+
+  List<AttendanceRecord> get currentAttendance => List.unmodifiable(_mockAttendance);
+
+  Stream<List<AttendanceRecord>> streamAttendance() async* {
+    ensureInitialized();
+    yield List.unmodifiable(_mockAttendance);
+    if (isCloudSyncActive) {
+      try {
+        final cloudStream = _tenantCol('attendance')
+            .orderBy('timestamp', descending: true)
+            .limit(100)
+            .snapshots()
+            .map((snap) {
+          final list = snap.docs
+              .map((d) => AttendanceRecord.fromMap({'id': d.id, ...d.data()}))
+              .toList();
+          _mockAttendance.clear();
+          _mockAttendance.addAll(list);
+          if (!_mockAttendanceController.isClosed) {
+            _mockAttendanceController.add(List.unmodifiable(_mockAttendance));
+          }
+          return List.unmodifiable(_mockAttendance);
+        }).handleError((_) => List.unmodifiable(_mockAttendance));
+        yield* cloudStream;
+        return;
+      } catch (_) {}
+    }
+    yield* _mockAttendanceController.stream;
+  }
+
+  Future<AttendanceRecord> recordGateEntry({
+    required String studentId,
+    required String studentName,
+    int? seatNumber,
+    required String shift,
+    required String status,
+  }) async {
+    ensureInitialized();
+    final now = DateTime.now();
+    final record = AttendanceRecord(
+      id: 'att_${now.millisecondsSinceEpoch}',
+      studentId: studentId,
+      studentName: studentName,
+      seatNumber: seatNumber,
+      shift: shift,
+      timestamp: now,
+      status: status,
+    );
+    _mockAttendance.insert(0, record);
+    if (!_mockAttendanceController.isClosed) {
+      _mockAttendanceController.add(List.unmodifiable(_mockAttendance));
+    }
+    await _saveLocalState();
+    if (isFirebaseConnected && tenantId.isNotEmpty) {
+      try {
+        await _tenantCol('attendance').doc(record.id).set(record.toMap());
+      } catch (_) {}
+    }
+    return record;
   }
 
   // Submit self-registration request (called from public QR student registration web portal)

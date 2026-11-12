@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +11,7 @@ import '../../services/excel_import_service.dart';
 import '../../services/file_export_service.dart';
 import '../../services/language_service.dart';
 import '../../services/library_service.dart';
+import '../../services/local_storage_service.dart';
 import '../../services/theme_service.dart';
 import '../login_screen.dart';
 import '../onboarding/admin_profile_screen.dart';
@@ -2502,17 +2504,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showRateAppModal() {
+  Future<void> _showRateAppModal() async {
     int rating = 5;
+    final noteCtrl = TextEditingController();
+    try {
+      final saved = await LocalStorageService.getString('app_user_rating');
+      if (saved != null && saved.isNotEmpty) {
+        final decoded = json.decode(saved);
+        if (decoded is Map) {
+          rating = (decoded['rating'] as num?)?.toInt() ?? 5;
+          noteCtrl.text = decoded['note']?.toString() ?? '';
+        }
+      }
+    } catch (_) {}
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (modalCtx, setModalState) => Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            MediaQuery.of(modalCtx).viewInsets.bottom + 24,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2533,7 +2553,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 }),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'Optional feedback or suggestion...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -2543,11 +2573,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
+                    final payload = {
+                      'rating': rating,
+                      'note': noteCtrl.text.trim(),
+                      'updated_at': DateTime.now().toIso8601String(),
+                    };
+                    await LocalStorageService.saveString('app_user_rating', json.encode(payload));
+                    if (_service.isCloudSyncActive && _service.tenantId.isNotEmpty) {
+                      try {
+                        await _service.db
+                            .collection('libraries')
+                            .doc(_service.tenantId)
+                            .collection('settings')
+                            .doc('feedback')
+                            .set(payload, SetOptions(merge: true));
+                      } catch (_) {}
+                    }
+                    if (!ctx.mounted) return;
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Thank you for your rating & support! ❤️')),
-                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Saved your $rating-star review. Thank you! ❤️')),
+                      );
+                    }
                   },
                   child: const Text('Submit Review', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),

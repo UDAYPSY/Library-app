@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../services/library_service.dart';
+import '../../services/local_storage_service.dart';
 
 class LibraryCommunityScreen extends StatefulWidget {
   const LibraryCommunityScreen({super.key});
@@ -14,6 +15,36 @@ class LibraryCommunityScreen extends StatefulWidget {
 class _LibraryCommunityScreenState extends State<LibraryCommunityScreen> {
   final LibraryService _service = LibraryService();
   bool _webinarReminderSet = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWebinarReminder();
+  }
+
+  Future<void> _loadWebinarReminder() async {
+    try {
+      final saved = await LocalStorageService.getString('app_webinar_reminder_set');
+      if (mounted && saved == 'true') {
+        setState(() => _webinarReminderSet = true);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleWebinarReminder() async {
+    final nextVal = !_webinarReminderSet;
+    setState(() => _webinarReminderSet = nextVal);
+    try {
+      await LocalStorageService.saveString('app_webinar_reminder_set', nextVal ? 'true' : 'false');
+    } catch (_) {}
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(nextVal ? 'Webinar reminder saved for Sunday 7:00 PM!' : 'Reminder cancelled.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   Future<void> _joinWhatsAppGroup(BuildContext context) async {
     const groupLink = 'https://chat.whatsapp.com/TrackMyLibraryCommunity';
@@ -259,15 +290,7 @@ class _LibraryCommunityScreenState extends State<LibraryCommunityScreen> {
                   ),
                   IconButton(
                     icon: Icon(_webinarReminderSet ? Icons.notifications_active_rounded : Icons.notifications_outlined, color: _webinarReminderSet ? const Color(0xFF10B981) : const Color(0xFF64748B)),
-                    onPressed: () {
-                      setState(() => _webinarReminderSet = !_webinarReminderSet);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(_webinarReminderSet ? 'Webinar reminder set for Sunday!' : 'Reminder cancelled.'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
+                    onPressed: _toggleWebinarReminder,
                   ),
                 ],
               ),

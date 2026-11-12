@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_strings.dart';
 import '../models/library_models.dart';
@@ -1212,21 +1213,54 @@ Future<void> showCollectPaymentModal(
 
                           onPaymentRecorded?.call();
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                selectedAdvanceMonths == -1
-                                    ? (isExpired
-                                        ? 'Past due of ₹$paid settled! Current month fee of ₹$remainingDues remains pending.'
-                                        : 'Due payment of ₹$paid recorded (₹$remainingDues remaining due).')
-                                    : (remainingDues > 0
-                                        ? 'Payment of ₹$paid recorded (${advanceToApply > 0 ? "₹$advanceToApply advance adjusted, " : ""}₹$remainingDues remaining due). Valid until ${DateFormat('dd-MMM-yyyy').format(targetDueDate)}'
-                                        : 'Payment of ₹$paid recorded${advanceToApply > 0 ? " (₹$advanceToApply advance adjusted)" : ""}! Active until ${DateFormat('dd-MMM-yyyy').format(targetDueDate)}'),
+                          if ((paid > 0 || advanceToApply > 0) &&
+                              service.profile.whatsappNotifications &&
+                              service.profile.autoPaymentReceipt &&
+                              student.phone.trim().isNotEmpty) {
+                            final cleanPhone = LibraryService.normalizePhone(student.phone);
+                            final effectiveAmt = paid > 0 ? paid : advanceToApply;
+                            final effectiveMode = paid > 0 ? selectedMethod : 'Advance Credit';
+                            final validStr = DateFormat('dd-MMM-yyyy').format(targetDueDate);
+                            final seatText = student.seatNumber != null ? '${student.seatNumber}' : 'Unallocated';
+                            final receiptMsg = service.profile.receiptTemplate
+                                .replaceAll('{student_name}', student.name)
+                                .replaceAll('{amount}', '$effectiveAmt')
+                                .replaceAll('{mode}', effectiveMode)
+                                .replaceAll('{library_name}', service.profile.libraryName)
+                                .replaceAll('{valid_until}', validStr)
+                                .replaceAll('{seat_number}', seatText)
+                                .replaceAll('{shift}', student.shift);
+                            final waUri = Uri.parse(
+                              'https://wa.me/91$cleanPhone?text=${Uri.encodeComponent(receiptMsg)}',
+                            );
+                            try {
+                              if (await canLaunchUrl(waUri)) {
+                                await launchUrl(waUri, mode: LaunchMode.externalApplication);
+                              } else {
+                                await launchUrl(waUri);
+                              }
+                            } catch (_) {
+                              await Clipboard.setData(ClipboardData(text: receiptMsg));
+                            }
+                          }
+
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  selectedAdvanceMonths == -1
+                                      ? (isExpired
+                                          ? 'Past due of ₹$paid settled! Current month fee of ₹$remainingDues remains pending.'
+                                          : 'Due payment of ₹$paid recorded (₹$remainingDues remaining due).')
+                                      : (remainingDues > 0
+                                          ? 'Payment of ₹$paid recorded (${advanceToApply > 0 ? "₹$advanceToApply advance adjusted, " : ""}₹$remainingDues remaining due). Valid until ${DateFormat('dd-MMM-yyyy').format(targetDueDate)}'
+                                          : 'Payment of ₹$paid recorded${advanceToApply > 0 ? " (₹$advanceToApply advance adjusted)" : ""}! Active until ${DateFormat('dd-MMM-yyyy').format(targetDueDate)}'),
+                                ),
+                                backgroundColor: remainingDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF0D9488),
+                                behavior: SnackBarBehavior.floating,
                               ),
-                              backgroundColor: remainingDues > 0 ? const Color(0xFFE11D48) : const Color(0xFF0D9488),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                            );
+                          }
                         },
                       ),
                     ),

@@ -971,7 +971,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
       }
 
       if (mounted) {
-        if (!_isTrial && _service.profile.autoWelcomeMessage) {
+        if (!_isTrial && _service.profile.whatsappNotifications && _service.profile.autoWelcomeMessage) {
           _sendWelcomeWhatsApp(name, phone, seatNum, _selectedShift.name);
         }
         final String successMsg;

@@ -1080,4 +1080,55 @@ class RegistrationRequest {
   }
 }
 
+class AttendanceRecord {
+  final String id;
+  final String studentId;
+  final String studentName;
+  final int? seatNumber;
+  final String shift;
+  final DateTime timestamp;
+  final String status; // 'GRANTED', 'DUES_PENDING'
+
+  const AttendanceRecord({
+    required this.id,
+    required this.studentId,
+    required this.studentName,
+    this.seatNumber,
+    required this.shift,
+    required this.timestamp,
+    this.status = 'GRANTED',
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'student_id': studentId,
+      'student_name': studentName,
+      'seat_number': seatNumber,
+      'shift': shift,
+      'timestamp': timestamp.toIso8601String(),
+      'status': status,
+    };
+  }
+
+  factory AttendanceRecord.fromMap(Map<String, dynamic> map) {
+    DateTime parseDate(dynamic val) {
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      return DateTime.now();
+    }
+
+    return AttendanceRecord(
+      id: map['id']?.toString() ?? '',
+      studentId: map['student_id']?.toString() ?? '',
+      studentName: map['student_name']?.toString() ?? 'Student',
+      seatNumber: (map['seat_number'] as num?)?.toInt(),
+      shift: map['shift']?.toString() ?? 'General',
+      timestamp: parseDate(map['timestamp']),
+      status: map['status']?.toString() ?? 'GRANTED',
+    );
+  }
+}
+
+
 

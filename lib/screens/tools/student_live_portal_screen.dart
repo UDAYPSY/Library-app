@@ -904,6 +904,20 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
     required bool isOverdue,
     required String studentPhone,
   }) {
+    final now = DateTime.now();
+    DateTime? persistedCheckIn = _gateEntryConfirmedAt;
+    if (persistedCheckIn == null) {
+      for (final att in _service.currentAttendance) {
+        if (att.studentId == verifiedId &&
+            att.timestamp.year == now.year &&
+            att.timestamp.month == now.month &&
+            att.timestamp.day == now.day) {
+          persistedCheckIn = att.timestamp;
+          break;
+        }
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
@@ -1173,7 +1187,7 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                 const SizedBox(height: 16),
 
                 // Gate Entry Attendance Action Button
-                if (_gateEntryConfirmedAt != null)
+                if (persistedCheckIn != null)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1188,7 +1202,7 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                         const Icon(Icons.check_circle_rounded, color: Color(0xFF34D399), size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          'Entry Verified & Logged at ${DateFormat('hh:mm a').format(_gateEntryConfirmedAt!)}',
+                          'Entry Verified & Logged at ${DateFormat('hh:mm a').format(persistedCheckIn)}',
                           style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 13),
                         ),
                       ],
@@ -1210,13 +1224,21 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                             'Confirm Library Entry',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
-                          onPressed: () {
+                          onPressed: () async {
+                            final record = await _service.recordGateEntry(
+                              studentId: verifiedId,
+                              studentName: studentName,
+                              seatNumber: seatNum > 0 ? seatNum : null,
+                              shift: shiftName,
+                              status: isEntryAllowed ? 'GRANTED' : 'DUES_PENDING',
+                            );
+                            if (!mounted) return;
                             setState(() {
-                              _gateEntryConfirmedAt = DateTime.now();
+                              _gateEntryConfirmedAt = record.timestamp;
                             });
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Gate entry recorded for $studentName!'),
+                                content: Text('Gate entry recorded & saved for $studentName!'),
                                 backgroundColor: const Color(0xFF10B981),
                                 behavior: SnackBarBehavior.floating,
                               ),

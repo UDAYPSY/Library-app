@@ -215,6 +215,24 @@ class DisasterRecoveryService {
     }
   }
 
+  /// Checks whether auto-backup is enabled and hasn't run today yet, then triggers a daily cycle.
+  Future<bool> checkAndRunDailyAutoBackup() async {
+    try {
+      final enabled = await isAutoBackupEnabled();
+      if (!enabled) return false;
+      final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final lastDate = await LocalStorageService.getString('gdrive_last_auto_backup_date');
+      if (lastDate == todayKey) return false;
+      final ok = await runAutomatedBackupCycle();
+      if (ok) {
+        await LocalStorageService.saveString('gdrive_last_auto_backup_date', todayKey);
+      }
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
   String _cleanCsvField(dynamic value) {
     if (value == null) return '""';
     final str = value.toString().replaceAll('\r', ' ').replaceAll('\n', ' ');

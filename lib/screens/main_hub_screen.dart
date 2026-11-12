@@ -6,8 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_strings.dart';
 import '../models/library_models.dart';
+import '../services/disaster_recovery_service.dart';
 import '../services/language_service.dart';
 import '../services/library_service.dart';
+import '../services/local_storage_service.dart';
 import 'analytics/financial_analytics_screen.dart';
 import 'analytics/add_expense_sheet.dart';
 import 'payments/revenue_screen.dart';
@@ -38,6 +40,31 @@ class _MainHubScreenState extends State<MainHubScreen> {
   bool _isModernMode = false;
   String _studentFilter = 'RECENT';
   String _paymentTimeFilter = 'MONTHLY';
+
+  @override
+  void initState() {
+    super.initState();
+    _initDashboardState();
+  }
+
+  Future<void> _initDashboardState() async {
+    try {
+      final savedMode = await LocalStorageService.getString('app_home_view_mode');
+      if (mounted && savedMode == 'modern') {
+        setState(() => _isModernMode = true);
+      }
+      if (_service.isAdmin) {
+        await DisasterRecoveryService().checkAndRunDailyAutoBackup();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _setDashboardMode(bool isModern) async {
+    setState(() => _isModernMode = isModern);
+    try {
+      await LocalStorageService.saveString('app_home_view_mode', isModern ? 'modern' : 'classic');
+    } catch (_) {}
+  }
 
   void _openFinancialAnalytics() {
     if (!_service.canViewRevenue) {
@@ -406,7 +433,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         Expanded(
                           child: InkWell(
                             borderRadius: BorderRadius.circular(11),
-                            onTap: () => setState(() => _isModernMode = false),
+                            onTap: () => _setDashboardMode(false),
                             child: Container(
                               decoration: BoxDecoration(
                                 color: !_isModernMode
@@ -443,7 +470,7 @@ class _MainHubScreenState extends State<MainHubScreen> {
                         Expanded(
                           child: InkWell(
                             borderRadius: BorderRadius.circular(11),
-                            onTap: () => setState(() => _isModernMode = true),
+                            onTap: () => _setDashboardMode(true),
                             child: Container(
                               decoration: BoxDecoration(
                                 color: _isModernMode
@@ -582,85 +609,294 @@ class _MainHubScreenState extends State<MainHubScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // 2x2 Metric Grid (Image 1) - Scoped to role
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _overviewCard(
-                          icon: Icons.people_alt_rounded,
-                          iconBg: AppColors.activeGreenBg,
-                          iconColor: AppColors.activeGreenIcon,
-                          value: '$activeStudents',
-                          label: isHindi ? 'सक्रिय' : 'ACTIVE',
-                          onTap: () => _openStudentsWithFilter('ACTIVE'),
+                  if (_isModernMode) ...[
+                    // Modern Mode: Occupancy Gauge + Compact 3-Column KPI Strip + Today's Gate Check-Ins
+                    Builder(
+                      builder: (context) {
+                        final totalCap = _service.totalSeatsCount;
+                        final occPct = totalCap > 0 ? (occupiedSeats / totalCap).clamp(0.0, 1.0) : 0.0;
+                        final occPctLabel = '${(occPct * 100).round()}%';
+                        final vacantSeats = (totalCap - occupiedSeats).clamp(0, totalCap);
+                        return Column(
+                          children: [
+                            InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => setState(() => _currentTabIndex = 2),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(18),
+                                decoration: BoxDecoration(
+                                  color: AppColors.card(context),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: AppColors.cardBorderColor(context)),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x0A000000),
+                                      blurRadius: 10,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          isHindi ? 'सीट उपयोग (Occupancy)' : 'Seat Occupancy Gauge',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.text(context),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.activeGreenBg,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            '$occupiedSeats / $totalCap ($occPctLabel)',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0F766E),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: LinearProgressIndicator(
+                                        value: occPct,
+                                        minHeight: 10,
+                                        backgroundColor: AppColors.subSurface(context),
+                                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0D9488)),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      isHindi
+                                          ? '$vacantSeats सीटें खाली • $dueStudentsCount छात्रों की फीस बकाया'
+                                          : '$vacantSeats seats vacant • $dueStudentsCount members with pending dues',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textMutedColor(context),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _overviewCard(
+                                    icon: Icons.people_alt_rounded,
+                                    iconBg: AppColors.activeGreenBg,
+                                    iconColor: AppColors.activeGreenIcon,
+                                    value: '$activeStudents',
+                                    label: isHindi ? 'सक्रिय' : 'ACTIVE',
+                                    onTap: () => _openStudentsWithFilter('ACTIVE'),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _service.canViewRevenue
+                                      ? _overviewCard(
+                                          icon: Icons.calendar_today_rounded,
+                                          iconBg: AppColors.todayPurpleBg,
+                                          iconColor: AppColors.todayPurpleIcon,
+                                          value: '₹$todayEarnings',
+                                          label: isHindi ? 'आज' : 'TODAY',
+                                          onTap: () => _openRevenueScreen('TODAY'),
+                                        )
+                                      : _overviewCard(
+                                          icon: Icons.chair_rounded,
+                                          iconBg: AppColors.todayPurpleBg,
+                                          iconColor: AppColors.todayPurpleIcon,
+                                          value: '$occupiedSeats',
+                                          label: isHindi ? 'भरी' : 'FILLED',
+                                          onTap: () => setState(() => _currentTabIndex = 2),
+                                        ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _service.canViewRevenue
+                                      ? _overviewCard(
+                                          icon: Icons.account_balance_wallet_rounded,
+                                          iconBg: AppColors.monthlyAmberBg,
+                                          iconColor: AppColors.monthlyAmberIcon,
+                                          value: '₹$monthEarnings',
+                                          label: isHindi ? 'मासिक' : 'MONTH',
+                                          onTap: () => _openRevenueScreen('MONTHLY'),
+                                        )
+                                      : _overviewCard(
+                                          icon: Icons.assignment_late_rounded,
+                                          iconBg: const Color(0xFFFEE2E2),
+                                          iconColor: const Color(0xFFEF4444),
+                                          value: '$dueStudentsCount',
+                                          label: isHindi ? 'बकाया' : 'DUES',
+                                          onTap: () => _openStudentsWithFilter('DUES'),
+                                        ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            StreamBuilder<List<AttendanceRecord>>(
+                              stream: _service.streamAttendance(),
+                              initialData: _service.currentAttendance,
+                              builder: (context, attSnap) {
+                                final allAtt = attSnap.data ?? [];
+                                final todayAtt = allAtt.where((a) =>
+                                    a.timestamp.year == today.year &&
+                                    a.timestamp.month == today.month &&
+                                    a.timestamp.day == today.day).toList();
+                                final latestNames = todayAtt.take(3).map((a) => a.studentName).join(', ');
+                                return Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.card(context),
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(color: AppColors.cardBorderColor(context)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFECFDF5),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(Icons.door_sliding_rounded, color: Color(0xFF059669), size: 20),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              isHindi
+                                                  ? 'आज गेट चेक-इन: ${todayAtt.length}'
+                                                  : 'Today\'s Gate Check-Ins: ${todayAtt.length}',
+                                              style: TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppColors.text(context),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              todayAtt.isEmpty
+                                                  ? (isHindi ? 'आज कोई QR गेट एंट्री दर्ज नहीं हुई' : 'No QR gate entries logged today yet')
+                                                  : latestNames,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                color: AppColors.textMutedColor(context),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ] else ...[
+                    // Classic Mode: 2x2 Metric Grid (Image 1) - Scoped to role
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _overviewCard(
+                            icon: Icons.people_alt_rounded,
+                            iconBg: AppColors.activeGreenBg,
+                            iconColor: AppColors.activeGreenIcon,
+                            value: '$activeStudents',
+                            label: isHindi ? 'सक्रिय' : 'ACTIVE',
+                            onTap: () => _openStudentsWithFilter('ACTIVE'),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _service.canViewRevenue
-                            ? _overviewCard(
-                                icon: Icons.calendar_today_rounded,
-                                iconBg: AppColors.todayPurpleBg,
-                                iconColor: AppColors.todayPurpleIcon,
-                                value: '₹$todayEarnings',
-                                label: isHindi ? 'आज' : 'TODAY',
-                                onTap: () => _openRevenueScreen('TODAY'),
-                              )
-                            : _overviewCard(
-                                icon: Icons.chair_rounded,
-                                iconBg: AppColors.todayPurpleBg,
-                                iconColor: AppColors.todayPurpleIcon,
-                                value: '$occupiedSeats',
-                                label: isHindi ? 'भरी सीटें' : 'OCCUPIED',
-                                onTap: () => setState(() => _currentTabIndex = 2),
-                              ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _service.canViewRevenue
-                            ? _overviewCard(
-                                icon: Icons.account_balance_wallet_rounded,
-                                iconBg: AppColors.monthlyAmberBg,
-                                iconColor: AppColors.monthlyAmberIcon,
-                                value: '₹$monthEarnings',
-                                label: isHindi ? 'मासिक' : 'MONTHLY',
-                                onTap: () => _openRevenueScreen('MONTHLY'),
-                              )
-                            : _overviewCard(
-                                icon: Icons.event_seat_rounded,
-                                iconBg: AppColors.monthlyAmberBg,
-                                iconColor: AppColors.monthlyAmberIcon,
-                                value: '${_service.totalSeatsCount - occupiedSeats}',
-                                label: isHindi ? 'खाली सीटें' : 'AVAILABLE',
-                                onTap: () => setState(() => _currentTabIndex = 2),
-                              ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _service.canViewRevenue
-                            ? _overviewCard(
-                                icon: Icons.bar_chart_rounded,
-                                iconBg: AppColors.totalBlueBg,
-                                iconColor: AppColors.totalBlueIcon,
-                                value: '${_service.totalSeatsCount}',
-                                label: isHindi ? 'कुल सीटें' : 'TOTAL',
-                                onTap: () => _openStudentsWithFilter('RECENT'),
-                              )
-                            : _overviewCard(
-                                icon: Icons.assignment_late_rounded,
-                                iconBg: const Color(0xFFFEE2E2),
-                                iconColor: const Color(0xFFEF4444),
-                                value: '$dueStudentsCount',
-                                label: isHindi ? 'बकाया फीस' : 'FEES DUE',
-                                onTap: () => _openStudentsWithFilter('DUES'),
-                              ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: _service.canViewRevenue
+                              ? _overviewCard(
+                                  icon: Icons.calendar_today_rounded,
+                                  iconBg: AppColors.todayPurpleBg,
+                                  iconColor: AppColors.todayPurpleIcon,
+                                  value: '₹$todayEarnings',
+                                  label: isHindi ? 'आज' : 'TODAY',
+                                  onTap: () => _openRevenueScreen('TODAY'),
+                                )
+                              : _overviewCard(
+                                  icon: Icons.chair_rounded,
+                                  iconBg: AppColors.todayPurpleBg,
+                                  iconColor: AppColors.todayPurpleIcon,
+                                  value: '$occupiedSeats',
+                                  label: isHindi ? 'भरी सीटें' : 'OCCUPIED',
+                                  onTap: () => setState(() => _currentTabIndex = 2),
+                                ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _service.canViewRevenue
+                              ? _overviewCard(
+                                  icon: Icons.account_balance_wallet_rounded,
+                                  iconBg: AppColors.monthlyAmberBg,
+                                  iconColor: AppColors.monthlyAmberIcon,
+                                  value: '₹$monthEarnings',
+                                  label: isHindi ? 'मासिक' : 'MONTHLY',
+                                  onTap: () => _openRevenueScreen('MONTHLY'),
+                                )
+                              : _overviewCard(
+                                  icon: Icons.event_seat_rounded,
+                                  iconBg: AppColors.monthlyAmberBg,
+                                  iconColor: AppColors.monthlyAmberIcon,
+                                  value: '${_service.totalSeatsCount - occupiedSeats}',
+                                  label: isHindi ? 'खाली सीटें' : 'AVAILABLE',
+                                  onTap: () => setState(() => _currentTabIndex = 2),
+                                ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: _service.canViewRevenue
+                              ? _overviewCard(
+                                  icon: Icons.bar_chart_rounded,
+                                  iconBg: AppColors.totalBlueBg,
+                                  iconColor: AppColors.totalBlueIcon,
+                                  value: '${_service.totalSeatsCount}',
+                                  label: isHindi ? 'कुल सीटें' : 'TOTAL',
+                                  onTap: () => _openStudentsWithFilter('RECENT'),
+                                )
+                              : _overviewCard(
+                                  icon: Icons.assignment_late_rounded,
+                                  iconBg: const Color(0xFFFEE2E2),
+                                  iconColor: const Color(0xFFEF4444),
+                                  value: '$dueStudentsCount',
+                                  label: isHindi ? 'बकाया फीस' : 'FEES DUE',
+                                  onTap: () => _openStudentsWithFilter('DUES'),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 26),
 
                   // Section Header: Quick Actions (Image 1)

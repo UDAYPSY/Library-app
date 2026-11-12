@@ -1,11 +1,161 @@
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../constants/app_colors.dart';
 import '../../services/library_service.dart';
+import '../../services/local_storage_service.dart';
 
-class ReferEarnScreen extends StatelessWidget {
+class ReferEarnScreen extends StatefulWidget {
   const ReferEarnScreen({super.key});
+
+  @override
+  State<ReferEarnScreen> createState() => _ReferEarnScreenState();
+}
+
+class _ReferEarnScreenState extends State<ReferEarnScreen> {
+  final LibraryService _service = LibraryService();
+  int _earnedAmount = 0;
+  int _referralsCount = 0;
+  int _pendingCount = 0;
+  final List<Map<String, dynamic>> _referralLogs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReferrals();
+  }
+
+  Future<void> _loadReferrals() async {
+    try {
+      final raw = await LocalStorageService.getString('app_referral_stats');
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = json.decode(raw);
+        if (decoded is Map<String, dynamic>) {
+          _applyReferralData(decoded);
+        }
+      }
+      if (_service.isCloudSyncActive && _service.tenantId.isNotEmpty) {
+        final doc = await _service.db
+            .collection('libraries')
+            .doc(_service.tenantId)
+            .collection('settings')
+            .doc('referrals')
+            .get();
+        if (doc.exists && doc.data() != null) {
+          _applyReferralData(doc.data()!);
+          await LocalStorageService.saveString('app_referral_stats', json.encode(doc.data()!));
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _applyReferralData(Map<String, dynamic> data) {
+    final logs = (data['logs'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
+        [];
+    int earned = (data['earned_amount'] as num?)?.toInt() ?? 0;
+    int count = (data['referrals_count'] as num?)?.toInt() ?? logs.length;
+    int pending = (data['pending_count'] as num?)?.toInt() ??
+        logs.where((l) => (l['status'] ?? 'PENDING') == 'PENDING').length;
+
+    if (!mounted) return;
+    setState(() {
+      _earnedAmount = earned;
+      _referralsCount = count;
+      _pendingCount = pending;
+      _referralLogs
+        ..clear()
+        ..addAll(logs);
+    });
+  }
+
+  Future<void> _saveReferralData() async {
+    final payload = {
+      'earned_amount': _earnedAmount,
+      'referrals_count': _referralsCount,
+      'pending_count': _pendingCount,
+      'logs': _referralLogs,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    await LocalStorageService.saveString('app_referral_stats', json.encode(payload));
+    if (_service.isCloudSyncActive && _service.tenantId.isNotEmpty) {
+      try {
+        await _service.db
+            .collection('libraries')
+            .doc(_service.tenantId)
+            .collection('settings')
+            .doc('referrals')
+            .set(payload, SetOptions(merge: true));
+      } catch (_) {}
+    }
+  }
+
+  void _showLogReferralDialog() {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Log Referred Library', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Library / Owner Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Owner Mobile Number',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF5B4DFF),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final libName = nameCtrl.text.trim();
+              if (libName.isEmpty) return;
+              Navigator.pop(ctx);
+              setState(() {
+                _referralLogs.insert(0, {
+                  'library_name': libName,
+                  'phone': phoneCtrl.text.trim(),
+                  'status': 'PENDING',
+                  'created_at': DateTime.now().toIso8601String(),
+                });
+                _referralsCount = _referralLogs.length;
+                _pendingCount = _referralLogs.where((l) => l['status'] == 'PENDING').length;
+              });
+              await _saveReferralData();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Referral for "$libName" saved!')),
+                );
+              }
+            },
+            child: const Text('Save Referral'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _openWhatsAppClaim(BuildContext context, String adminName) async {
     const phone = '919457464850';
@@ -245,12 +395,24 @@ class ReferEarnScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _statCol('Earned', '₹298', const Color(0xFF16A34A)),
+                      _statCol('Earned', '₹$_earnedAmount', const Color(0xFF16A34A)),
                       Container(width: 1, height: 30, color: const Color(0xFFE2E8F0)),
-                      _statCol('Referrals', '2 Libraries', AppColors.textNavy),
+                      _statCol('Referrals', '$_referralsCount ${_referralsCount == 1 ? "Library" : "Libraries"}', AppColors.textNavy),
                       Container(width: 1, height: 30, color: const Color(0xFFE2E8F0)),
-                      _statCol('Pending', '1 (₹149)', const Color(0xFFF59E0B)),
+                      _statCol('Pending', '$_pendingCount (₹${_pendingCount * 149})', const Color(0xFFF59E0B)),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _showLogReferralDialog,
+                      icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: Color(0xFF5B4DFF)),
+                      label: const Text(
+                        'Log a Referral',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF5B4DFF)),
+                      ),
+                    ),
                   ),
                 ],
               ),
