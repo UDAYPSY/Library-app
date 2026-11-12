@@ -1381,28 +1381,28 @@ class LibraryService {
     }
   }
 
-  List<AttendanceRecord> get currentAttendance => List.unmodifiable(_mockAttendance);
+  List<AttendanceRecord> get currentAttendance => List<AttendanceRecord>.unmodifiable(_mockAttendance);
 
   Stream<List<AttendanceRecord>> streamAttendance() async* {
     ensureInitialized();
-    yield List.unmodifiable(_mockAttendance);
+    yield List<AttendanceRecord>.unmodifiable(_mockAttendance);
     if (isCloudSyncActive) {
       try {
-        final cloudStream = _tenantCol('attendance')
+        final Stream<List<AttendanceRecord>> cloudStream = _tenantCol('attendance')
             .orderBy('timestamp', descending: true)
             .limit(100)
             .snapshots()
-            .map((snap) {
+            .map<List<AttendanceRecord>>((snap) {
           final list = snap.docs
               .map((d) => AttendanceRecord.fromMap({'id': d.id, ...d.data()}))
               .toList();
           _mockAttendance.clear();
           _mockAttendance.addAll(list);
           if (!_mockAttendanceController.isClosed) {
-            _mockAttendanceController.add(List.unmodifiable(_mockAttendance));
+            _mockAttendanceController.add(List<AttendanceRecord>.unmodifiable(_mockAttendance));
           }
-          return List.unmodifiable(_mockAttendance);
-        }).handleError((_) => List.unmodifiable(_mockAttendance));
+          return list;
+        }).handleError((_) {});
         yield* cloudStream;
         return;
       } catch (_) {}
