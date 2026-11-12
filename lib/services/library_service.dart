@@ -1660,6 +1660,35 @@ class LibraryService {
     }
   }
 
+  /// Permanently deletes a QR registration request (e.g., declined/processed requests)
+  Future<void> deleteRegistrationRequest(String requestId) async {
+    ensureInitialized();
+    if (isFirebaseConnected) {
+      try {
+        await _tenantCol('registration_requests').doc(requestId).delete();
+      } catch (_) {}
+      try {
+        await _tenantCol('students').doc('st_qr_$requestId').delete();
+      } catch (_) {}
+    }
+
+    final tempStudentId = 'st_qr_$requestId';
+    final beforeStudents = _mockStudents.length;
+    _mockStudents.removeWhere((s) => s.id == tempStudentId);
+    if (_mockStudents.length != beforeStudents) {
+      notifyStudentsChanged();
+    }
+
+    final beforeReqs = _mockRegistrationRequests.length;
+    _mockRegistrationRequests.removeWhere((r) => r.id == requestId);
+    if (_mockRegistrationRequests.length != beforeReqs) {
+      notifyRegistrationRequestsChanged();
+      await _saveLocalState();
+    } else if (_mockStudents.length != beforeStudents) {
+      await _saveLocalState();
+    }
+  }
+
   // Disaster recovery and sync accessors
   List<StudentInfo> get mockStudentsList => _mockStudents;
   List<PaymentTransaction> get mockPaymentsList => _mockPayments;

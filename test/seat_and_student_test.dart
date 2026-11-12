@@ -1584,6 +1584,29 @@ void main() {
       final firstEmission = await service.streamPublicStudents('default_library').first;
       expect(firstEmission.any((s) => s.seatNumber == 4 && s.status == 'ACTIVE'), isTrue);
     });
+
+    test('Declined QR registration request can be permanently deleted', () async {
+      final req = RegistrationRequest(
+        id: 'req_del_001',
+        libraryId: 'default_library',
+        studentName: 'Declined Applicant',
+        phone: '9833445566',
+        shift: 'Morning Shift',
+        createdAt: DateTime.now(),
+        status: 'PENDING',
+      );
+
+      await service.submitRegistrationRequest(req);
+      expect(service.currentRegistrationRequests.any((r) => r.id == 'req_del_001'), isTrue);
+
+      await service.rejectRegistrationRequest('req_del_001');
+      final rejected = service.currentRegistrationRequests.firstWhere((r) => r.id == 'req_del_001');
+      expect(rejected.status, equals('REJECTED'));
+
+      await service.deleteRegistrationRequest('req_del_001');
+      expect(service.currentRegistrationRequests.any((r) => r.id == 'req_del_001'), isFalse);
+      expect(service.findStudentByPhone('9833445566'), isNull);
+    });
   });
 }
 

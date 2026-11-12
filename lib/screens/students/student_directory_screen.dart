@@ -2298,6 +2298,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   Widget _buildRegistrationRequestCard(RegistrationRequest req) {
     final isPending = req.status == 'PENDING';
     final isAccepted = req.status == 'ACCEPTED';
+    final isRejected = req.status == 'REJECTED';
 
     Color statusBg = const Color(0xFFFEF3C7);
     Color statusColor = const Color(0xFFD97706);
@@ -2561,6 +2562,52 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                   child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
               ],
+            ),
+          ],
+          if (isRejected) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFEF4444),
+                  side: const BorderSide(color: Color(0xFFFECACA)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      title: const Text('Delete Declined Request?', style: TextStyle(fontWeight: FontWeight.bold)),
+                      content: Text('Permanently delete QR admission request from ${req.studentName}?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancel')),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+                          onPressed: () => Navigator.pop(dCtx, true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await _service.deleteRegistrationRequest(req.id);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Declined request deleted.'),
+                          backgroundColor: Color(0xFF0D6E66),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                label: const Text('Delete Request', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
             ),
           ],
         ],
