@@ -3212,7 +3212,11 @@ class LibraryService {
           final list = snapshot.docs
               .map((d) => StudentInfo.fromFirestore(d.id, d.data()))
               .toList();
-          list.sort((a, b) => b.joinedAt.compareTo(a.joinedAt));
+          list.sort((a, b) {
+            final aj = a.joinedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bj = b.joinedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bj.compareTo(aj);
+          });
           return list;
         });
         yield* cloudStream;
