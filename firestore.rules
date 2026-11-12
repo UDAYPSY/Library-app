@@ -2,59 +2,77 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function isLibraryOwner(libraryId) {
       return request.auth != null && request.auth.uid == libraryId;
     }
 
-    // Global Staff Directory for seamless multi-device staff lookup by phone or email
+    // Global Staff Directory: lookup by exact phone/email doc ID only (no collection listing)
     match /staff_directory/{identifier} {
-      allow read: if true;
-      allow write: if true;
+      allow get: if true;
+      allow list: if false;
+      allow write: if isSignedIn();
     }
 
     match /libraries/{libraryId} {
-      // Allow public read on library profile for public QR admission portal & seat verification
-      allow read: if true;
+      // Allow public get on a single library profile by exact ID for QR portals; block listing all libraries
+      allow get: if true;
+      allow list: if false;
       allow write: if isLibraryOwner(libraryId);
 
+      // Student PII (phone, Aadhaar, address, photos, fees) requires authenticated owner/staff session
       match /students/{studentId} {
-        allow read: if true;
-        allow create, update: if request.resource.data.name is string
+        allow read: if isSignedIn();
+        allow create, update: if isSignedIn()
+                              && request.resource.data.name is string
                               && request.resource.data.name.size() > 0
                               && request.resource.data.phone is string;
         allow delete: if isLibraryOwner(libraryId);
       }
 
+      // Sanitized non-PII student pass validity check for QR ID Gate Pass
+      match /public_passes/{studentId} {
+        allow get: if true;
+        allow list: if false;
+        allow write: if isSignedIn();
+      }
+
       match /seats/{seatId} {
-        allow read, write: if true;
-      }
-
-      match /payments/{paymentId} {
-        allow read: if true;
-        allow create: if request.resource.data.amount is number
-                      && request.resource.data.amount > 0;
-        allow update: if true;
-        allow delete: if isLibraryOwner(libraryId); // Only library owner can wipe on permanent account deletion
-      }
-
-      match /expenses/{expenseId} {
-        allow read: if true;
-        allow create, update: if true;
+        allow read, create, update: if isSignedIn();
         allow delete: if isLibraryOwner(libraryId);
       }
 
+      match /payments/{paymentId} {
+        allow read, update: if isSignedIn();
+        allow create: if isSignedIn()
+                      && request.resource.data.amount is number
+                      && request.resource.data.amount > 0;
+        allow delete: if isLibraryOwner(libraryId);
+      }
+
+      match /expenses/{expenseId} {
+        allow read, create, update: if isSignedIn();
+        allow delete: if isLibraryOwner(libraryId);
+      }
+
+      // Settings docs (branding, sections, shifts, sanitized public_occupancy) readable by exact ID for QR portals
       match /settings/{docId} {
-        allow read: if true;
-        allow write: if isLibraryOwner(libraryId);
+        allow get: if true;
+        allow list: if false;
+        allow write: if isLibraryOwner(libraryId)
+                     || (isSignedIn() && docId == 'public_occupancy');
       }
 
       match /staff/{staffId} {
-        allow read: if true;
+        allow read: if isSignedIn();
         allow write: if isLibraryOwner(libraryId);
       }
 
       match /branches/{branchId} {
-        allow read: if true;
+        allow read: if isSignedIn();
         allow write: if isLibraryOwner(libraryId);
       }
 
@@ -63,14 +81,16 @@ service cloud.firestore {
       }
 
       match /registration_requests/{requestId} {
-        // Prospective students can submit self-registration via public QR / link
-        allow create: if request.resource.data.phone is string 
+        // Prospective students can submit self-registration via public Desk QR without logging in
+        allow create: if request.resource.data.phone is string
+                      && request.resource.data.phone.size() >= 10
+                      && request.resource.data.phone.size() <= 20
                       && (
-                        (request.resource.data.student_name is string && request.resource.data.student_name.size() > 0) ||
-                        (request.resource.data.name is string && request.resource.data.name.size() > 0)
+                        (request.resource.data.student_name is string && request.resource.data.student_name.size() > 0 && request.resource.data.student_name.size() <= 120) ||
+                        (request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 120)
                       );
-        // Authenticated library accounts & staff can view, approve, update, or reject requests
-        allow read, update, delete: if true;
+        // Only authenticated library owner / staff can view, accept, decline, or delete requests
+        allow read, update, delete: if isSignedIn();
       }
     }
 

@@ -471,6 +471,103 @@ class LibraryService {
     if (!_mockSeatsController.isClosed) {
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
     }
+    syncPublicOccupancyToCloud();
+  }
+
+  static String _lastPublicOccupancySig = '';
+  static final Map<String, String> _lastPublicPassSigs = {};
+
+  /// Builds a sanitized map of `seatNumber -> List<shiftName>` containing zero student PII.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+    final map = <String, List<String>>{};
+    for (final s in students) {
+      if (s.seatNumber == null || s.seatNumber! <= 0) continue;
+      if (s.status.toUpperCase() == 'INACTIVE') continue;
+      final key = s.seatNumber.toString();
+      final list = map.putIfAbsent(key, () => <String>[]);
+      final shift = s.shift.trim().isNotEmpty ? s.shift.trim() : 'Full Day';
+      list.add(shift);
+    }
+    return map;
+  }
+
+  /// Reconstructs non-PII seat occupancy markers from the sanitized `public_occupancy` map.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+    final result = <StudentInfo>[];
+    occupancy.forEach((seatKey, rawShifts) {
+      final seatNum = int.tryParse(seatKey);
+      if (seatNum == null || seatNum <= 0) return;
+      if (rawShifts is List) {
+        for (int i = 0; i < rawShifts.length; i++) {
+          final shiftName = rawShifts[i]?.toString().trim() ?? 'Full Day';
+          result.add(StudentInfo(
+            id: 'occ_${seatNum}_$i',
+            name: 'Occupied',
+            phone: '',
+            shift: shiftName.isNotEmpty ? shiftName : 'Full Day',
+            seatNumber: seatNum,
+            status: 'ACTIVE',
+          ));
+        }
+      }
+    });
+    return result;
+  }
+
+  /// Syncs sanitized (zero-PII) seat occupancy & pass validity docs for public QR portals.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+    if (!isCloudSyncActive) return;
+    if (FirebaseAuth.instance.currentUser == null) return;
+    final activeTenant = tenantId.trim();
+    if (activeTenant.isEmpty || activeTenant == 'default_library') return;
+
+    final targetStudents = students ?? _mockStudents;
+    final occMap = buildPublicOccupancyMap(targetStudents);
+    final sortedKeys = occMap.keys.toList()..sort();
+    final sig = '$activeTenant|$totalSeatsCount|${sortedKeys.map((k) => '$k=${occMap[k]!.join(',')}').join(';')}';
+
+    if (force || sig != _lastPublicOccupancySig) {
+      _lastPublicOccupancySig = sig;
+      try {
+        await _db
+            .collection('libraries')
+            .doc(activeTenant)
+            .collection('settings')
+            .doc('public_occupancy')
+            .set({
+          'total_seats': totalSeatsCount,
+          'occupancy': occMap,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        _lastPublicOccupancySig = '';
+      }
+    }
+
+    for (final s in targetStudents) {
+      if (s.id.isEmpty || s.status.toUpperCase() == 'UNALLOCATED') continue;
+      final passKey = '$activeTenant|${s.id}';
+      final passSig = '${s.seatNumber ?? ''}|${s.shift}|${s.status}|${s.feeDueDate?.millisecondsSinceEpoch ?? ''}';
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+      _lastPublicPassSigs[passKey] = passSig;
+      try {
+        await _db
+            .collection('libraries')
+            .doc(activeTenant)
+            .collection('public_passes')
+            .doc(s.id)
+            .set({
+          'student_id': s.id,
+          'seat_number': s.seatNumber,
+          'shift': s.shift,
+          'status': s.status,
+          'fee_due_date': s.feeDueDate != null ? Timestamp.fromDate(s.feeDueDate!) : null,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        _lastPublicPassSigs.remove(passKey);
+      }
+    }
   }
 
   Future<void> _loadFromLocalStorage() async {
@@ -647,6 +744,7 @@ class LibraryService {
             await _tenantCol('branches').doc(b.id).set(b.toMap(), SetOptions(merge: true));
           }
         }
+        await syncPublicOccupancyToCloud(force: true);
       } catch (_) {}
     }
   }
@@ -1698,6 +1796,103 @@ class LibraryService {
     if (!_mockSeatsController.isClosed) {
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
     }
+    syncPublicOccupancyToCloud();
+  }
+
+  static String _lastPublicOccupancySig = '';
+  static final Map<String, String> _lastPublicPassSigs = {};
+
+  /// Builds a sanitized map of `seatNumber -> List<shiftName>` containing zero student PII.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+    final map = <String, List<String>>{};
+    for (final s in students) {
+      if (s.seatNumber == null || s.seatNumber! <= 0) continue;
+      if (s.status.toUpperCase() == 'INACTIVE') continue;
+      final key = s.seatNumber.toString();
+      final list = map.putIfAbsent(key, () => <String>[]);
+      final shift = s.shift.trim().isNotEmpty ? s.shift.trim() : 'Full Day';
+      list.add(shift);
+    }
+    return map;
+  }
+
+  /// Reconstructs non-PII seat occupancy markers from the sanitized `public_occupancy` map.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+    final result = <StudentInfo>[];
+    occupancy.forEach((seatKey, rawShifts) {
+      final seatNum = int.tryParse(seatKey);
+      if (seatNum == null || seatNum <= 0) return;
+      if (rawShifts is List) {
+        for (int i = 0; i < rawShifts.length; i++) {
+          final shiftName = rawShifts[i]?.toString().trim() ?? 'Full Day';
+          result.add(StudentInfo(
+            id: 'occ_${seatNum}_$i',
+            name: 'Occupied',
+            phone: '',
+            shift: shiftName.isNotEmpty ? shiftName : 'Full Day',
+            seatNumber: seatNum,
+            status: 'ACTIVE',
+          ));
+        }
+      }
+    });
+    return result;
+  }
+
+  /// Syncs sanitized (zero-PII) seat occupancy & pass validity docs for public QR portals.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+    if (!isCloudSyncActive) return;
+    if (FirebaseAuth.instance.currentUser == null) return;
+    final activeTenant = tenantId.trim();
+    if (activeTenant.isEmpty || activeTenant == 'default_library') return;
+
+    final targetStudents = students ?? _mockStudents;
+    final occMap = buildPublicOccupancyMap(targetStudents);
+    final sortedKeys = occMap.keys.toList()..sort();
+    final sig = '$activeTenant|$totalSeatsCount|${sortedKeys.map((k) => '$k=${occMap[k]!.join(',')}').join(';')}';
+
+    if (force || sig != _lastPublicOccupancySig) {
+      _lastPublicOccupancySig = sig;
+      try {
+        await _db
+            .collection('libraries')
+            .doc(activeTenant)
+            .collection('settings')
+            .doc('public_occupancy')
+            .set({
+          'total_seats': totalSeatsCount,
+          'occupancy': occMap,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        _lastPublicOccupancySig = '';
+      }
+    }
+
+    for (final s in targetStudents) {
+      if (s.id.isEmpty || s.status.toUpperCase() == 'UNALLOCATED') continue;
+      final passKey = '$activeTenant|${s.id}';
+      final passSig = '${s.seatNumber ?? ''}|${s.shift}|${s.status}|${s.feeDueDate?.millisecondsSinceEpoch ?? ''}';
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+      _lastPublicPassSigs[passKey] = passSig;
+      try {
+        await _db
+            .collection('libraries')
+            .doc(activeTenant)
+            .collection('public_passes')
+            .doc(s.id)
+            .set({
+          'student_id': s.id,
+          'seat_number': s.seatNumber,
+          'shift': s.shift,
+          'status': s.status,
+          'fee_due_date': s.feeDueDate != null ? Timestamp.fromDate(s.feeDueDate!) : null,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        _lastPublicPassSigs.remove(passKey);
+      }
+    }
   }
   Future<void> saveLocalState() => _saveLocalState();
   void notifyStudentsChanged() {
@@ -1728,6 +1923,103 @@ class LibraryService {
     notifyRegistrationRequestsChanged();
     if (!_mockSeatsController.isClosed) {
       _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    }
+    syncPublicOccupancyToCloud();
+  }
+
+  static String _lastPublicOccupancySig = '';
+  static final Map<String, String> _lastPublicPassSigs = {};
+
+  /// Builds a sanitized map of `seatNumber -> List<shiftName>` containing zero student PII.
+  static Map<String, List<String>> buildPublicOccupancyMap(List<StudentInfo> students) {
+    final map = <String, List<String>>{};
+    for (final s in students) {
+      if (s.seatNumber == null || s.seatNumber! <= 0) continue;
+      if (s.status.toUpperCase() == 'INACTIVE') continue;
+      final key = s.seatNumber.toString();
+      final list = map.putIfAbsent(key, () => <String>[]);
+      final shift = s.shift.trim().isNotEmpty ? s.shift.trim() : 'Full Day';
+      list.add(shift);
+    }
+    return map;
+  }
+
+  /// Reconstructs non-PII seat occupancy markers from the sanitized `public_occupancy` map.
+  static List<StudentInfo> studentsFromPublicOccupancy(Map<String, dynamic> occupancy) {
+    final result = <StudentInfo>[];
+    occupancy.forEach((seatKey, rawShifts) {
+      final seatNum = int.tryParse(seatKey);
+      if (seatNum == null || seatNum <= 0) return;
+      if (rawShifts is List) {
+        for (int i = 0; i < rawShifts.length; i++) {
+          final shiftName = rawShifts[i]?.toString().trim() ?? 'Full Day';
+          result.add(StudentInfo(
+            id: 'occ_${seatNum}_$i',
+            name: 'Occupied',
+            phone: '',
+            shift: shiftName.isNotEmpty ? shiftName : 'Full Day',
+            seatNumber: seatNum,
+            status: 'ACTIVE',
+          ));
+        }
+      }
+    });
+    return result;
+  }
+
+  /// Syncs sanitized (zero-PII) seat occupancy & pass validity docs for public QR portals.
+  Future<void> syncPublicOccupancyToCloud({List<StudentInfo>? students, bool force = false}) async {
+    if (!isCloudSyncActive) return;
+    if (FirebaseAuth.instance.currentUser == null) return;
+    final activeTenant = tenantId.trim();
+    if (activeTenant.isEmpty || activeTenant == 'default_library') return;
+
+    final targetStudents = students ?? _mockStudents;
+    final occMap = buildPublicOccupancyMap(targetStudents);
+    final sortedKeys = occMap.keys.toList()..sort();
+    final sig = '$activeTenant|$totalSeatsCount|${sortedKeys.map((k) => '$k=${occMap[k]!.join(',')}').join(';')}';
+
+    if (force || sig != _lastPublicOccupancySig) {
+      _lastPublicOccupancySig = sig;
+      try {
+        await _db
+            .collection('libraries')
+            .doc(activeTenant)
+            .collection('settings')
+            .doc('public_occupancy')
+            .set({
+          'total_seats': totalSeatsCount,
+          'occupancy': occMap,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        _lastPublicOccupancySig = '';
+      }
+    }
+
+    for (final s in targetStudents) {
+      if (s.id.isEmpty || s.status.toUpperCase() == 'UNALLOCATED') continue;
+      final passKey = '$activeTenant|${s.id}';
+      final passSig = '${s.seatNumber ?? ''}|${s.shift}|${s.status}|${s.feeDueDate?.millisecondsSinceEpoch ?? ''}';
+      if (!force && _lastPublicPassSigs[passKey] == passSig) continue;
+      _lastPublicPassSigs[passKey] = passSig;
+      try {
+        await _db
+            .collection('libraries')
+            .doc(activeTenant)
+            .collection('public_passes')
+            .doc(s.id)
+            .set({
+          'student_id': s.id,
+          'seat_number': s.seatNumber,
+          'shift': s.shift,
+          'status': s.status,
+          'fee_due_date': s.feeDueDate != null ? Timestamp.fromDate(s.feeDueDate!) : null,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        _lastPublicPassSigs.remove(passKey);
+      }
     }
   }
 
@@ -1829,6 +2121,19 @@ class LibraryService {
               final sVal = (sData['total_seats'] as num).toInt();
               if (sVal > 0) cloudTotalSeats = sVal;
             }
+          }
+        } catch (_) {}
+
+        try {
+          final occDoc = await _db
+              .collection('libraries')
+              .doc(clean)
+              .collection('settings')
+              .doc('public_occupancy')
+              .get();
+          if (occDoc.exists && occDoc.data() != null && occDoc.data()!['total_seats'] != null) {
+            final sVal = (occDoc.data()!['total_seats'] as num).toInt();
+            if (sVal > 0 && cloudTotalSeats == 0) cloudTotalSeats = sVal;
           }
         } catch (_) {}
 
@@ -3212,6 +3517,7 @@ class LibraryService {
           _mockStudents.addAll(list);
           _syncSeatsWithStudents();
           _saveLocalState();
+          syncPublicOccupancyToCloud(students: list);
           return list;
         }).handleError((_) => List.unmodifiable(_mockStudents));
         yield* cloudStream;
@@ -3221,34 +3527,88 @@ class LibraryService {
     yield* _mockStudentsController.stream;
   }
 
-  /// Public read-only student stream for QR portals on unauthenticated devices.
-  /// Queries `libraries/<targetTenantId>/students` directly in Firestore when Firebase is connected,
-  /// without mutating local admin storage, and falls back to in-memory state when offline/local.
-  Stream<List<StudentInfo>> streamPublicStudents(String targetTenantId) async* {
+  /// Public read-only student/occupancy stream for QR portals on unauthenticated devices.
+  /// Reads sanitized non-PII `settings/public_occupancy` (or `public_passes/{verifyStudentId}` for
+  /// gate-pass verification) from Firestore when connected, falling back safely to legacy `students`
+  /// if `public_occupancy` has not yet been synced, or local state when offline/local.
+  Stream<List<StudentInfo>> streamPublicStudents(String targetTenantId, {String? verifyStudentId}) async* {
     ensureInitialized();
     final clean = targetTenantId.trim();
+    final cleanVerify = verifyStudentId?.trim() ?? '';
     if (isFirebaseConnected && clean.isNotEmpty && clean != 'default_library') {
       if (isAuthenticated && tenantId == clean && _mockStudents.isNotEmpty) {
         yield List.unmodifiable(_mockStudents);
       }
+
+      if (cleanVerify.isNotEmpty) {
+        try {
+          await for (final passSnap in _db
+              .collection('libraries')
+              .doc(clean)
+              .collection('public_passes')
+              .doc(cleanVerify)
+              .snapshots()) {
+            if (passSnap.exists && passSnap.data() != null) {
+              final d = passSnap.data()!;
+              yield [
+                StudentInfo(
+                  id: passSnap.id,
+                  name: '',
+                  phone: '',
+                  seatNumber: (d['seat_number'] as num?)?.toInt(),
+                  shift: (d['shift'] as String?) ?? '',
+                  status: (d['status'] as String?) ?? 'ACTIVE',
+                  feeDueDate: (d['fee_due_date'] as Timestamp?)?.toDate(),
+                ),
+              ];
+            } else {
+              try {
+                final legacyDoc = await _db
+                    .collection('libraries')
+                    .doc(clean)
+                    .collection('students')
+                    .doc(cleanVerify)
+                    .get();
+                if (legacyDoc.exists && legacyDoc.data() != null) {
+                  yield [StudentInfo.fromFirestore(legacyDoc.id, legacyDoc.data()!)];
+                } else {
+                  yield const <StudentInfo>[];
+                }
+              } catch (_) {
+                yield const <StudentInfo>[];
+              }
+            }
+          }
+          return;
+        } catch (_) {}
+      }
+
       try {
-        final cloudStream = _db
+        await for (final occSnap in _db
             .collection('libraries')
             .doc(clean)
-            .collection('students')
-            .snapshots()
-            .map((snapshot) {
-          final list = snapshot.docs
-              .map((d) => StudentInfo.fromFirestore(d.id, d.data()))
-              .toList();
-          list.sort((a, b) {
-            final aj = a.joinedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final bj = b.joinedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return bj.compareTo(aj);
-          });
-          return list;
-        });
-        yield* cloudStream;
+            .collection('settings')
+            .doc('public_occupancy')
+            .snapshots()) {
+          if (occSnap.exists && occSnap.data() != null && occSnap.data()!['occupancy'] is Map) {
+            final occMap = Map<String, dynamic>.from(occSnap.data()!['occupancy'] as Map);
+            yield studentsFromPublicOccupancy(occMap);
+          } else {
+            try {
+              final legacySnaps = await _db
+                  .collection('libraries')
+                  .doc(clean)
+                  .collection('students')
+                  .get();
+              final list = legacySnaps.docs
+                  .map((d) => StudentInfo.fromFirestore(d.id, d.data()))
+                  .toList();
+              yield list;
+            } catch (_) {
+              yield const <StudentInfo>[];
+            }
+          }
+        }
         return;
       } catch (_) {}
     }
@@ -4401,6 +4761,8 @@ class LibraryService {
         final batch = _db.batch();
         final studentDocRef = _tenantCol('students').doc(studentId);
         batch.delete(studentDocRef);
+        batch.delete(_tenantCol('public_passes').doc(studentId));
+        _lastPublicPassSigs.remove('${tenantId.trim()}|$studentId');
 
         // Delete all payment records linked to this student from Firestore
         try {

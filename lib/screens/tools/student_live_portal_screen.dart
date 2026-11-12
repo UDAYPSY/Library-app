@@ -66,7 +66,10 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
       }
       _fetchCloudLibraryProfile(targetLib);
     }
-    _studentsStream = _service.streamPublicStudents(targetLib);
+    _studentsStream = _service.streamPublicStudents(
+      targetLib,
+      verifyStudentId: _urlParams['verify'],
+    );
   }
 
   Future<void> _fetchCloudLibraryProfile(String targetLib) async {
@@ -166,11 +169,18 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
           } catch (_) {}
         }
 
-        final studentName = matchedStudent?.name ?? paramStudent ?? 'Registered Student';
+        final matchedName = matchedStudent?.name.trim() ?? '';
+        final studentName = (matchedName.isNotEmpty && matchedName != 'Occupied')
+            ? matchedName
+            : (paramStudent ?? 'Registered Student');
         final seatNum = matchedStudent?.seatNumber ?? int.tryParse(paramSeat ?? '') ?? 0;
-        final shiftName = matchedStudent?.shift ?? paramShift ?? 'Regular Shift';
+        final shiftName = (matchedStudent != null && matchedStudent.shift.trim().isNotEmpty)
+            ? matchedStudent.shift
+            : (paramShift ?? 'Regular Shift');
         final status = (matchedStudent?.status ?? paramStatus ?? 'ACTIVE').toUpperCase();
-        final studentPhone = matchedStudent?.phone ?? paramPhone ?? '';
+        final studentPhone = (matchedStudent != null && matchedStudent.phone.trim().isNotEmpty)
+            ? matchedStudent.phone
+            : (paramPhone ?? '');
         final feeDueDate = matchedStudent?.feeDueDate ?? (paramValid != null && paramValid.isNotEmpty ? DateTime.tryParse(paramValid) : null);
         final studentPhoto = matchedStudent?.hasPhoto == true ? matchedStudent!.photoBase64 : null;
         final libraryName = (paramLibName != null && paramLibName.trim().isNotEmpty) ? paramLibName.trim() : (profile.libraryName.trim().isNotEmpty ? profile.libraryName.trim() : 'Digital Library');
@@ -606,7 +616,10 @@ class _StudentLivePortalScreenState extends State<StudentLivePortalScreen> {
                           TextButton(
                             onPressed: () {
                               setState(() {
-                                _studentsStream = _service.streamPublicStudents(_effectiveLibraryId);
+                                _studentsStream = _service.streamPublicStudents(
+                                  _effectiveLibraryId,
+                                  verifyStudentId: _urlParams['verify'],
+                                );
                               });
                             },
                             child: const Text('Retry', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),

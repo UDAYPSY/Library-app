@@ -1607,6 +1607,47 @@ void main() {
       expect(service.currentRegistrationRequests.any((r) => r.id == 'req_del_001'), isFalse);
       expect(service.findStudentByPhone('9833445566'), isNull);
     });
+
+    test('Public occupancy map excludes student PII while preserving seat and shift occupancy', () {
+      final students = [
+        StudentInfo(
+          id: 'st_pii_1',
+          name: 'Secret Student',
+          phone: '9998887776',
+          shift: 'Morning Shift',
+          seatNumber: 7,
+          status: 'ACTIVE',
+          aadhaarNumber: '123456789012',
+        ),
+        StudentInfo(
+          id: 'st_pii_2',
+          name: 'Evening Student',
+          phone: '9998887775',
+          shift: 'Evening Shift',
+          seatNumber: 7,
+          status: 'ACTIVE',
+        ),
+        StudentInfo(
+          id: 'st_pii_3',
+          name: 'Inactive Student',
+          phone: '9998887774',
+          shift: 'Full Day',
+          seatNumber: 8,
+          status: 'INACTIVE',
+        ),
+      ];
+
+      final occMap = LibraryService.buildPublicOccupancyMap(students);
+      expect(occMap.containsKey('7'), isTrue);
+      expect(occMap['7'], equals(['Morning Shift', 'Evening Shift']));
+      expect(occMap.containsKey('8'), isFalse);
+
+      final reconstructed = LibraryService.studentsFromPublicOccupancy(occMap);
+      expect(reconstructed.length, equals(2));
+      expect(reconstructed.every((s) => s.name == 'Occupied' && s.phone.isEmpty), isTrue);
+      expect(reconstructed.any((s) => s.seatNumber == 7 && s.shift == 'Morning Shift'), isTrue);
+      expect(reconstructed.any((s) => s.seatNumber == 7 && s.shift == 'Evening Shift'), isTrue);
+    });
   });
 }
 

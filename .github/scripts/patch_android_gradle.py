@@ -27,20 +27,18 @@ def patch_gradle_files():
             content = re.sub(r'namespace\s*=\s*["\'][^"\']+["\']', 'namespace = "com.trackmylibrary.app"', content)
             content = re.sub(r'applicationId\s*=\s*["\'][^"\']+["\']', 'applicationId = "com.trackmylibrary.app"', content)
 
-            kts_signing = '''    signingConfigs {
-        getByName("debug") {
-            storeFile = file("${project.projectDir}/release.jks")
-            storePassword = "trackmylib2026"
-            keyAlias = "trackmylib"
-            keyPassword = "trackmylib2026"
-        }
-        create("release") {
-            storeFile = file("${project.projectDir}/release.jks")
-            storePassword = "trackmylib2026"
-            keyAlias = "trackmylib"
-            keyPassword = "trackmylib2026"
-        }
-    }'''
+            store_pwd = os.environ.get('STORE_PASSWORD') or 'trackmylib2026'
+            key_alias = os.environ.get('KEY_ALIAS') or 'trackmylib'
+            key_pwd = os.environ.get('KEY_PASSWORD') or 'trackmylib2026'
+
+            kts_signing = f'''    signingConfigs {{
+        create("release") {{
+            storeFile = file("${{project.projectDir}}/release.jks")
+            storePassword = "{store_pwd}"
+            keyAlias = "{key_alias}"
+            keyPassword = "{key_pwd}"
+        }}
+    }}'''
             if 'signingConfigs {' in content:
                 content = re.sub(r'signingConfigs\s*\{.*?\n    \}', kts_signing, content, flags=re.DOTALL)
             content = re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\(["\']debug["\']\)', 'signingConfig = signingConfigs.getByName("release")', content)
@@ -54,21 +52,18 @@ def patch_gradle_files():
             content = re.sub(r'applicationId\s+["\'][^"\']+["\']', 'applicationId "com.trackmylibrary.app"', content)
             content = re.sub(r'applicationId\s*=\s*["\'][^"\']+["\']', 'applicationId = "com.trackmylibrary.app"', content)
 
-            # Override BOTH debug and release signing configs to permanently use release.jks
-            groovy_signing = '''    signingConfigs {
-        debug {
-            storeFile file("${project.projectDir}/release.jks")
-            storePassword 'trackmylib2026'
-            keyAlias 'trackmylib'
-            keyPassword 'trackmylib2026'
-        }
-        release {
-            storeFile file("${project.projectDir}/release.jks")
-            storePassword 'trackmylib2026'
-            keyAlias 'trackmylib'
-            keyPassword 'trackmylib2026'
-        }
-    }'''
+            store_pwd = os.environ.get('STORE_PASSWORD') or 'trackmylib2026'
+            key_alias = os.environ.get('KEY_ALIAS') or 'trackmylib'
+            key_pwd = os.environ.get('KEY_PASSWORD') or 'trackmylib2026'
+
+            groovy_signing = f'''    signingConfigs {{
+        release {{
+            storeFile file("${{project.projectDir}}/release.jks")
+            storePassword '{store_pwd}'
+            keyAlias '{key_alias}'
+            keyPassword '{key_pwd}'
+        }}
+    }}'''
             if 'signingConfigs {' in content:
                 content = re.sub(r'signingConfigs\s*\{.*?\n    \}', groovy_signing, content, flags=re.DOTALL)
             else:
