@@ -1669,56 +1669,60 @@ void main() {
     });
 
     test('Overdue monthly cycles and effectiveDues accurately compute for 1, 2, and multi-month overdue periods', () {
-      final now = DateTime(2026, 11, 17);
+      final now = DateTime.now();
+      final oneMonthAgo = StudentInfo.addMonths(now, -1);
+      final twoMonthsAgo = StudentInfo.addMonths(now, -2);
+      final futureDate = StudentInfo.addMonths(now, 1);
 
-      // Student 1: Unexpired active student (due 25-Nov-2026) -> 0 overdue months, 0 dues
+      // Student 1: Unexpired active student -> 0 overdue months, 0 dues
       final activeStudent = StudentInfo(
         id: 'st_active_test',
         name: 'Active Student',
         phone: '9811122233',
         monthlyFee: 500,
-        feeDueDate: DateTime(2026, 11, 25),
+        feeDueDate: futureDate,
       );
       expect(activeStudent.calculateOverdueCycles(now), equals(0));
       expect(activeStudent.effectiveDues, equals(0));
 
-      // Student 2: 1 month overdue (due 17-Oct-2026) -> 1 overdue month, dues = 500
+      // Student 2: 1 month overdue -> 1 overdue month, dues = 500
       final oneMonthOverdue = StudentInfo(
         id: 'st_one_mo_test',
         name: 'One Month Overdue',
         phone: '9811122234',
         monthlyFee: 500,
-        feeDueDate: DateTime(2026, 10, 17),
+        feeDueDate: oneMonthAgo,
       );
       expect(oneMonthOverdue.calculateOverdueCycles(now), equals(1));
       expect(oneMonthOverdue.effectiveDues, equals(500));
 
-      // Student 3: 2 months overdue (due 17-Sep-2026) -> 2 overdue months, dues = 1000
+      // Student 3: 2 months overdue -> 2 overdue months, dues = 1000
       final twoMonthsOverdue = StudentInfo(
         id: 'st_two_mo_test',
         name: 'Two Months Overdue',
         phone: '9811122235',
         monthlyFee: 500,
-        feeDueDate: DateTime(2026, 9, 17),
+        feeDueDate: twoMonthsAgo,
       );
       expect(twoMonthsOverdue.calculateOverdueCycles(now), equals(2));
       expect(twoMonthsOverdue.effectiveDues, equals(1000));
 
-      // Student 4: 2 months overdue with different monthly fee (due 15-Sep-2026, ₹700/mo) -> dues = 1400
+      // Student 4: 2 months overdue with different monthly fee (₹700/mo) -> dues = 1400
       final customFeeOverdue = StudentInfo(
         id: 'st_custom_due_test',
         name: 'Custom Fee Overdue',
         phone: '9811122236',
         monthlyFee: 700,
-        feeDueDate: DateTime(2026, 9, 15),
+        feeDueDate: twoMonthsAgo,
       );
       expect(customFeeOverdue.calculateOverdueCycles(now), equals(2));
       expect(customFeeOverdue.effectiveDues, equals(1400));
     });
 
     test('Collecting due payment accurately picks membership validity date as fromDate and extends tenure correctly', () async {
-      // Seed a student who is 2 months overdue (due 15-Sep-2026, today is 17-Nov-2026)
-      final feeDueDate = DateTime(2026, 9, 15);
+      // Seed a student who is 2 months overdue
+      final now = DateTime.now();
+      final feeDueDate = StudentInfo.addMonths(now, -2);
       final std = StudentInfo(
         id: 'std_overdue_collection_test',
         name: 'Overdue Ramesh',
@@ -1735,11 +1739,11 @@ void main() {
       expect(studentBefore.effectiveDues, equals(1000)); // 2 months overdue = 1000
 
       // 1. Partial Due Payment: Ramesh pays for 1 month (500)
-      // fromDate must be membership validity date (15-Sep-2026), NOT payment date!
-      // validUntil must extend by 1 month to 15-Oct-2026
+      // fromDate must be membership validity date (feeDueDate), NOT payment date!
+      // validUntil must extend by 1 month to addMonths(feeDueDate, 1)
       final fromDate1 = studentBefore.feeDueDate!;
       final untilDate1 = StudentInfo.addMonths(fromDate1, 1);
-      final paymentDate = DateTime.now();
+      final paymentDate = now;
 
       await service.recordPayment(
         studentId: std.id,
@@ -1752,7 +1756,7 @@ void main() {
         validFrom: fromDate1,
         validUntil: untilDate1,
         durationMonths: 1,
-        notes: 'Partial due payment for 1 month of 2 months due (Period: 15-Sep-2026 to 15-Oct-2026)',
+        notes: 'Partial due payment for 1 month of 2 months due',
       );
 
       await service.updateStudent(
@@ -1767,17 +1771,17 @@ void main() {
       );
 
       final studentAfter1 = service.findStudentById('std_overdue_collection_test')!;
-      expect(studentAfter1.feeDueDate, equals(DateTime(2026, 10, 15)));
+      expect(studentAfter1.feeDueDate, equals(untilDate1));
       expect(studentAfter1.duesAmount, equals(500));
       expect(studentAfter1.status, equals('DUES'));
 
       final latestPayment1 = service.currentPayments.firstWhere((p) => p.studentId == std.id);
-      expect(latestPayment1.validFrom, equals(DateTime(2026, 9, 15)));
-      expect(latestPayment1.validUntil, equals(DateTime(2026, 10, 15)));
+      expect(latestPayment1.validFrom, equals(fromDate1));
+      expect(latestPayment1.validUntil, equals(untilDate1));
 
       // 2. Full Clearance: Ramesh now pays the remaining 1 month due (500)
-      // fromDate must be updated validity date (15-Oct-2026)
-      // validUntil must extend to 15-Nov-2026
+      // fromDate must be updated validity date (untilDate1)
+      // validUntil must extend to untilDate2
       final fromDate2 = studentAfter1.feeDueDate!;
       final untilDate2 = StudentInfo.addMonths(fromDate2, 1);
 
@@ -1792,7 +1796,7 @@ void main() {
         validFrom: fromDate2,
         validUntil: untilDate2,
         durationMonths: 1,
-        notes: 'Full due settlement payment (Period: 15-Oct-2026 to 15-Nov-2026)',
+        notes: 'Full due settlement payment',
       );
 
       await service.updateStudent(
@@ -1807,13 +1811,13 @@ void main() {
       );
 
       final studentAfter2 = service.findStudentById('std_overdue_collection_test')!;
-      expect(studentAfter2.feeDueDate, equals(DateTime(2026, 11, 15)));
+      expect(studentAfter2.feeDueDate, equals(untilDate2));
       expect(studentAfter2.duesAmount, equals(0));
       expect(studentAfter2.status, equals('ACTIVE'));
 
       final latestPayment2 = service.currentPayments.firstWhere((p) => p.studentId == std.id);
-      expect(latestPayment2.validFrom, equals(DateTime(2026, 10, 15)));
-      expect(latestPayment2.validUntil, equals(DateTime(2026, 11, 15)));
+      expect(latestPayment2.validFrom, equals(fromDate2));
+      expect(latestPayment2.validUntil, equals(untilDate2));
     });
   });
 }

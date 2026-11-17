@@ -469,12 +469,23 @@ class StudentInfo {
 
   bool get hasPhoto => photoBase64 != null && photoBase64!.isNotEmpty;
 
+  /// Returns the number of days in the specified month of a year.
+  static int daysInMonth(int year, int month) {
+    if (month == 2) {
+      final isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+      return isLeap ? 29 : 28;
+    }
+    const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return days[month - 1];
+  }
+
   /// Safely advances or steps back a DateTime by the given number of months with month-end clamping.
   static DateTime addMonths(DateTime date, int months) {
-    final newYear = date.year + ((date.month - 1 + months) ~/ 12);
-    final newMonth = ((date.month - 1 + months) % 12) + 1;
-    final daysInTargetMonth = DateTime(newYear, newMonth + 1, 0).day;
-    final newDay = date.day > daysInTargetMonth ? daysInTargetMonth : date.day;
+    final totalMonths = (date.year * 12) + (date.month - 1) + months;
+    final newYear = totalMonths ~/ 12;
+    final newMonth = (totalMonths % 12) + 1;
+    final maxDays = daysInMonth(newYear, newMonth);
+    final newDay = date.day > maxDays ? maxDays : date.day;
     return DateTime(newYear, newMonth, newDay, date.hour, date.minute, date.second);
   }
 
@@ -501,11 +512,12 @@ class StudentInfo {
     return false;
   }
 
-  int get effectiveDues {
+  int calculateEffectiveDues([DateTime? referenceDate]) {
     if (status == 'INACTIVE' || status == 'TRIAL') return 0;
+    final now = referenceDate ?? DateTime.now();
     final mFee = monthlyFee > 0 ? monthlyFee : 500;
-    if (feeDueDate != null && feeDueDate!.isBefore(DateTime.now())) {
-      final cycles = overdueMonths;
+    if (feeDueDate != null && feeDueDate!.isBefore(now)) {
+      final cycles = calculateOverdueCycles(now);
       final periodicDue = cycles * mFee;
       if (duesAmount > 0 && duesAmount < mFee) {
         return duesAmount + periodicDue;
@@ -516,6 +528,8 @@ class StudentInfo {
     if (hasDues) return mFee;
     return 0;
   }
+
+  int get effectiveDues => calculateEffectiveDues();
 
   static const Object _sentinel = Object();
 
