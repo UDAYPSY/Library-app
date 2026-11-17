@@ -3648,7 +3648,7 @@ class LibraryService {
         }
       } else if (s.feeDueDate != null && s.feeDueDate!.isBefore(payDate) && newDues == 0) {
         final monthsToAdd = durationMonths != null && durationMonths > 0 ? durationMonths : 1;
-        updatedDueDate = DateTime(payDate.year, payDate.month + monthsToAdd, payDate.day);
+        updatedDueDate = StudentInfo.addMonths(s.feeDueDate!, monthsToAdd);
       }
 
       final dateStr = DateFormat('dd-MMM-yyyy').format(payDate);
@@ -5138,10 +5138,16 @@ class LibraryService {
     final sIdx = _mockStudents.indexWhere((s) => s.id == studentId);
     final s = sIdx != -1 ? _mockStudents[sIdx] : null;
 
+    DateTime? targetFrom;
     DateTime? targetUntil;
     if (s != null && s.duesAmount > 0 && s.feeDueDate != null && s.feeDueDate!.isAfter(now)) {
+      targetFrom = s.joinedAt ?? s.feeDueDate!.subtract(const Duration(days: 30));
       targetUntil = s.feeDueDate;
+    } else if (s != null && s.feeDueDate != null) {
+      targetFrom = s.feeDueDate;
+      targetUntil = StudentInfo.addMonths(s.feeDueDate!, 1);
     } else {
+      targetFrom = now;
       targetUntil = now.add(const Duration(days: 30));
     }
 
@@ -5155,7 +5161,7 @@ class LibraryService {
       date: now,
       paymentMode: paymentMode,
       notes: notes,
-      validFrom: now,
+      validFrom: targetFrom,
       validUntil: targetUntil,
     );
   }

@@ -469,6 +469,31 @@ class StudentInfo {
 
   bool get hasPhoto => photoBase64 != null && photoBase64!.isNotEmpty;
 
+  /// Safely advances or steps back a DateTime by the given number of months with month-end clamping.
+  static DateTime addMonths(DateTime date, int months) {
+    final newYear = date.year + ((date.month - 1 + months) ~/ 12);
+    final newMonth = ((date.month - 1 + months) % 12) + 1;
+    final daysInTargetMonth = DateTime(newYear, newMonth + 1, 0).day;
+    final newDay = date.day > daysInTargetMonth ? daysInTargetMonth : date.day;
+    return DateTime(newYear, newMonth, newDay, date.hour, date.minute, date.second);
+  }
+
+  /// Calculates the number of overdue monthly cycles between feeDueDate and referenceDate (defaults to now).
+  int calculateOverdueCycles([DateTime? referenceDate]) {
+    if (feeDueDate == null) return 0;
+    final now = referenceDate ?? DateTime.now();
+    final due = DateTime(feeDueDate!.year, feeDueDate!.month, feeDueDate!.day);
+    final today = DateTime(now.year, now.month, now.day);
+    if (!due.isBefore(today)) return 0;
+    int months = (today.year - due.year) * 12 + (today.month - due.month);
+    if (today.day > due.day && months == 0) {
+      months = 1;
+    }
+    return months < 1 ? 1 : months.clamp(1, 120);
+  }
+
+  int get overdueMonths => calculateOverdueCycles();
+
   bool get hasDues {
     if (status == 'INACTIVE' || status == 'TRIAL') return false;
     if (status == 'DUES' || duesAmount > 0) return true;
@@ -477,8 +502,18 @@ class StudentInfo {
   }
 
   int get effectiveDues {
+    if (status == 'INACTIVE' || status == 'TRIAL') return 0;
+    final mFee = monthlyFee > 0 ? monthlyFee : 500;
+    if (feeDueDate != null && feeDueDate!.isBefore(DateTime.now())) {
+      final cycles = overdueMonths;
+      final periodicDue = cycles * mFee;
+      if (duesAmount > 0 && duesAmount < mFee) {
+        return duesAmount + periodicDue;
+      }
+      return duesAmount > periodicDue ? duesAmount : periodicDue;
+    }
     if (duesAmount > 0) return duesAmount;
-    if (hasDues) return monthlyFee;
+    if (hasDues) return mFee;
     return 0;
   }
 

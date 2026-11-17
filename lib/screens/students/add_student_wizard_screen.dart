@@ -221,10 +221,10 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           } else {
             final advanceMonths = months - existingTenure;
             final base = s.feeDueDate!;
-            _validUntilDate = DateTime(base.year, base.month + advanceMonths, base.day);
+            _validUntilDate = StudentInfo.addMonths(base, advanceMonths);
           }
         } else {
-          _validUntilDate = DateTime(_fromDate.year, _fromDate.month + months, _fromDate.day);
+          _validUntilDate = StudentInfo.addMonths(_fromDate, months);
         }
         final due = _dueAmount;
         if (due == 0) {
@@ -236,7 +236,7 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
           }
         }
       } else {
-        _validUntilDate = DateTime(_fromDate.year, _fromDate.month + months, _fromDate.day);
+        _validUntilDate = StudentInfo.addMonths(_fromDate, months);
         _amountPaidCtrl.text = '$_calculatedTotalFee';
       }
     });
@@ -308,12 +308,12 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         _fromDate = s.joinedAt ?? s.feeDueDate!.subtract(Duration(days: 30 * _selectedDurationMonths));
         _validUntilDate = s.feeDueDate!;
       } else if (isExpired) {
-        _fromDate = now;
-        _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
+        _fromDate = s.feeDueDate ?? now;
+        _validUntilDate = StudentInfo.addMonths(_fromDate, _selectedDurationMonths);
       } else {
         // Active student with 0 dues: renewals must start from existing feeDueDate
         _fromDate = s.feeDueDate!;
-        _validUntilDate = DateTime(_fromDate.year, _fromDate.month + _selectedDurationMonths, _fromDate.day);
+        _validUntilDate = StudentInfo.addMonths(_fromDate, _selectedDurationMonths);
       }
 
       final initialDue = _dueAmount;
