@@ -3615,7 +3615,10 @@ class LibraryService {
           !s.feeDueDate!.isBefore(today);
 
       // Overlap & Duplicate check: Reject duplicate payments for already-paid active tenure
-      if (isAlreadyPaidActive && validUntil != null) {
+      final hasExistingPayment = _mockPayments.any((p) =>
+          (p.studentId.isNotEmpty && p.studentId == s.id) ||
+          (phone != null && phone.isNotEmpty && normalizePhone(p.studentPhone) == normalizePhone(phone)));
+      if (hasExistingPayment && isAlreadyPaidActive && validUntil != null) {
         final targetUntil = DateTime(validUntil.year, validUntil.month, validUntil.day);
         final currentDue = DateTime(s.feeDueDate!.year, s.feeDueDate!.month, s.feeDueDate!.day);
         if (!targetUntil.isAfter(currentDue)) {
