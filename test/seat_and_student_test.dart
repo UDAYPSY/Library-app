@@ -1815,9 +1815,14 @@ void main() {
       expect(studentAfter2.duesAmount, equals(0));
       expect(studentAfter2.status, equals('ACTIVE'));
 
-      final latestPayment2 = service.currentPayments.firstWhere((p) => p.studentId == std.id);
-      expect(latestPayment2.validFrom, equals(fromDate2));
-      expect(latestPayment2.validUntil, equals(untilDate2));
+      final allPayments = service.currentPayments.where((p) => p.studentId == std.id).toList();
+      expect(allPayments.length, equals(2));
+      final payment2 = allPayments[0]; // most recent
+      final payment1 = allPayments[1]; // first
+      expect(payment1.validFrom, equals(fromDate1));
+      expect(payment1.validUntil, equals(untilDate1));
+      expect(payment2.validFrom, equals(fromDate2));
+      expect(payment2.validUntil, equals(untilDate2));
     });
   });
 }

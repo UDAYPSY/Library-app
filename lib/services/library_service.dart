@@ -1290,6 +1290,15 @@ class LibraryService {
     }
   }
 
+  StudentInfo? findStudentById(String id) {
+    if (id.isEmpty) return null;
+    try {
+      return _mockStudents.firstWhere((s) => s.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Determines whether two shifts overlap or conflict.
   /// Full Day / 24 Hours conflicts with all shifts.
   /// Identical shifts conflict.
@@ -3599,7 +3608,7 @@ class LibraryService {
     DateTime? updatedDueDate;
     if (matchIdx != -1) {
       final s = _mockStudents[matchIdx];
-      final currentDues = s.effectiveDues;
+      final currentDues = s.duesAmount;
       final today = DateTime(payDate.year, payDate.month, payDate.day);
       final isAlreadyPaidActive = currentDues == 0 &&
           s.feeDueDate != null &&
@@ -3631,7 +3640,7 @@ class LibraryService {
 
     if (matchIdx != -1) {
       final s = _mockStudents[matchIdx];
-      final currentDues = s.effectiveDues;
+      final currentDues = s.duesAmount;
 
       final isDuePayment = currentDues > 0 || notes.toLowerCase().contains('due');
       if (isDuePayment && periodStr.isNotEmpty && !notes.toLowerCase().contains('period')) {
