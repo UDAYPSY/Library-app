@@ -265,13 +265,15 @@ void main() {
       service.sections = [
         SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
       ];
-      await service.addStudent(
+      final studentA = StudentInfo(
+        id: 'std_test_a',
         name: 'Account A Student',
         phone: '9876543210',
         seatNumber: 1,
         monthlyFee: 500,
       );
-      expect(service.students.length, 1);
+      await service.addStudent(studentA);
+      expect(service.currentStudents.length, 1);
       expect(service.totalSeatsCount, 35);
 
       await LocalStorageService.saveString('app_active_session', '{"user_id":"owner_a"}');
@@ -282,7 +284,7 @@ void main() {
       expect(service.isAuthenticated, isFalse);
       expect(service.currentUserId, isNull);
       expect(service.currentUserRole, 'Guest');
-      expect(service.students, isEmpty);
+      expect(service.currentStudents, isEmpty);
       expect(service.mockStudentsList, isEmpty);
       expect(service.totalSeatsCount, 35);
       expect(await LocalStorageService.getString('app_active_session'), isNull);
@@ -296,18 +298,20 @@ void main() {
       service.sections = [
         SectionConfig(id: 'sec_1', name: 'Hall 1', startSeat: 1, endSeat: 35),
       ];
-      await service.addStudent(
+      final studentAlpha = StudentInfo(
+        id: 'std_alpha',
         name: 'Student Alpha',
         phone: '9888888888',
         seatNumber: 5,
         monthlyFee: 600,
       );
+      await service.addStudent(studentAlpha);
       expect(service.totalSeatsCount, 35);
-      expect(service.students.length, 1);
+      expect(service.currentStudents.length, 1);
 
       // Sign out Account A
       await service.signOut();
-      expect(service.students, isEmpty);
+      expect(service.currentStudents, isEmpty);
       expect(service.totalSeatsCount, 35);
 
       // 2. Account B created with 4 seats
@@ -315,27 +319,28 @@ void main() {
       service.sections = [
         SectionConfig(id: 'sec_beta', name: 'Cabin', startSeat: 1, endSeat: 4),
       ];
-      service.generateSeats(4);
-      await service.addStudent(
+      final studentBeta = StudentInfo(
+        id: 'std_beta',
         name: 'Student Beta',
         phone: '9777777777',
         seatNumber: 2,
         monthlyFee: 400,
       );
+      await service.addStudent(studentBeta);
       expect(service.totalSeatsCount, 4);
-      expect(service.students.length, 1);
-      expect(service.students.first.name, 'Student Beta');
+      expect(service.currentStudents.length, 1);
+      expect(service.currentStudents.first.name, 'Student Beta');
 
       // Sign out Account B
       await service.signOut();
-      expect(service.students, isEmpty);
+      expect(service.currentStudents, isEmpty);
       // After sign out, state defaults back to 35 seats cleanly without residual 4 seats
       expect(service.totalSeatsCount, 35);
 
       // 3. Deleting Account B does not affect state or corrupt sections
       await service.deleteAccountPermanently();
       expect(service.totalSeatsCount, 35);
-      expect(service.students, isEmpty);
+      expect(service.currentStudents, isEmpty);
     });
   });
 }

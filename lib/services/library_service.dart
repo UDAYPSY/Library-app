@@ -987,6 +987,11 @@ class LibraryService {
         adminPhone: '',
         upiId: '',
       );
+      currentUserRole = 'Admin';
+      currentUserName = 'Admin';
+      currentUserEmail = '';
+      currentUserId = null;
+      isAuthenticated = false;
     } else {
       sections = [];
       shifts = defaultShifts;
@@ -1002,13 +1007,13 @@ class LibraryService {
         adminPhone: '',
         upiId: '',
       );
+      currentUserRole = 'Guest';
+      currentUserName = 'Guest';
+      currentUserEmail = '';
+      currentUserId = null;
+      isAuthenticated = false;
     }
 
-    currentUserId = null;
-    currentUserName = 'Guest';
-    currentUserEmail = '';
-    currentUserRole = 'Guest';
-    isAuthenticated = false;
     _loadedFromLocalStorage = false;
 
     _lastPublicOccupancySig = '';
@@ -1245,6 +1250,11 @@ class LibraryService {
     // Reset all in-memory collections and profile cleanly
     resetInMemoryState(reseedDefaults: true);
     branches.clear();
+    currentUserId = null;
+    currentUserName = 'Guest';
+    currentUserEmail = '';
+    currentUserRole = 'Guest';
+    isAuthenticated = false;
     _initialized = false;
 
     // Explicitly purge every known key to prevent any persistence leaks
@@ -3249,6 +3259,11 @@ class LibraryService {
       } catch (_) {}
     }
     resetInMemoryState(reseedDefaults: true);
+    currentUserId = null;
+    currentUserName = 'Guest';
+    currentUserEmail = '';
+    currentUserRole = 'Guest';
+    isAuthenticated = false;
     await clearTenantLocalStorage();
   }
 
