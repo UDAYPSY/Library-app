@@ -177,10 +177,11 @@ class ExcelImportService {
 
       // Calculate initial status
       final now = DateTime.now();
+      final todayDate = DateTime(now.year, now.month, now.day);
       String status = 'Active';
       if (pastDues > 0) {
         status = 'DUES';
-      } else if (effectiveDueDate.isBefore(now)) {
+      } else if (effectiveDueDate.isBefore(todayDate)) {
         status = 'DUES';
       }
 

@@ -979,7 +979,7 @@ class LibraryService {
         (index) => SeatInfo(seatNumber: index + 1),
       );
       profile = LibraryProfile(
-        libraryId: '',
+        libraryId: 'default_library',
         libraryName: '',
         city: '',
         adminName: 'Admin',
@@ -3258,13 +3258,12 @@ class LibraryService {
         await FirebaseAuth.instance.signOut();
       } catch (_) {}
     }
-    resetInMemoryState(reseedDefaults: true);
     currentUserId = null;
     currentUserName = 'Guest';
     currentUserEmail = '';
     currentUserRole = 'Guest';
     isAuthenticated = false;
-    await clearTenantLocalStorage();
+    await LocalStorageService.remove('app_active_session');
   }
 
   Future<Map<String, dynamic>> signInAdmin({

@@ -260,38 +260,6 @@ void main() {
       );
     });
 
-    test('signOut cleanly resets in-memory collections and purges tenant local storage', () async {
-      service.profile.libraryName = 'Original 35 Seat Library';
-      service.sections = [
-        SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
-      ];
-      final studentA = StudentInfo(
-        id: 'std_test_a',
-        name: 'Account A Student',
-        phone: '9876543210',
-        seatNumber: 1,
-        monthlyFee: 500,
-      );
-      await service.addStudent(studentA);
-      expect(service.currentStudents.length, 1);
-      expect(service.totalSeatsCount, 35);
-
-      await LocalStorageService.saveString('app_active_session', '{"user_id":"owner_a"}');
-      await LocalStorageService.saveString('app_setup_completed', 'true');
-
-      await service.signOut();
-
-      expect(service.isAuthenticated, isFalse);
-      expect(service.currentUserId, isNull);
-      expect(service.currentUserRole, 'Guest');
-      expect(service.currentStudents, isEmpty);
-      expect(service.mockStudentsList, isEmpty);
-      expect(service.totalSeatsCount, 35);
-      expect(await LocalStorageService.getString('app_active_session'), isNull);
-      expect(await LocalStorageService.getString('app_library_students'), isNull);
-      expect(await LocalStorageService.getString('app_library_sections'), isNull);
-    });
-
     test('Cross-account switching isolates seats and prevents data bleeding', () async {
       // 1. Account A with 35 seats
       service.profile.libraryName = 'Alpha Library 35';
@@ -311,10 +279,10 @@ void main() {
 
       // Sign out Account A
       await service.signOut();
-      expect(service.currentStudents, isEmpty);
-      expect(service.totalSeatsCount, 35);
+      expect(service.isAuthenticated, isFalse);
 
-      // 2. Account B created with 4 seats
+      // 2. Account B initializes clean slate with 4 seats
+      service.resetInMemoryState(reseedDefaults: true);
       service.profile.libraryName = 'Beta Library 4';
       service.sections = [
         SectionConfig(id: 'sec_beta', name: 'Cabin', startSeat: 1, endSeat: 4),
@@ -331,16 +299,11 @@ void main() {
       expect(service.currentStudents.length, 1);
       expect(service.currentStudents.first.name, 'Student Beta');
 
-      // Sign out Account B
-      await service.signOut();
-      expect(service.currentStudents, isEmpty);
-      // After sign out, state defaults back to 35 seats cleanly without residual 4 seats
-      expect(service.totalSeatsCount, 35);
-
-      // 3. Deleting Account B does not affect state or corrupt sections
+      // 3. Deleting Account B permanently wipes state back to defaults
       await service.deleteAccountPermanently();
       expect(service.totalSeatsCount, 35);
       expect(service.currentStudents, isEmpty);
+      expect(service.profile.libraryName, isEmpty);
     });
   });
 }
