@@ -36,8 +36,9 @@ service cloud.firestore {
       // Sanitized non-PII student pass validity check for QR ID Gate Pass
       match /public_passes/{studentId} {
         allow get: if true;
-        allow list: if false;
+        allow list: if isLibraryOwner(libraryId);
         allow write: if isSignedIn();
+        allow delete: if isLibraryOwner(libraryId) || isSignedIn();
       }
 
       match /seats/{seatId} {
@@ -61,9 +62,10 @@ service cloud.firestore {
       // Settings docs (branding, sections, shifts, sanitized public_occupancy) readable by exact ID for QR portals
       match /settings/{docId} {
         allow get: if true;
-        allow list: if false;
+        allow list: if isLibraryOwner(libraryId);
         allow write: if isLibraryOwner(libraryId)
                      || (isSignedIn() && docId == 'public_occupancy');
+        allow delete: if isLibraryOwner(libraryId);
       }
 
       match /staff/{staffId} {
@@ -78,6 +80,11 @@ service cloud.firestore {
 
       match /backups/{backupId} {
         allow read, write: if isLibraryOwner(libraryId);
+      }
+
+      match /attendance/{attendanceId} {
+        allow read, write: if isSignedIn();
+        allow delete: if isLibraryOwner(libraryId);
       }
 
       match /registration_requests/{requestId} {

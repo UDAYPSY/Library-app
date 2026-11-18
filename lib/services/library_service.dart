@@ -67,10 +67,11 @@ class LibraryService {
 
   // Active configuration models
   LibraryProfile profile = LibraryProfile();
-  List<SectionConfig> sections = [
+  static List<SectionConfig> get defaultSections => [
     SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
   ];
-  List<ShiftConfig> shifts = [
+
+  static List<ShiftConfig> get defaultShifts => [
     ShiftConfig(
       id: 'shift_1',
       name: 'Full Day',
@@ -118,9 +119,7 @@ class LibraryService {
     ),
   ];
 
-  List<StaffMember> staffList = [];
-
-  List<LibraryBranch> branches = [
+  static List<LibraryBranch> get defaultBranches => [
     const LibraryBranch(
       id: 'branch_1',
       name: 'Main Campus (Central)',
@@ -129,6 +128,11 @@ class LibraryService {
       isDefault: true,
     ),
   ];
+
+  List<SectionConfig> sections = defaultSections;
+  List<ShiftConfig> shifts = defaultShifts;
+  List<StaffMember> staffList = [];
+  List<LibraryBranch> branches = defaultBranches;
   String activeBranchId = 'branch_1';
 
   List<LibraryBranch> get effectiveBranches {
@@ -925,6 +929,112 @@ class LibraryService {
   }
 
 
+  Future<void> clearTenantLocalStorage() async {
+    final keysToRemove = [
+      'app_library_students',
+      'app_library_payments',
+      'app_library_expenses',
+      'app_library_staff',
+      'app_library_profile',
+      'app_admin_profile',
+      'app_library_sections',
+      'app_library_shifts',
+      'app_library_branches',
+      'app_library_active_branch',
+      'app_library_registration_requests',
+      'app_library_attendance',
+      'app_setup_completed',
+      'app_active_session',
+      'app_last_login_identifier',
+      'app_biometric_binding',
+      'app_admin_password',
+      'app_admin_password_hash',
+      'gdrive_auto_backup_enabled',
+      'gdrive_backup_email',
+      'gdrive_last_snapshot_content',
+      'gdrive_last_backup_time',
+      'gdrive_last_backup_size',
+      'gdrive_last_backup_status',
+    ];
+    for (final key in keysToRemove) {
+      await LocalStorageService.remove(key);
+    }
+  }
+
+  void resetInMemoryState({bool reseedDefaults = true}) {
+    _mockStudents.clear();
+    _mockPayments.clear();
+    _mockExpenses.clear();
+    _mockRegistrationRequests.clear();
+    _mockAttendance.clear();
+    staffList.clear();
+
+    if (reseedDefaults) {
+      sections = defaultSections;
+      shifts = defaultShifts;
+      branches = defaultBranches;
+      activeBranchId = 'branch_1';
+      _mockSeats = List.generate(
+        totalSeatsCount,
+        (index) => SeatInfo(seatNumber: index + 1),
+      );
+      profile = LibraryProfile(
+        libraryId: '',
+        libraryName: '',
+        city: '',
+        adminName: 'Admin',
+        adminEmail: '',
+        adminPhone: '',
+        upiId: '',
+      );
+    } else {
+      sections = [];
+      shifts = defaultShifts;
+      branches = [];
+      activeBranchId = '';
+      _mockSeats = [];
+      profile = LibraryProfile(
+        libraryId: '',
+        libraryName: '',
+        city: '',
+        adminName: '',
+        adminEmail: '',
+        adminPhone: '',
+        upiId: '',
+      );
+    }
+
+    currentUserId = null;
+    currentUserName = 'Guest';
+    currentUserEmail = '';
+    currentUserRole = 'Guest';
+    isAuthenticated = false;
+    _loadedFromLocalStorage = false;
+
+    _lastPublicOccupancySig = '';
+    _lastPublicPassSigs.clear();
+
+    if (!_mockStudentsController.isClosed) {
+      _mockStudentsController.add(const []);
+    }
+    if (!_mockPaymentsController.isClosed) {
+      _mockPaymentsController.add(const []);
+    }
+    if (!_mockExpensesController.isClosed) {
+      _mockExpensesController.add(const []);
+    }
+    if (!_mockRegistrationRequestsController.isClosed) {
+      _mockRegistrationRequestsController.add(const []);
+    }
+    if (!_mockAttendanceController.isClosed) {
+      _mockAttendanceController.add(const []);
+    }
+    if (!_mockSeatsController.isClosed) {
+      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+    }
+    notifyStreamControllers();
+  }
+
   Future<void> clearAllData() async {
     if (isFirebaseConnected) {
       final authUid = FirebaseAuth.instance.currentUser?.uid;
@@ -935,7 +1045,17 @@ class LibraryService {
         tenantId,
       }..remove('default_library');
 
-      final collections = ['payments', 'students', 'seats', 'expenses', 'staff', 'branches', 'registration_requests'];
+      final collections = [
+        'payments',
+        'students',
+        'seats',
+        'expenses',
+        'staff',
+        'branches',
+        'registration_requests',
+        'public_passes',
+        'attendance',
+      ];
       for (final tId in tenantIdsToDelete) {
         if (tId.isEmpty) continue;
         for (final col in collections) {
@@ -963,64 +1083,34 @@ class LibraryService {
             } catch (_) {}
           }
         }
+
+        // Direct delete of known settings docs by ID
+        final knownSettingsDocs = [
+          'branding',
+          'sections',
+          'shifts',
+          'public_occupancy',
+          'whatsapp',
+        ];
+        for (final sDocId in knownSettingsDocs) {
+          try {
+            await _db.collection('libraries').doc(tId).collection('settings').doc(sDocId).delete();
+          } catch (_) {}
+        }
+
+        // Direct delete of public passes for all known students
+        for (final s in _mockStudents) {
+          if (s.id.isNotEmpty) {
+            try {
+              await _db.collection('libraries').doc(tId).collection('public_passes').doc(s.id).delete();
+            } catch (_) {}
+          }
+        }
       }
     }
-    _mockStudents.clear();
-    _mockPayments.clear();
-    _mockExpenses.clear();
-    _mockRegistrationRequests.clear();
-    _mockAttendance.clear();
-    staffList.clear();
-    branches = [
-      const LibraryBranch(
-        id: 'branch_1',
-        name: 'Main Campus',
-        address: 'Main Branch',
-        totalSeats: 35,
-        isDefault: true,
-      ),
-    ];
-    activeBranchId = 'branch_1';
-    currentUserRole = 'Admin';
-    currentUserName = 'Admin';
-    currentUserId = null;
-    isAuthenticated = false;
-    _mockSeats = List.generate(
-      totalSeatsCount,
-      (index) => SeatInfo(seatNumber: index + 1),
-    );
-    if (!_mockStudentsController.isClosed) {
-      _mockStudentsController.add(const []);
-    }
-    if (!_mockPaymentsController.isClosed) {
-      _mockPaymentsController.add(const []);
-    }
-    if (!_mockExpensesController.isClosed) {
-      _mockExpensesController.add(const []);
-    }
-    if (!_mockRegistrationRequestsController.isClosed) {
-      _mockRegistrationRequestsController.add(const []);
-    }
-    if (!_mockAttendanceController.isClosed) {
-      _mockAttendanceController.add(const []);
-    }
-    if (!_mockSeatsController.isClosed) {
-      _mockSeatsController.add(List.unmodifiable(_mockSeats));
-    }
-    notifyStreamControllers();
-    profile = LibraryProfile(libraryId: 'default_library');
-    await LocalStorageService.remove('app_library_students');
-    await LocalStorageService.remove('app_library_payments');
-    await LocalStorageService.remove('app_library_expenses');
-    await LocalStorageService.remove('app_library_staff');
-    await LocalStorageService.remove('app_library_registration_requests');
-    await LocalStorageService.remove('app_library_attendance');
-    await LocalStorageService.remove('app_library_branches');
-    await LocalStorageService.remove('app_library_active_branch');
-    await LocalStorageService.remove('app_active_session');
-    await LocalStorageService.remove('app_admin_password_hash');
-    await LocalStorageService.remove('app_library_profile');
-    await LocalStorageService.remove('app_admin_profile');
+
+    resetInMemoryState(reseedDefaults: true);
+    await clearTenantLocalStorage();
   }
 
   // Permanently delete user account, wipe cloud tenant data, delete Firebase user, and purge all local storage
@@ -1048,6 +1138,8 @@ class LibraryService {
         'backups',
         'branches',
         'registration_requests',
+        'public_passes',
+        'attendance',
       ];
 
       for (final tId in tenantIdsToDelete) {
@@ -1080,6 +1172,32 @@ class LibraryService {
             } catch (err) {
               debugPrint('[deleteAccountPermanently] Col ref get failed for $col: $err');
             }
+          }
+        }
+
+        // Direct delete of known settings docs by ID to guarantee removal
+        // even if listing or batch collection queries fail or are restricted
+        final knownSettingsDocs = [
+          'branding',
+          'sections',
+          'shifts',
+          'public_occupancy',
+          'whatsapp',
+        ];
+        for (final sDocId in knownSettingsDocs) {
+          try {
+            await _db.collection('libraries').doc(tId).collection('settings').doc(sDocId).delete();
+          } catch (e) {
+            debugPrint('[deleteAccountPermanently] Direct delete failed for settings/$sDocId: $e');
+          }
+        }
+
+        // Direct delete of public passes for all known students
+        for (final s in _mockStudents) {
+          if (s.id.isNotEmpty) {
+            try {
+              await _db.collection('libraries').doc(tId).collection('public_passes').doc(s.id).delete();
+            } catch (_) {}
           }
         }
 
@@ -1124,85 +1242,13 @@ class LibraryService {
       } catch (_) {}
     }
 
-    // Reset all in-memory collections cleanly
-    _mockStudents.clear();
-    _mockPayments.clear();
-    _mockExpenses.clear();
-    _mockRegistrationRequests.clear();
-    _mockAttendance.clear();
-    staffList.clear();
+    // Reset all in-memory collections and profile cleanly
+    resetInMemoryState(reseedDefaults: true);
     branches.clear();
-    sections = [
-      SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
-    ];
-    _mockSeats = List.generate(
-      totalSeatsCount,
-      (index) => SeatInfo(seatNumber: index + 1),
-    );
-    profile = LibraryProfile(
-      libraryId: '',
-      libraryName: '',
-      city: '',
-      adminName: 'Admin',
-      adminEmail: '',
-      adminPhone: '',
-      upiId: '',
-    );
-    isAuthenticated = false;
-    currentUserId = null;
-    currentUserRole = 'Guest';
-    currentUserName = 'Guest';
-    currentUserEmail = '';
-    activeBranchId = 'branch_1';
-    _loadedFromLocalStorage = false;
     _initialized = false;
 
-    // Notify all UI streams of complete reset
-    if (!_mockStudentsController.isClosed) {
-      _mockStudentsController.add(const []);
-    }
-    if (!_mockPaymentsController.isClosed) {
-      _mockPaymentsController.add(const []);
-    }
-    if (!_mockExpensesController.isClosed) {
-      _mockExpensesController.add(const []);
-    }
-    if (!_mockRegistrationRequestsController.isClosed) {
-      _mockRegistrationRequestsController.add(const []);
-    }
-    if (!_mockAttendanceController.isClosed) {
-      _mockAttendanceController.add(const []);
-    }
-    if (!_mockSeatsController.isClosed) {
-      _mockSeatsController.add(List.unmodifiable(_mockSeats));
-    }
-    notifyStreamControllers();
-
     // Explicitly purge every known key to prevent any persistence leaks
-    await LocalStorageService.remove('app_library_students');
-    await LocalStorageService.remove('app_library_payments');
-    await LocalStorageService.remove('app_library_expenses');
-    await LocalStorageService.remove('app_library_staff');
-    await LocalStorageService.remove('app_library_profile');
-    await LocalStorageService.remove('app_admin_profile');
-    await LocalStorageService.remove('app_library_sections');
-    await LocalStorageService.remove('app_library_shifts');
-    await LocalStorageService.remove('app_library_branches');
-    await LocalStorageService.remove('app_library_active_branch');
-    await LocalStorageService.remove('app_library_registration_requests');
-    await LocalStorageService.remove('app_library_attendance');
-    await LocalStorageService.remove('app_setup_completed');
-    await LocalStorageService.remove('app_active_session');
-    await LocalStorageService.remove('app_last_login_identifier');
-    await LocalStorageService.remove('app_biometric_binding');
-    await LocalStorageService.remove('app_admin_password');
-    await LocalStorageService.remove('app_admin_password_hash');
-    await LocalStorageService.remove('gdrive_auto_backup_enabled');
-    await LocalStorageService.remove('gdrive_backup_email');
-    await LocalStorageService.remove('gdrive_last_snapshot_content');
-    await LocalStorageService.remove('gdrive_last_backup_time');
-    await LocalStorageService.remove('gdrive_last_backup_size');
-    await LocalStorageService.remove('gdrive_last_backup_status');
+    await clearTenantLocalStorage();
 
     // Completely wipe persistent local storage (memory cache, JSON file, web localStorage)
     await LocalStorageService.clearAll();
@@ -2005,7 +2051,7 @@ class LibraryService {
     return null;
   }
 
-  Future<void> _loadStaffLibraryData(String targetLibraryId) async {
+  Future<void> loadLibraryDataFromCloud(String targetLibraryId) async {
     if (!isFirebaseConnected || targetLibraryId.isEmpty) return;
     try {
       int cloudTotalSeats = 0;
@@ -2025,14 +2071,16 @@ class LibraryService {
       // Strictly maintain targetLibraryId as libraryId
       profile.libraryId = targetLibraryId;
 
+      bool loadedSectionsFromCloud = false;
       try {
         final secDoc = await _db.collection('libraries').doc(targetLibraryId).collection('settings').doc('sections').get();
         if (secDoc.exists && secDoc.data() != null) {
           final sData = secDoc.data()!;
-          if (sData['sections'] is List) {
+          if (sData['sections'] is List && (sData['sections'] as List).isNotEmpty) {
             sections = (sData['sections'] as List)
                 .map((x) => SectionConfig.fromMap(Map<String, dynamic>.from(x)))
                 .toList();
+            loadedSectionsFromCloud = true;
           }
           if (sData['total_seats'] != null) {
             final sVal = (sData['total_seats'] as num).toInt();
@@ -2040,6 +2088,34 @@ class LibraryService {
           }
         }
       } catch (_) {}
+
+      if (!loadedSectionsFromCloud) {
+        if (cloudTotalSeats > 0) {
+          sections = [
+            SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: cloudTotalSeats),
+          ];
+        } else {
+          sections = defaultSections;
+        }
+      }
+
+      // Load shifts from cloud
+      bool loadedShiftsFromCloud = false;
+      try {
+        final shiftDoc = await _db.collection('libraries').doc(targetLibraryId).collection('settings').doc('shifts').get();
+        if (shiftDoc.exists && shiftDoc.data() != null) {
+          final sData = shiftDoc.data()!;
+          if (sData['shifts'] is List && (sData['shifts'] as List).isNotEmpty) {
+            shifts = (sData['shifts'] as List)
+                .map((x) => ShiftConfig.fromMap(Map<String, dynamic>.from(x)))
+                .toList();
+            loadedShiftsFromCloud = true;
+          }
+        }
+      } catch (_) {}
+      if (!loadedShiftsFromCloud) {
+        shifts = defaultShifts;
+      }
 
       final branchSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('branches').get();
       if (branchSnaps.docs.isNotEmpty) {
@@ -2054,20 +2130,26 @@ class LibraryService {
             isDefault: true,
           ),
         ];
+      } else {
+        branches = defaultBranches;
       }
 
       if (cloudTotalSeats > 0 && branches.isNotEmpty) {
         branches[0] = branches[0].copyWith(totalSeats: cloudTotalSeats);
       }
 
+      // Cleanly clear and load students
+      _mockStudents.clear();
       final studentSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('students').get();
       if (studentSnaps.docs.isNotEmpty) {
-        _mockStudents.clear();
         _mockStudents.addAll(studentSnaps.docs.map((d) => StudentInfo.fromFirestore(d.id, d.data())));
       }
 
-      _syncSeatsWithStudents();
-      _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      // Re-generate seat grid matching the loaded totalSeatsCount
+      _mockSeats = List.generate(
+        totalSeatsCount,
+        (index) => SeatInfo(seatNumber: index + 1),
+      );
 
       final seatSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('seats').get();
       if (seatSnaps.docs.isNotEmpty) {
@@ -2081,38 +2163,64 @@ class LibraryService {
           }
         }
       }
-      _mockSeatsController.add(List.unmodifiable(_mockSeats));
+      _syncSeatsWithStudents();
+      if (!_mockStudentsController.isClosed) {
+        _mockStudentsController.add(List.unmodifiable(_mockStudents));
+      }
+      if (!_mockSeatsController.isClosed) {
+        _mockSeatsController.add(List.unmodifiable(_mockSeats));
+      }
 
+      // Cleanly clear and load payments
+      _mockPayments.clear();
       final paySnaps = await _db.collection('libraries').doc(targetLibraryId).collection('payments').limit(150).get();
       if (paySnaps.docs.isNotEmpty) {
-        _mockPayments.clear();
         _mockPayments.addAll(paySnaps.docs.map((d) => PaymentTransaction.fromFirestore(d.id, d.data())));
+      }
+      if (!_mockPaymentsController.isClosed) {
         _mockPaymentsController.add(List.unmodifiable(_mockPayments));
       }
 
+      // Cleanly clear and load registration requests
+      _mockRegistrationRequests.clear();
       try {
         final regSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('registration_requests').orderBy('created_at', descending: true).limit(50).get();
         if (regSnaps.docs.isNotEmpty) {
-          _mockRegistrationRequests.clear();
           _mockRegistrationRequests.addAll(regSnaps.docs.map((d) => RegistrationRequest.fromMap({'id': d.id, ...d.data()})));
-          notifyRegistrationRequestsChanged();
         }
       } catch (_) {}
+      notifyRegistrationRequestsChanged();
 
+      // Cleanly clear and load expenses
+      _mockExpenses.clear();
       try {
         final expSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('expenses').limit(100).get();
         if (expSnaps.docs.isNotEmpty) {
-          _mockExpenses.clear();
           _mockExpenses.addAll(expSnaps.docs.map((d) => ExpenseItem.fromFirestore(d.id, d.data())));
-          _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+        }
+      } catch (_) {}
+      if (!_mockExpensesController.isClosed) {
+        _mockExpensesController.add(List.unmodifiable(_mockExpenses));
+      }
+
+      // Cleanly clear and load staff
+      staffList.clear();
+      try {
+        final staffSnaps = await _db.collection('libraries').doc(targetLibraryId).collection('staff').get();
+        if (staffSnaps.docs.isNotEmpty) {
+          staffList.addAll(staffSnaps.docs.map((d) => StaffMember.fromMap({'id': d.id, ...d.data()})));
         }
       } catch (_) {}
 
       await _saveLocalState();
+      notifyStreamControllers();
     } catch (e) {
-      debugPrint('[Staff] Failed to load library data from cloud: $e');
+      debugPrint('[LibraryService] Failed to load library data from cloud: $e');
     }
   }
+
+  // Alias for backward compatibility
+  Future<void> _loadStaffLibraryData(String targetLibraryId) => loadLibraryDataFromCloud(targetLibraryId);
 
   CollectionReference<Map<String, dynamic>> _tenantCol(String collectionName) {
     return _db.collection('libraries').doc(tenantId).collection(collectionName);
@@ -2266,7 +2374,6 @@ class LibraryService {
                 if (name.isNotEmpty) {
                   profile = LibraryProfile.fromMap(data);
                   await LocalStorageService.saveString('app_setup_completed', 'true');
-                  await _saveLocalState();
                   restoredCloudProfile = true;
                 }
               }
@@ -2278,29 +2385,27 @@ class LibraryService {
                   if (name.isNotEmpty) {
                     profile = LibraryProfile.fromMap(data);
                     await LocalStorageService.saveString('app_setup_completed', 'true');
-                    await _saveLocalState();
                     restoredCloudProfile = true;
                   }
                 }
               }
             } catch (_) {}
 
-            if (!restoredCloudProfile) {
+            if (restoredCloudProfile) {
+              await loadLibraryDataFromCloud(user.uid);
+            } else {
               // First time user or account was permanently deleted:
-              // Ensure local state is clean so they are routed to library creation wizard
-              profile.libraryName = '';
-              profile.city = '';
-              _mockStudents.clear();
-              _mockPayments.clear();
-              _mockExpenses.clear();
-              _mockRegistrationRequests.clear();
-              staffList.clear();
-              branches.clear();
-              await LocalStorageService.remove('app_setup_completed');
-              await LocalStorageService.remove('app_library_profile');
-              await LocalStorageService.remove('app_library_payments');
-              await LocalStorageService.remove('app_library_students');
-              await LocalStorageService.remove('app_library_expenses');
+              // Ensure local and in-memory state is completely clean so they are routed to library creation wizard
+              resetInMemoryState(reseedDefaults: true);
+              await clearTenantLocalStorage();
+              currentUserId = user.uid;
+              profile.libraryId = user.uid;
+              currentUserEmail = user.email ?? cleanId;
+              currentUserName = currentUserName;
+              profile.adminName = currentUserName;
+              profile.adminEmail = currentUserEmail;
+              currentUserRole = 'Admin';
+              isAuthenticated = true;
             }
           }
 
@@ -2571,7 +2676,7 @@ class LibraryService {
           if (name.isNotEmpty) {
             profile = LibraryProfile.fromMap(data);
             await LocalStorageService.saveString('app_setup_completed', 'true');
-            await _saveLocalState();
+            await loadLibraryDataFromCloud(tenantId);
             return true;
           }
         }
@@ -2583,7 +2688,7 @@ class LibraryService {
           if (name.isNotEmpty) {
             profile = LibraryProfile.fromMap(data);
             await LocalStorageService.saveString('app_setup_completed', 'true');
-            await _saveLocalState();
+            await loadLibraryDataFromCloud(tenantId);
             return true;
           }
         }
@@ -2681,7 +2786,6 @@ class LibraryService {
               if (name.isNotEmpty) {
                 profile = LibraryProfile.fromMap(data);
                 await LocalStorageService.saveString('app_setup_completed', 'true');
-                await _saveLocalState();
                 restoredCloudProfile = true;
               }
             }
@@ -2693,26 +2797,27 @@ class LibraryService {
                 if (name.isNotEmpty) {
                   profile = LibraryProfile.fromMap(data);
                   await LocalStorageService.saveString('app_setup_completed', 'true');
-                  await _saveLocalState();
                   restoredCloudProfile = true;
                 }
               }
             }
           } catch (_) {}
 
-          if (!restoredCloudProfile) {
+          if (restoredCloudProfile) {
+            await loadLibraryDataFromCloud(user.uid);
+          } else {
             // First time Google user or account was permanently deleted:
-            // Ensure local state is clean so they are routed to library creation wizard
-            profile.libraryName = '';
-            profile.city = '';
-            _mockStudents.clear();
-            _mockPayments.clear();
-            _mockExpenses.clear();
-            _mockRegistrationRequests.clear();
-            staffList.clear();
-            branches.clear();
-            await LocalStorageService.remove('app_setup_completed');
-            await LocalStorageService.remove('app_library_profile');
+            // Ensure local and in-memory state is completely clean so they are routed to library creation wizard
+            resetInMemoryState(reseedDefaults: true);
+            await clearTenantLocalStorage();
+            currentUserId = user.uid;
+            profile.libraryId = user.uid;
+            currentUserEmail = user.email ?? '';
+            currentUserName = derivedName;
+            profile.adminName = derivedName;
+            profile.adminEmail = currentUserEmail;
+            currentUserRole = 'Admin';
+            isAuthenticated = true;
           }
 
           await LocalStorageService.saveString(
@@ -3143,12 +3248,8 @@ class LibraryService {
         await FirebaseAuth.instance.signOut();
       } catch (_) {}
     }
-    currentUserId = null;
-    currentUserName = 'Guest';
-    currentUserEmail = '';
-    currentUserRole = 'Guest';
-    isAuthenticated = false;
-    await LocalStorageService.remove('app_active_session');
+    resetInMemoryState(reseedDefaults: true);
+    await clearTenantLocalStorage();
   }
 
   Future<Map<String, dynamic>> signInAdmin({
@@ -3184,28 +3285,38 @@ class LibraryService {
           if (name.isNotEmpty) {
             profile = LibraryProfile.fromMap(data);
             await LocalStorageService.saveString('app_setup_completed', 'true');
-            await _saveLocalState();
             restoredCloudProfile = true;
+          }
+        }
+        if (!restoredCloudProfile) {
+          final brandingDoc = await _db.collection('libraries').doc(uid).collection('settings').doc('branding').get();
+          if (brandingDoc.exists && brandingDoc.data() != null) {
+            final data = brandingDoc.data()!;
+            final name = data['library_name']?.toString().trim() ?? '';
+            if (name.isNotEmpty) {
+              profile = LibraryProfile.fromMap(data);
+              await LocalStorageService.saveString('app_setup_completed', 'true');
+              restoredCloudProfile = true;
+            }
           }
         }
       } catch (_) {}
 
-      if (!restoredCloudProfile) {
+      if (restoredCloudProfile) {
+        await loadLibraryDataFromCloud(uid);
+      } else {
         // First time user or account was permanently deleted:
-        // Ensure local state is clean so they are routed to library creation wizard
-        profile.libraryName = '';
-        profile.city = '';
-        _mockStudents.clear();
-        _mockPayments.clear();
-        _mockExpenses.clear();
-        _mockRegistrationRequests.clear();
-        staffList.clear();
-        branches.clear();
-        await LocalStorageService.remove('app_setup_completed');
-        await LocalStorageService.remove('app_library_profile');
-        await LocalStorageService.remove('app_library_payments');
-        await LocalStorageService.remove('app_library_students');
-        await LocalStorageService.remove('app_library_expenses');
+        // Ensure local and in-memory state is completely clean so they are routed to library creation wizard
+        resetInMemoryState(reseedDefaults: true);
+        await clearTenantLocalStorage();
+        currentUserId = uid;
+        profile.libraryId = uid;
+        currentUserEmail = credential.user?.email ?? email.trim();
+        currentUserName = currentUserName;
+        profile.adminName = currentUserName;
+        profile.adminEmail = currentUserEmail;
+        currentUserRole = 'Admin';
+        isAuthenticated = true;
       }
 
       await LocalStorageService.saveString(

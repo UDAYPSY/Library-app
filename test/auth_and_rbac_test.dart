@@ -259,6 +259,84 @@ void main() {
         throwsA(isA<UnsupportedError>()),
       );
     });
+
+    test('signOut cleanly resets in-memory collections and purges tenant local storage', () async {
+      service.profile.libraryName = 'Original 35 Seat Library';
+      service.sections = [
+        SectionConfig(id: 'sec_1', name: 'Main Hall', startSeat: 1, endSeat: 35),
+      ];
+      await service.addStudent(
+        name: 'Account A Student',
+        phone: '9876543210',
+        seatNumber: 1,
+        monthlyFee: 500,
+      );
+      expect(service.students.length, 1);
+      expect(service.totalSeatsCount, 35);
+
+      await LocalStorageService.saveString('app_active_session', '{"user_id":"owner_a"}');
+      await LocalStorageService.saveString('app_setup_completed', 'true');
+
+      await service.signOut();
+
+      expect(service.isAuthenticated, isFalse);
+      expect(service.currentUserId, isNull);
+      expect(service.currentUserRole, 'Guest');
+      expect(service.students, isEmpty);
+      expect(service.mockStudentsList, isEmpty);
+      expect(service.totalSeatsCount, 35);
+      expect(await LocalStorageService.getString('app_active_session'), isNull);
+      expect(await LocalStorageService.getString('app_library_students'), isNull);
+      expect(await LocalStorageService.getString('app_library_sections'), isNull);
+    });
+
+    test('Cross-account switching isolates seats and prevents data bleeding', () async {
+      // 1. Account A with 35 seats
+      service.profile.libraryName = 'Alpha Library 35';
+      service.sections = [
+        SectionConfig(id: 'sec_1', name: 'Hall 1', startSeat: 1, endSeat: 35),
+      ];
+      await service.addStudent(
+        name: 'Student Alpha',
+        phone: '9888888888',
+        seatNumber: 5,
+        monthlyFee: 600,
+      );
+      expect(service.totalSeatsCount, 35);
+      expect(service.students.length, 1);
+
+      // Sign out Account A
+      await service.signOut();
+      expect(service.students, isEmpty);
+      expect(service.totalSeatsCount, 35);
+
+      // 2. Account B created with 4 seats
+      service.profile.libraryName = 'Beta Library 4';
+      service.sections = [
+        SectionConfig(id: 'sec_beta', name: 'Cabin', startSeat: 1, endSeat: 4),
+      ];
+      service.generateSeats(4);
+      await service.addStudent(
+        name: 'Student Beta',
+        phone: '9777777777',
+        seatNumber: 2,
+        monthlyFee: 400,
+      );
+      expect(service.totalSeatsCount, 4);
+      expect(service.students.length, 1);
+      expect(service.students.first.name, 'Student Beta');
+
+      // Sign out Account B
+      await service.signOut();
+      expect(service.students, isEmpty);
+      // After sign out, state defaults back to 35 seats cleanly without residual 4 seats
+      expect(service.totalSeatsCount, 35);
+
+      // 3. Deleting Account B does not affect state or corrupt sections
+      await service.deleteAccountPermanently();
+      expect(service.totalSeatsCount, 35);
+      expect(service.students, isEmpty);
+    });
   });
 }
 

@@ -255,13 +255,8 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           // First-time Google user: no library created yet.
           // Reset sample mock data so they start with a clean slate
-          _service.mockStudentsList.clear();
-          _service.mockPaymentsList.clear();
-          _service.mockExpensesList.clear();
-          _service.staffList.clear();
-          _service.branches.clear();
-          _service.profile.libraryName = '';
-          _service.profile.city = '';
+          _service.resetInMemoryState(reseedDefaults: true);
+          await _service.clearTenantLocalStorage();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
