@@ -803,24 +803,29 @@ Priya Singh,9812345678,Morning,2,500,Vijay Singh,Boring Road Patna''';
     });
 
     test('ExcelImportService 10-column CSV imports historical join date, custom next due date and past dues', () {
-      const registerCsv = '''Full Name,Phone Number,Shift,Seat Number,Monthly Fee,Father Name,Address,Joining Date,Next Fee Due Date,Past Dues
-Amit Kumar,9876543211,Full Day,5,800,Rajesh Kumar,Patna,15-08-2026,18-11-2026,0
-Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,10-11-2026,300''';
+      final futureDue = DateTime.now().add(const Duration(days: 30));
+      final futureDueStr = '${futureDue.day.toString().padLeft(2, '0')}-${futureDue.month.toString().padLeft(2, '0')}-${futureDue.year}';
+      final pastDue = DateTime.now().subtract(const Duration(days: 12));
+      final pastDueStr = '${pastDue.day.toString().padLeft(2, '0')}-${pastDue.month.toString().padLeft(2, '0')}-${pastDue.year}';
+
+      final registerCsv = '''Full Name,Phone Number,Shift,Seat Number,Monthly Fee,Father Name,Address,Joining Date,Next Fee Due Date,Past Dues
+Amit Kumar,9876543211,Full Day,5,800,Rajesh Kumar,Patna,15-08-2026,$futureDueStr,0
+Suman Roy,9812345679,Morning,6,600,B Roy,Boring Road,01-09-2026,$pastDueStr,300''';
 
       final result = ExcelImportService.parseAndImport(registerCsv, service);
       expect(result.successfullyImported, equals(2));
       expect(result.errorMessages, isEmpty);
 
-      // Amit Kumar: fee paid up to 18-Nov-2026, no past dues -> Active
+      // Amit Kumar: fee paid up to future date, no past dues -> Active
       final amit = service.findStudentByPhone('9876543211');
       expect(amit, isNotNull);
       expect(amit!.name, equals('Amit Kumar'));
       expect(amit.joinedAt?.year, equals(2026));
       expect(amit.joinedAt?.month, equals(8));
       expect(amit.joinedAt?.day, equals(15));
-      expect(amit.feeDueDate?.year, equals(2026));
-      expect(amit.feeDueDate?.month, equals(11));
-      expect(amit.feeDueDate?.day, equals(18));
+      expect(amit.feeDueDate?.year, equals(futureDue.year));
+      expect(amit.feeDueDate?.month, equals(futureDue.month));
+      expect(amit.feeDueDate?.day, equals(futureDue.day));
       expect(amit.duesAmount, equals(0));
       expect(amit.status, equals('Active'));
 
