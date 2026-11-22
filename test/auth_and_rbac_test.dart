@@ -305,6 +305,39 @@ void main() {
       expect(service.currentStudents, isEmpty);
       expect(service.profile.libraryName, isEmpty);
     });
+
+    test('resetInMemoryState with preserveAuth protects Google session and email', () {
+      final service = LibraryService();
+      service.currentUserEmail = 'owner@gmail.com';
+      service.currentUserName = 'Library Owner';
+      service.currentUserId = 'user_google_123';
+      service.currentUserRole = 'Admin';
+      service.isAuthenticated = true;
+
+      service.resetInMemoryState(reseedDefaults: true, preserveAuth: true);
+
+      expect(service.currentUserEmail, equals('owner@gmail.com'));
+      expect(service.currentUserName, equals('Library Owner'));
+      expect(service.currentUserId, equals('user_google_123'));
+      expect(service.currentUserRole, equals('Admin'));
+      expect(service.isAuthenticated, isTrue);
+      expect(service.profile.adminEmail, equals('owner@gmail.com'));
+      expect(service.profile.adminName, equals('Library Owner'));
+      expect(service.profile.libraryId, equals('user_google_123'));
+    });
+
+    test('appendNote smart deduplication discards duplicate payment notes', () {
+      final note1 = 'Initial note';
+      final payLog1 = 'Due payment of ₹500 collected via Cash on 22-Nov-2026 [by Admin] (Period: 01-Oct-2026 to 01-Nov-2026).';
+      final payLog2 = 'Due payment of ₹500 collected via Cash on 22-Nov-2026 for period: 01-Oct-2026 to 01-Nov-2026 (1 mo tenure).';
+
+      final res1 = LibraryService.appendNote(note1, payLog1);
+      expect(res1.contains('Due payment of ₹500'), isTrue);
+
+      // Attempt to append duplicate payment on same date and amount
+      final res2 = LibraryService.appendNote(res1, payLog2);
+      expect(res2, equals(res1)); // Second duplicate entry is safely discarded
+    });
   });
 }
 

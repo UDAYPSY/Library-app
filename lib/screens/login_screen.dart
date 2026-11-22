@@ -254,9 +254,23 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else {
           // First-time Google user: no library created yet.
-          // Reset sample mock data so they start with a clean slate
-          _service.resetInMemoryState(reseedDefaults: true);
+          // Reset sample mock data so they start with a clean slate while strictly preserving Google session
+          final gEmail = _service.currentUserEmail;
+          final gName = _service.currentUserName;
+          final gUid = _service.currentUserId;
+          _service.resetInMemoryState(reseedDefaults: true, preserveAuth: true);
           await _service.clearTenantLocalStorage();
+          if (gUid != null) _service.currentUserId = gUid;
+          if (gEmail.isNotEmpty) {
+            _service.currentUserEmail = gEmail;
+            _service.profile.adminEmail = gEmail;
+          }
+          if (gName.isNotEmpty) {
+            _service.currentUserName = gName;
+            _service.profile.adminName = gName;
+          }
+          _service.currentUserRole = 'Admin';
+          _service.isAuthenticated = true;
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

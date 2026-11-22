@@ -816,9 +816,8 @@ class _AddStudentWizardScreenState extends State<AddStudentWizardScreen> {
         if (isSeatChanged) {
           finalNotes = LibraryService.appendNote(finalNotes, seatLog);
         }
-        if (collectedNow > 0) {
-          finalNotes = LibraryService.appendNote(finalNotes, payLog);
-        }
+        // Note: Do NOT append payLog to finalNotes here, because recordPayment() below
+        // automatically records and formats the payment log into the student's note.
 
         // CRITICAL SYNC: Record payment in financial ledger & transaction stream
         if (collectedNow > 0) {

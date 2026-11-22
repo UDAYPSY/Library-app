@@ -37,11 +37,13 @@ Future<void> showCollectPaymentModal(
   DateTime untilDate;
   int selectedAdvanceMonths;
 
-  if (hasUnexpiredDue) {
+  if (hasPastDue) {
+    // If student has ANY pending dues (whether active or expired),
+    // default to settling the exact past due without extending membership dates.
     selectedAdvanceMonths = -1;
     alreadyPaid = (defaultMonthly - student.duesAmount).clamp(0, defaultMonthly);
-    fromDate = student.joinedAt ?? student.feeDueDate!.subtract(const Duration(days: 30));
-    untilDate = student.feeDueDate!;
+    fromDate = student.joinedAt ?? (student.feeDueDate != null ? student.feeDueDate!.subtract(const Duration(days: 30)) : now);
+    untilDate = student.feeDueDate ?? now;
   } else if (isExpired) {
     // Expired membership: From Date MUST be the student's existing membership validity date
     fromDate = student.feeDueDate ?? student.joinedAt ?? now;
@@ -58,7 +60,7 @@ Future<void> showCollectPaymentModal(
   final initialTotalFee = selectedAdvanceMonths == -1
       ? student.duesAmount
       : (hasUnexpiredDue
-          ? (selectedAdvanceMonths == 1 ? defaultMonthly : defaultMonthly * selectedAdvanceMonths)
+          ? (student.duesAmount + (defaultMonthly * selectedAdvanceMonths))
           : (isExpired
               ? (selectedAdvanceMonths <= overdueCycles
                   ? (selectedAdvanceMonths == overdueCycles ? student.effectiveDues : defaultMonthly * selectedAdvanceMonths)
@@ -66,9 +68,7 @@ Future<void> showCollectPaymentModal(
               : defaultMonthly * selectedAdvanceMonths));
   final initialGrossDue = selectedAdvanceMonths == -1
       ? student.duesAmount
-      : (hasUnexpiredDue
-          ? (selectedAdvanceMonths == 1 ? student.duesAmount : (initialTotalFee - alreadyPaid).clamp(0, initialTotalFee))
-          : (initialTotalFee - alreadyPaid).clamp(0, initialTotalFee));
+      : initialTotalFee;
   final initialAdvanceApplied = student.advanceAmount.clamp(0, initialGrossDue);
   final initialNetPayable = (initialGrossDue - initialAdvanceApplied).clamp(0, initialGrossDue);
 
@@ -116,15 +116,9 @@ Future<void> showCollectPaymentModal(
             } else if (months > 0) {
               int gross = 0;
               if (hasUnexpiredDue) {
-                if (months == 1) {
-                  gross = student.duesAmount;
-                  untilDate = student.feeDueDate!;
-                } else {
-                  final total = defaultMonthly * months;
-                  gross = (total - alreadyPaid).clamp(0, total);
-                  final base = student.feeDueDate!;
-                  untilDate = StudentInfo.addMonths(base, months - 1);
-                }
+                gross = student.duesAmount + (defaultMonthly * months);
+                fromDate = student.feeDueDate!;
+                untilDate = StudentInfo.addMonths(student.feeDueDate!, months);
               } else if (isExpired) {
                 fromDate = student.feeDueDate ?? student.joinedAt ?? now;
                 untilDate = StudentInfo.addMonths(fromDate, months);
@@ -145,9 +139,7 @@ Future<void> showCollectPaymentModal(
 
               final periodTag = 'Period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}';
               if (hasUnexpiredDue) {
-                notesCtrl.text = months == 1
-                    ? 'Due payment for period: ${DateFormat('dd-MMM-yyyy').format(fromDate)} to ${DateFormat('dd-MMM-yyyy').format(untilDate)}'
-                    : '$months Months Fee (${student.duesAmount} Due + ${months - 1} mo Advance) • $periodTag';
+                notesCtrl.text = '$months Month${months > 1 ? "s" : ""} Renewal (₹${student.duesAmount} Due + ₹${defaultMonthly * months} Tenure) • $periodTag';
               } else if (isExpired) {
                 if (months == overdueCycles && overdueCycles > 1) {
                   notesCtrl.text = 'Due payment for $months months ($periodTag)';
@@ -367,7 +359,7 @@ Future<void> showCollectPaymentModal(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      if (hasUnexpiredDue) ...[
+                      if (hasPastDue) ...[
                         _durationChip(
                           label: LanguageService().isHindi ? 'केवल बकाया जमा (₹${student.duesAmount})' : 'Clear Due Only (₹${student.duesAmount})',
                           isSelected: selectedAdvanceMonths == -1,
@@ -1188,7 +1180,9 @@ Future<void> showCollectPaymentModal(
                             final pastDueCovered = paid + advanceToApply;
                             remainingDues = (student.duesAmount - pastDueCovered).clamp(0, 999999);
                             targetDueDate = student.feeDueDate ?? now;
-                            targetStatus = remainingDues > 0 ? 'DUES' : 'ACTIVE';
+                            final todayRef = DateTime(now.year, now.month, now.day);
+                            final targetDay = DateTime(targetDueDate.year, targetDueDate.month, targetDueDate.day);
+                            targetStatus = (remainingDues > 0 || targetDay.isBefore(todayRef)) ? 'DUES' : 'ACTIVE';
                           } else if (isExpired) {
                             final totalCovered = paid + advanceToApply;
                             final totalDue = student.effectiveDues;

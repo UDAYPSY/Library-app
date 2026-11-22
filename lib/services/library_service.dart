@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/library_models.dart';
 import 'local_storage_service.dart';
 import 'biometric_auth_service.dart';
@@ -26,6 +27,26 @@ class LibraryService {
       }
       if (entry.isEmpty) continue;
       if (cur.contains(entry)) continue;
+
+      // Smart payment log deduplication: discard duplicate payment entries on the same date with the same amount
+      final lowerEntry = entry.toLowerCase();
+      if (lowerEntry.contains('payment of') || lowerEntry.contains('due payment of')) {
+        final amountMatch = RegExp(r'₹(\d+)').firstMatch(entry);
+        final dateMatch = RegExp(r'(\d{2}-[A-Za-z]{3}-\d{4})').firstMatch(entry);
+        if (amountMatch != null && dateMatch != null) {
+          final amt = amountMatch.group(1);
+          final dt = dateMatch.group(1);
+          final curLines = cur.split('\n');
+          final alreadyExists = curLines.any((l) {
+            final lLow = l.toLowerCase();
+            return (lLow.contains('payment of') || lLow.contains('due payment of')) &&
+                l.contains('₹$amt') &&
+                l.contains(dt!);
+          });
+          if (alreadyExists) continue;
+        }
+      }
+
       cur = cur.isEmpty ? '• $entry' : '$cur\n• $entry';
     }
     return cur;
@@ -961,13 +982,19 @@ class LibraryService {
     }
   }
 
-  void resetInMemoryState({bool reseedDefaults = true}) {
+  void resetInMemoryState({bool reseedDefaults = true, bool preserveAuth = false}) {
     _mockStudents.clear();
     _mockPayments.clear();
     _mockExpenses.clear();
     _mockRegistrationRequests.clear();
     _mockAttendance.clear();
     staffList.clear();
+
+    final prevEmail = currentUserEmail;
+    final prevName = currentUserName;
+    final prevId = currentUserId;
+    final prevAuth = isAuthenticated;
+    final prevRole = currentUserRole;
 
     if (reseedDefaults) {
       sections = defaultSections;
@@ -979,19 +1006,27 @@ class LibraryService {
         (index) => SeatInfo(seatNumber: index + 1),
       );
       profile = LibraryProfile(
-        libraryId: 'default_library',
+        libraryId: preserveAuth && prevId != null && prevId.isNotEmpty ? prevId : 'default_library',
         libraryName: '',
         city: '',
-        adminName: 'Admin',
-        adminEmail: '',
+        adminName: preserveAuth && prevName.isNotEmpty ? prevName : 'Admin',
+        adminEmail: preserveAuth && prevEmail.isNotEmpty ? prevEmail : '',
         adminPhone: '',
         upiId: '',
       );
-      currentUserRole = 'Admin';
-      currentUserName = 'Admin';
-      currentUserEmail = '';
-      currentUserId = null;
-      isAuthenticated = false;
+      if (preserveAuth) {
+        currentUserRole = prevRole.isNotEmpty ? prevRole : 'Admin';
+        currentUserName = prevName.isNotEmpty ? prevName : 'Admin';
+        currentUserEmail = prevEmail;
+        currentUserId = prevId;
+        isAuthenticated = prevAuth;
+      } else {
+        currentUserRole = 'Admin';
+        currentUserName = 'Admin';
+        currentUserEmail = '';
+        currentUserId = null;
+        isAuthenticated = false;
+      }
     } else {
       sections = [];
       shifts = defaultShifts;
@@ -999,19 +1034,27 @@ class LibraryService {
       activeBranchId = '';
       _mockSeats = [];
       profile = LibraryProfile(
-        libraryId: '',
+        libraryId: preserveAuth && prevId != null && prevId.isNotEmpty ? prevId : '',
         libraryName: '',
         city: '',
-        adminName: '',
-        adminEmail: '',
+        adminName: preserveAuth && prevName.isNotEmpty ? prevName : '',
+        adminEmail: preserveAuth && prevEmail.isNotEmpty ? prevEmail : '',
         adminPhone: '',
         upiId: '',
       );
-      currentUserRole = 'Guest';
-      currentUserName = 'Guest';
-      currentUserEmail = '';
-      currentUserId = null;
-      isAuthenticated = false;
+      if (preserveAuth) {
+        currentUserRole = prevRole.isNotEmpty ? prevRole : 'Admin';
+        currentUserName = prevName.isNotEmpty ? prevName : 'Admin';
+        currentUserEmail = prevEmail;
+        currentUserId = prevId;
+        isAuthenticated = prevAuth;
+      } else {
+        currentUserRole = 'Guest';
+        currentUserName = 'Guest';
+        currentUserEmail = '';
+        currentUserId = null;
+        isAuthenticated = false;
+      }
     }
 
     _loadedFromLocalStorage = false;
@@ -2763,13 +2806,45 @@ class LibraryService {
     ensureInitialized();
     if (isFirebaseConnected) {
       try {
-        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        googleProvider.addScope('email');
-        googleProvider.addScope('profile');
-        googleProvider.setCustomParameters({'prompt': 'select_account'});
-        final UserCredential userCredential = kIsWeb
-            ? await FirebaseAuth.instance.signInWithPopup(googleProvider)
-            : await FirebaseAuth.instance.signInWithProvider(googleProvider);
+        UserCredential? userCredential;
+        if (!kIsWeb) {
+          try {
+            final GoogleSignIn googleSignIn = GoogleSignIn(
+              scopes: ['email', 'profile'],
+            );
+            // Sign out first from any lingering native session so account chooser always displays
+            try {
+              await googleSignIn.signOut();
+            } catch (_) {}
+            final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+            if (googleUser != null) {
+              final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+              final AuthCredential credential = GoogleAuthProvider.credential(
+                accessToken: googleAuth.accessToken,
+                idToken: googleAuth.idToken,
+              );
+              userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+            } else {
+              return const AuthResult(
+                success: false,
+                message: 'Google Sign-In was cancelled.',
+              );
+            }
+          } catch (_) {
+            // Fallback to web/custom-tabs provider if Google Play Services is unavailable
+          }
+        }
+
+        if (userCredential == null) {
+          final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+          googleProvider.addScope('email');
+          googleProvider.addScope('profile');
+          googleProvider.setCustomParameters({'prompt': 'select_account'});
+          userCredential = kIsWeb
+              ? await FirebaseAuth.instance.signInWithPopup(googleProvider)
+              : await FirebaseAuth.instance.signInWithProvider(googleProvider);
+        }
+
         if (userCredential.user != null) {
           final user = userCredential.user!;
           currentUserId = user.uid;
@@ -2818,7 +2893,7 @@ class LibraryService {
           } else {
             // First time Google user or account was permanently deleted:
             // Ensure local and in-memory state is completely clean so they are routed to library creation wizard
-            resetInMemoryState(reseedDefaults: true);
+            resetInMemoryState(reseedDefaults: true, preserveAuth: true);
             await clearTenantLocalStorage();
             currentUserId = user.uid;
             profile.libraryId = user.uid;
